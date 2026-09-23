@@ -72,6 +72,10 @@ function backend(overrides: { login?: (request: RecordedRequest) => Response } =
       signedIn = false
       return jsonResponse(200, { message: 'logged out' })
     }
+    // Task 1.4: the shell loads the workspace on sign-in. "No workspace yet" is a 404.
+    if (request.url === '/api/workspaces/current' && signedIn) {
+      return jsonResponse(404, { detail: 'no workspace yet' })
+    }
     return jsonResponse(401, { detail: 'session invalid or expired' })
   }
 }

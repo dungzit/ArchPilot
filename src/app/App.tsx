@@ -5,7 +5,8 @@ import { isApiError, setUnauthorizedHandler } from '../api/client'
 import { LoginScreen, type LoginNotice } from '../features/auth/LoginScreen'
 import { copy, type Copy } from '../ui/copy'
 import { navItems, type ModuleKey } from './navigation'
-import { loadWorkspace, type WorkspaceRecord } from '../domain/store'
+import { clearWorkspaceCache } from '../domain/store'
+import { useWorkspace, type WorkspaceSync } from '../features/workspace/useWorkspace'
 import { Overview } from '../features/overview/OverviewScreen'
 import { Lifecycle } from '../features/lifecycle/LifecycleScreen'
 import { UserBusiness } from '../features/user/UserBusinessScreen'
@@ -69,6 +70,9 @@ export function App() {
     } catch {
       // The session may already be gone server-side; leaving is still right.
     }
+    // D5: the workspace cache belongs to the session. The next person to sign
+    // in on this browser must not see it.
+    clearWorkspaceCache()
     setSession({ status: 'anonymous', notice: 'signed-out' })
   }
 
@@ -103,7 +107,8 @@ function AppShell({ language, onToggleLanguage, user, onLogout }: { language: La
   const [activeModule, setActiveModule] = useState<ModuleKey>('overview')
   const [showInvestment, setShowInvestment] = useState(false)
   const [showWorkspace, setShowWorkspace] = useState(false)
-  const [workspace, setWorkspace] = useState<WorkspaceRecord | null>(() => loadWorkspace())
+  const workspaceState = useWorkspace(user.id)
+  const { workspace } = workspaceState
 
   const text = (value: Copy) => value[language]
 
@@ -123,6 +128,7 @@ function AppShell({ language, onToggleLanguage, user, onLogout }: { language: La
           <div className="workspace-copy"><strong>{workspace?.name ?? 'Personal workspace'}</strong><span>{workspace?.systemName ?? 'Cloud & on-prem architecture lab'}</span></div>
           <ChevronDown size={15} />
         </button>
+        <WorkspaceSyncStatus text={text} sync={workspaceState.sync} imported={workspaceState.imported} onRetry={workspaceState.retry} />
 
         <nav className="main-nav" aria-label="Main navigation">
           <div className="nav-eyebrow">WORKSPACE</div>
@@ -175,7 +181,40 @@ function AppShell({ language, onToggleLanguage, user, onLogout }: { language: La
       </main>
 
       {showInvestment && <InvestmentModal text={text} onClose={() => setShowInvestment(false)} />}
-      {showWorkspace && <WorkspaceModal text={text} workspace={workspace} onClose={() => setShowWorkspace(false)} onSave={(next) => { setWorkspace(next); setShowWorkspace(false) }} />}
+      {showWorkspace && <WorkspaceModal text={text} workspace={workspace} sync={workspaceState.sync} onClose={() => setShowWorkspace(false)} onSave={workspaceState.save} />}
+    </div>
+  )
+}
+
+/**
+ * Task 1.4: a small line under the workspace switcher. Silent when synced; says
+ * so when the workspace is only in this browser, the server is unreachable, a
+ * newer revision was reloaded, or the legacy local workspace was just imported.
+ */
+function WorkspaceSyncStatus({ text, sync, imported, onRetry }: { text: (value: Copy) => string; sync: WorkspaceSync; imported: boolean; onRetry: () => Promise<void> }) {
+  const [retrying, setRetrying] = useState(false)
+  if (sync === 'synced' && !imported) return null
+  if (sync === 'loading') return null
+  const message =
+    sync === 'unsaved' ? copy('Chưa lưu lên máy chủ', 'Not saved to the server')
+      : sync === 'offline' ? copy('Mất kết nối máy chủ · đang dùng bản lưu tạm', 'Server unreachable · showing the cached copy')
+        : sync === 'conflict' ? copy('Đã tải bản mới hơn từ máy chủ', 'A newer version was loaded from the server')
+          : copy('Đã chuyển workspace cục bộ lên máy chủ', 'Your local workspace was copied to the server')
+  const tone = sync === 'unsaved' || sync === 'offline' ? 'warn' : 'info'
+  async function retry() {
+    setRetrying(true)
+    try {
+      await onRetry()
+    } catch {
+      // still unsaved; the line stays
+    } finally {
+      setRetrying(false)
+    }
+  }
+  return (
+    <div className={`workspace-sync ${tone}`} role="status">
+      <span>{text(message)}</span>
+      {sync === 'unsaved' && <button type="button" onClick={retry} disabled={retrying}>{text(copy('Thử lại', 'Retry'))}</button>}
     </div>
   )
 }

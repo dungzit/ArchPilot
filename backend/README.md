@@ -76,6 +76,7 @@ of `ruff.toml`.
 | `GET` | `/api/designs/{id}` | cookie/bearer | one design with its graph; **404, not 403, for a non-owner** |
 | `PUT` | `/api/designs/{id}` | cookie/bearer | `{name, graph, revision}` full replace; stale revision → **409**; non-owner → 404 |
 | `DELETE` | `/api/designs/{id}` | cookie/bearer | soft delete → 204; non-owner → 404 |
+| `GET` | `/api/benchmarks?componentType=` | cookie/bearer | per-node capacity benchmarks, **shared by all users** (not owner-scoped), one row per metric, each with `sourceTitle` (always) / `sourceUrl` (required for measured/declared) and a `confidence` tag. Read-only |
 
 **CSRF.** Every unsafe method (`POST`/`PUT`/`PATCH`/`DELETE`) on a
 cookie-authenticated request must echo the `archpilot_csrf` cookie in an
@@ -97,14 +98,16 @@ backend/
     dependencies.py      DbConn / CurrentUser / require_role
     logging_config.py    JSON logs to stdout
     csrf.py              double-submit CSRF check for cookie-auth mutations
-    migrations/          001_core.sql, 002_patterns_legal.sql, 003_publish_gate.sql
+    migrations/          001_core.sql, 002_patterns_legal.sql, 003_publish_gate.sql, 004_benchmark_seed.sql
     contract.py          loads ../contracts/archgraph.schema.json; validates design graphs per request
-    repositories/        users.py, patterns.py, workspaces.py, designs.py, errors.py (SQL, no ORM)
-    routers/             health.py, auth.py, workspaces.py, designs.py
+    repositories/        users.py, patterns.py, workspaces.py, designs.py, benchmarks.py (+ seed data), errors.py (SQL, no ORM)
+    routers/             health.py, auth.py, workspaces.py, designs.py, benchmarks.py
   scripts/
     init_db.py           migrate + create a user
     create_user.py       create a user; password from a prompt or --password-stdin only
     backup.py            VACUUM INTO snapshot, verify, prune
+    seed_benchmarks.py   insert never-seen seed benchmarks (the API also does this at every start-up); never
+                         updates, never resurrects a deleted row
   tests/                 pytest suite
   Dockerfile             SPA build stage + Python runtime, single container
 ```

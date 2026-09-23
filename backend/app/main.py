@@ -24,8 +24,9 @@ from .contract import load_contract
 from .csrf import CSRF_HEADER, enforce_csrf
 from .db import connect, init_database
 from .logging_config import configure_logging
+from .repositories import benchmarks as benchmarks_repo
 from .repositories import users as users_repo
-from .routers import auth, designs, health, workspaces
+from .routers import auth, benchmarks, designs, health, workspaces
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +47,14 @@ async def lifespan(app: FastAPI):
     configure_logging(settings.log_level)
     applied = init_database(settings)
     purged = _purge_expired_sessions(settings)
+    seeded = _seed_benchmarks(settings)
     logger.info(
         "backend started",
         extra={
             "db_path": str(settings.db_path),
             "migrations_applied": applied,
             "expired_sessions_purged": purged,
+            "benchmarks_seeded": seeded,
             "env": settings.env,
         },
     )
@@ -67,6 +70,24 @@ def _purge_expired_sessions(settings) -> int:
         return users_repo.purge_expired_sessions(conn)
     except Exception:  # broad on purpose: never let housekeeping block startup
         logger.exception("expired-session purge failed")
+        return 0
+    finally:
+        conn.close()
+
+
+def _seed_benchmarks(settings) -> int:
+    """Insert any never-seen seed benchmarks (task 3.3). Never updates or
+    deletes a row, so it is safe on every start (app/repositories/benchmarks.py).
+    A failure is logged, not fatal: the SPA falls back to its built-in defaults
+    when the list is empty, and the rest of the API does not depend on it."""
+    conn = connect(settings.db_path)
+    try:
+        report = benchmarks_repo.seed_benchmarks(conn)
+        if report.inserted or report.skipped_conflict:
+            logger.info(report.summary())
+        return len(report.inserted)
+    except Exception:  # broad on purpose, same reason as the session purge
+        logger.exception("benchmark seed failed")
         return 0
     finally:
         conn.close()
@@ -211,6 +232,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(workspaces.router)
     app.include_router(designs.router)
+    app.include_router(benchmarks.router)
 
     # Single-container deployment: if the built SPA is present, serve it from
     # the same origin. Then no CORS is involved and the session cookie is

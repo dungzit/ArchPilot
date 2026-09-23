@@ -241,9 +241,9 @@ def test_estimated_benchmark_may_omit_a_source_url(migrated_db):
     migrated_db.execute(
         """
         INSERT INTO benchmarks (id, component_type, metric, value, unit, hardware_profile,
-                                basis, confidence, created_at, updated_at)
+                                basis, source_title, confidence, created_at, updated_at)
         VALUES ('bm2','service','rps',1000,'rps','4 vCPU JSON API',
-                'industry rule of thumb','estimated',?,?)
+                'industry rule of thumb','generic planning heuristic','estimated',?,?)
         """,
         (now, now),
     )

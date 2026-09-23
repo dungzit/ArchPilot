@@ -68,3 +68,49 @@ button { cursor: pointer; }
 .auth-footnote { margin: 18px 0 0; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
 .auth-card button:focus-visible, .logout-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 .logout-button { padding: 7px 10px; }
+/* Task 1.4: workspace sync line under the switcher, and the modal's save message. */
+.workspace-sync { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: -22px 3px 22px; padding: 6px 9px; border-radius: 7px; font-size: 10px; line-height: 1.35; }
+.workspace-sync.warn { background: #3b3320; color: #f3c56b; border: 1px solid #6b5626; }
+.workspace-sync.info { background: #173951; color: #9fd6c8; border: 1px solid #31536b; }
+.workspace-sync button { font: inherit; font-weight: 600; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 5px; padding: 2px 7px; cursor: pointer; }
+.workspace-sync button:disabled { opacity: .6; cursor: default; }
+.workspace-modal-message { margin: 0; padding: 9px 11px; border-radius: 7px; background: #fff2d7; color: #7a5410; border: 1px solid #f0d49a; font-size: 11px; line-height: 1.45; }
+/* Task 3.4: sizing calculator (layout after docs/prototype/systemsarchitect-demo.html). */
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.calc-two { display: grid; grid-template-columns: minmax(270px, 350px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.calc-heading { margin: 0 0 12px; color: var(--navy); font: 600 15px 'Space Grotesk'; }
+.calc-form fieldset { border: 0; border-top: 1px solid var(--line); margin: 0 0 6px; padding: 10px 0 4px; display: flex; flex-direction: column; gap: 10px; }
+.calc-form legend { font: 500 9px 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; color: #7d8e9f; padding: 0 6px 0 0; }
+.calc-field { display: flex; flex-direction: column; gap: 5px; }
+.calc-field label, .calc-field > span { color: var(--ink); font-size: 11px; font-weight: 600; }
+.calc-unit { color: var(--muted); font-weight: 400; }
+.calc-field input, .calc-field select { border: 1px solid var(--line); border-radius: 6px; padding: 8px 9px; color: var(--ink); font: inherit; font-size: 12px; background: #fbfdfc; }
+.calc-field input:focus, .calc-field select:focus { outline: 0; border-color: #81c7b5; box-shadow: 0 0 0 3px #e2f4ee; }
+.calc-field input[aria-invalid="true"] { border-color: var(--coral); background: #fff7f5; }
+.calc-help { display: block; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.calc-error { color: #b4442f; font-size: 10px; font-weight: 600; }
+.calc-source { font-size: 10.5px; color: var(--ink); line-height: 1.45; background: #f6faf9; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; }
+.calc-source p { margin: 0 0 3px; }
+.calc-source a { color: var(--blue); overflow-wrap: anywhere; }
+.calc-check { display: flex; gap: 8px; align-items: flex-start; font-size: 11px; color: var(--ink); margin-top: 8px; line-height: 1.4; }
+.calc-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-content: start; }
+.calc-card { padding: 16px; display: flex; flex-direction: column; }
+.calc-card h3 { margin: 0; font: 500 9px 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; color: #7d8e9f; }
+.calc-big { margin: 6px 0 2px; color: var(--navy); font: 700 26px 'Space Grotesk'; }
+.calc-big small { font: 11px 'DM Mono', monospace; color: #748995; }
+.calc-meta { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 10.5px; color: var(--muted); }
+.calc-tag { font: 9px 'DM Mono', monospace; padding: 3px 6px; border-radius: 4px; white-space: nowrap; }
+.calc-tag.measured { color: #14806f; background: #e3f4ed; }
+.calc-tag.declared { color: #2f5f9e; background: #e4edf9; }
+.calc-tag.estimated { color: #aa771b; background: #fff2d5; }
+.calc-tag.unverified { color: #ca6251; background: #fde7e1; }
+.calc-formula { display: flex; flex-direction: column; gap: 4px; background: #f3f7f6; border-radius: 6px; padding: 7px 9px; margin: 4px 0 8px; }
+.calc-formula code { font: 10.5px ui-monospace, Consolas, monospace; color: #2b4a5f; overflow-wrap: anywhere; }
+.calc-assumptions-title { margin: 0 0 3px; font-size: 10px; color: var(--muted); font-weight: 600; }
+.calc-assumptions, .calc-hints ul { margin: 0; padding-left: 17px; color: #5d7282; font-size: 10.5px; line-height: 1.5; }
+.calc-compare { margin: 10px 0 0; background: #fff4e0; border: 1px solid var(--amber); color: #8a5a0c; border-radius: 7px; padding: 8px 10px; font-size: 11px; line-height: 1.45; }
+.calc-hint.warn { color: #9a4b1c; }
+.calc-hint.info { color: #3d6475; }
+.calc-hints .calc-help { margin-top: 10px; }
+.calc-paused { font-size: 12px; color: #9a4b1c; background: #fff7f5; }
+@media (max-width: 980px) { .calc-two { grid-template-columns: 1fr; } }

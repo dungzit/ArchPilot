@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Author** | Senior Developer #1 (Builder / Proposer) |
-| **Date** | 2026-09-23 (v1.0) · 2026-09-23 (v1.2, post-review) · 2026-09-23 (v1.3, CI + `main.tsx` split) · 2026-09-23 (v1.4, persistence spine: 1.2 / 1.3 / 1.6) |
-| **Version** | 1.4 |
-| **Status** | Reviewed (`senior-developer-2`, approve-with-changes) up to v1.3. **v1.4 is not yet reviewed.** All four red-team blockers carried in code. v1.4 adds the first real resources (**workspaces 1.3, designs CRUD 1.6**), the SPA's **API client + login screen (1.2)**, and the backend image **built and run for real** (0.8, local half). Next: **1.4** `store.ts` async rewrite. |
+| **Date** | 2026-09-23 (v1.0) · 2026-09-23 (v1.2, post-review) · 2026-09-23 (v1.3, CI + `main.tsx` split) · 2026-09-23 (v1.4, persistence spine: 1.2 / 1.3 / 1.6) · 2026-09-24 (v1.5, 1.4 store + 3.3 benchmarks + 3.4 sizing UI) |
+| **Version** | 1.5 |
+| **Status** | Reviewed (`senior-developer-2`, approve-with-changes) up to v1.3. **v1.4 and v1.5 are not yet reviewed.** All four red-team blockers carried in code. v1.5: the SPA's workspace now lives on the server (**1.4**), benchmarks have a cited, idempotent seed and a read endpoint (**3.3**), and the Sizing screen is a real calculator on the v2.0 engine (**3.4**). Next: the interactive canvas (1.5 → 2.1–2.6). |
 | **Language / stack** | Backend: Python 3.10+ (CI tests **3.12 and 3.10**; the image is 3.12), FastAPI, SQLite (stdlib-preferring, **4 runtime deps** since 1.6 — `jsonschema` promoted from test-only — + 3 test/lint-only). Frontend: existing ArchPilot React 18 + TypeScript + Vite on **Node 24**, with `vitest` + `ajv` + `jsdom` as devDependencies. |
 | **Code delivered with this doc** | `ArchPilot/backend/` · `ArchPilot/contracts/` · `ArchPilot/src/domain/sizing.ts` · `ArchPilot/src/contracts/` · `ArchPilot/src/{app,ui,features,api,test}/` · `ArchPilot/vite.config.ts` · `.github/workflows/ci.yml` (**outside this repo — see §7.2 item 5c**) |
 | **Related docs** | `docs/requirements/systemsarchitect-requirements.md` v0.1 · `docs/architecture/systemsarchitect-prototype-design.md` v0.1 · `docs/architecture/reviews/review-systemsarchitect-prototype.md` v1.0 · `docs/development/reviews/review-systemsarchitect-backend.md` v1.0 · `docs/development/systemsarchitect-contracts-and-sizing.md` v1.0 · `docs/requirements/systemsarchitect-decisions.md` v0.1 |
@@ -18,6 +18,7 @@
 | 1.1 | 2026-09-23 | `senior-developer-2` review: 14 findings fixed in code, backend suite 36 → 65. Wire format switched to camelCase (M-5). Two items handed back. |
 | 1.2 | 2026-09-23 | The two handed-back items delivered: task **0.5/0.6** (`contracts/` + shared fixtures + envelope rules) and task **3.1/3.2** (corrected sizing engine, red-team B3). Backend 65 → **90 pytest**; frontend 0 → **57 vitest**. |
 | 1.3 | 2026-09-23 | Task **0.7** (CI: `.github/workflows/ci.yml` runs ruff + pytest on Python 3.12 **and** 3.10, and `tsc -b` + vitest + `vite build` on Node 24) and task **1.1** (`main.tsx` 292 lines → 25 files under `src/app`, `src/ui`, `src/features/<module>/`, proved byte-identical by a 36-state DOM diff). Frontend 57 → **63 vitest**. Node images bumped 20 → 24 (Node 20 is EOL; jsdom 30 needs ≥ 22.22.2). |
+| 1.5 | 2026-09-24 | Tasks **1.4** (`store.ts` async on `/api/workspaces/current`, owner-scoped `localStorage` cache, one-time legacy import, 409 → reload + message, offline → pending edit + "not saved" + Retry), **3.3** (migration `004`, idempotent never-overwriting benchmark seed, `GET /api/benchmarks`) and **3.4** (Sizing calculator: inputs left, result cards right, formula + substitution + assumptions + confidence on every number, deterministic review hints, single-benchmark shortcut note, VI/EN). Backend 154 → **174 pytest**; frontend 97 → **150 vitest**. Image built and run as `archpilot:task-3x`, exercised with curl, then removed. |
 | 1.4 | 2026-09-23 | Tasks **1.3** (`GET/PUT /api/workspaces/current`, revision-checked, 409 on stale), **1.6** (designs CRUD, owner-scoped, 404 for non-owners, graph validated at request time against **the same** `contracts/archgraph.schema.json`, 409 on stale revision, paginated list, soft delete) and **1.2** (`src/api/client.ts`, `src/api/auth.ts`, `LoginScreen`, auth gate + Logout in `App.tsx`, Vite `/api` proxy, `scripts/create_user.py`). Backend 90 → **154 pytest**; frontend 63 → **97 vitest**. Backend image **built and run** under Docker 29.8 and exercised with curl (first time; the v1.3 `node:24-alpine` bump is now verified). |
 
 ---
@@ -38,16 +39,20 @@ decisions into one plan: the API surface, the SQLite schema, exactly what
 changes in `store.ts`, `architecture.ts`, `sizing.ts` and `knowledge.ts`, and a
 numbered 9-week task breakdown. The Phase-0 scaffold ships with this document
 and already runs: migrations, a deep health check, local login, WAL-safe
-backups, and **154 passing Python tests plus 97 passing TypeScript tests**
-(v1.4). ArchPilot's `main.tsx` — one 292-line file holding all sixteen screens
+backups, and **174 passing Python tests plus 150 passing TypeScript tests**
+(v1.5). ArchPilot's `main.tsx` — one 292-line file holding all sixteen screens
 — has been split into one file per screen (task 1.1). **As of v1.4 the
 persistence spine has started:** the server stores each user's workspace and
 architecture designs, other users get "not found" for them, and a stale edit
 is refused instead of silently overwriting newer work. The SPA now opens on a
 login screen and signs out from the top bar. The single Docker image has been
-built and run for real. The one thing still missing before users see
-server-side data in the screens is task 1.4: switching `store.ts` from
-`localStorage` to the API.
+built and run for real. **As of v1.5** the workspace itself is stored on the
+server (the browser keeps only a copy for when the server is down, and an old
+browser-only workspace is copied up once on first login), and the Sizing
+screen is a real calculator: every number it shows comes with its formula,
+its assumptions and a confidence tag, and per-node capacities can be loaded
+from a small, clearly-labelled set of generic benchmarks. The next large piece
+is the interactive architecture canvas.
 
 **Honest status of the four red-team blockers (v1.0 of this document did not
 make this clear enough, and the reviewer was right to say so).** At v1.0 only
@@ -74,17 +79,21 @@ bản phản biện, và các quyết định của chủ sản phẩm thành m�
 danh sách API, lược đồ SQLite, thay đổi chính xác trong `store.ts`,
 `architecture.ts`, `sizing.ts`, `knowledge.ts`, và phân rã công việc theo 9 tuần
 có đánh số. Bộ khung Phase-0 đi kèm tài liệu này đã chạy được: migration, health
-check sâu, đăng nhập nội bộ, sao lưu an toàn với WAL, và **154 test Python cùng
-97 test TypeScript đang pass** (v1.4). Tệp `main.tsx` của ArchPilot — một tệp
+check sâu, đăng nhập nội bộ, sao lưu an toàn với WAL, và **174 test Python cùng
+150 test TypeScript đang pass** (v1.5). Tệp `main.tsx` của ArchPilot — một tệp
 292 dòng chứa toàn bộ mười sáu màn hình — đã được tách thành mỗi màn hình một
 tệp (công việc 1.1). **Từ bản v1.4, phần lưu trữ phía máy chủ đã bắt đầu:**
 máy chủ lưu workspace và các thiết kế kiến trúc của từng người dùng, người
 khác nhận "không tìm thấy" khi truy cập chúng, và một lần sửa dựa trên dữ liệu
 cũ sẽ bị từ chối thay vì âm thầm ghi đè lên bản mới hơn. SPA nay mở bằng màn
 hình đăng nhập và có nút đăng xuất trên thanh trên cùng. Image Docker duy nhất
-đã được build và chạy thật. Việc còn thiếu để người dùng thấy dữ liệu phía máy
-chủ trong các màn hình là công việc 1.4: chuyển `store.ts` từ `localStorage`
-sang API.
+đã được build và chạy thật. **Từ bản v1.5**, workspace được lưu trên máy chủ
+(trình duyệt chỉ giữ một bản sao để dùng khi mất kết nối, và workspace cũ chỉ
+nằm trong trình duyệt được chuyển lên máy chủ một lần ở lần đăng nhập đầu
+tiên), và màn hình Sizing là một công cụ tính thật: mọi con số đều đi kèm công
+thức, giả định và mức tin cậy, và công suất mỗi node có thể nạp từ một bộ
+benchmark chung được ghi rõ là ước lượng. Phần lớn tiếp theo là canvas kiến
+trúc tương tác.
 
 **Tình trạng thật của bốn lỗi chặn từ đội phản biện.** Ở bản v1.0 chỉ có **B4**
 (sao lưu an toàn với WAL) là thực sự được khắc phục; **B1** mới làm một nửa,
@@ -253,7 +262,7 @@ hash binding is not relaxed.
 
 ### 3.4 API surface
 
-Bold = implemented (Phase-0 scaffold, plus v1.4 workspaces and designs). Everything else is scoped, not built.
+Bold = implemented (Phase-0 scaffold, plus v1.4 workspaces and designs, plus v1.5 benchmarks). Everything else is scoped, not built.
 
 | Method | Path | Auth | Requirement |
 |---|---|---|---|
@@ -265,7 +274,7 @@ Bold = implemented (Phase-0 scaffold, plus v1.4 workspaces and designs). Everyth
 | **GET / PUT** | **`/api/workspaces/current`** | session | ArchPilot module 1. **v1.4:** `WorkspaceRecord` shape; GET 404 until one exists; PUT `revision` = last seen (0 creates), stale → 409 |
 | **GET / POST** | **`/api/designs`** | session | `REQ-DESIGN-001/005`. **v1.4:** list is `?limit=` (1–100, default 50) `&offset=`, newest first, no graphs; POST `{name, graph}` → 201. `POST {seededFromPatternId}` (`REQ-HUB-007`) is **not** accepted yet — it lands with 6.1 so provenance cannot be forged by a client |
 | **GET / PUT / DELETE** | **`/api/designs/{id}`** | session (owner) | `REQ-DESIGN-004/005`; non-owner gets **404, not 403**. **v1.4:** PUT `{name, graph, revision}` full replace, stale → 409; DELETE is soft → 204 |
-| GET | `/api/benchmarks` | session | `REQ-CALC-003`, `M7` — every row carries its citation |
+| **GET** | **`/api/benchmarks`** | session (any user) | `REQ-CALC-003`, `M7` — every row carries its citation. **v1.5:** shared reference data (not owner-scoped), `?componentType=`, one row per metric, `sourceTitle` always non-blank (migration 004), `sourceUrl` required for measured/declared (001), `origin` `seed`/`user`. Read-only (405 on POST); editing arrives with the admin surface |
 | GET / POST | `/api/designs/{id}/sizings` | session (owner) | `REQ-CALC-007` |
 | POST | `/api/sizings/review` | session | Deterministic rules only, **no LLM** (Decision 5) |
 | GET | `/api/patterns` | session | `REQ-HUB-001/003/004/006` — `?q=&category=&company=&sort=`, published only |
@@ -289,18 +298,19 @@ else may query `patterns_fts` directly (`M1`).
 | File | Responsibility |
 |---|---|
 | `src/api/client.ts` ✅ **v1.4** | `fetch` wrapper: same-origin URLs, `credentials: 'include'`, `x-request-id`, `x-csrf-token` from the `archpilot_csrf` cookie on unsafe methods, JSON encode/decode with **no** case conversion (the wire is camelCase), typed `ApiError` (`status`, `detail`, `requestId`, `kind: 'http' \| 'unreachable'`), 401 → registered handler → login. No HTTP library |
-| `src/api/auth.ts` ✅ **v1.4**; `designs.ts`, `patterns.ts`, `sizings.ts`, `workspace.ts` | One thin module per resource; the only place a URL string appears. `workspace.ts` lands with 1.4, `designs.ts` with 2.5 |
+| `src/api/auth.ts` ✅ **v1.4**; `workspace.ts` ✅ **v1.5**; `benchmarks.ts` ✅ **v1.5**; `designs.ts`, `patterns.ts`, `sizings.ts` | One thin module per resource; the only place a URL string appears. `designs.ts` lands with 2.5 |
 | `src/features/auth/LoginScreen.tsx` ✅ **v1.4** | Username/password form, VI/EN via `copy()`, error states: wrong password, throttled, server unreachable, empty fields; session-expired and signed-out notices |
 | `src/domain/graph.ts` | `ArchGraph`, `ArchNode`, `ArchEdge`, `NodeType`, `PALETTE`, `validateGraph()`, `diffGraphs()`, `migrateGraph()` |
-| `src/domain/benchmarks.ts` | Benchmark types + client-side defaults used only until `/api/benchmarks` responds |
-| `src/features/canvas/*`, `src/features/sizing/*`, `src/features/patterns/*` | The three screens, extracted out of `main.tsx` |
+| `src/domain/benchmarks.ts` ✅ **v1.5** | `BenchmarkRow` (wire), `pairBenchmarks()` (read_qps + write_qps rows → one dual-capacity option; the weaker confidence wins; a URL is kept only if both rows share it), `builtInBenchmarkOptions()` used only when `/api/benchmarks` cannot be reached |
+| `src/domain/sizingCalculator.ts` ✅ **v1.5** | The Sizing screen's model: peak read/write → the engine's average + ratio (exact inverse, tested), substituted formula lines, the single-benchmark shortcut comparison, deterministic bilingual review hints that mirror every engine warning one-for-one (tested), per-field bilingual validation. No sizing arithmetic of its own (D3) |
+| `src/features/canvas/*`, `src/features/sizing/*` ✅ **v1.5**, `src/features/patterns/*` | The three screens. Sizing is done; canvas and patterns are open |
 | `contracts/archgraph.schema.json` | The one graph contract, validated by both languages (D4) |
 
 #### 3.5.2 Changes to the four existing domain modules
 
 | File | Change | Why | Breaking? |
 |---|---|---|---|
-| **`store.ts`** | `loadWorkspace(): WorkspaceRecord \| null` → `loadWorkspace(): Promise<WorkspaceRecord \| null>` calling `GET /api/workspaces/current`. `saveWorkspace(...)` → `Promise<WorkspaceRecord>` calling `PUT`. Keep the `localStorage` write as a read-only fallback cache, and add `importLegacyLocalWorkspace()` run once after first login. `revision` is now assigned by the server, not `previous.revision + 1` | Source of truth moves to SQLite; `revision` incremented client-side is wrong the moment two browsers exist | **Yes** — sync→async. Call site: `main.tsx` `useState(() => loadWorkspace())` becomes a `useEffect` load + loading state |
+| **`store.ts`** ✅ **done (v1.5)** | `loadWorkspace(): WorkspaceRecord \| null` → `loadWorkspace(): Promise<WorkspaceRecord \| null>` calling `GET /api/workspaces/current`. `saveWorkspace(...)` → `Promise<WorkspaceRecord>` calling `PUT`. Keep the `localStorage` write as a read-only fallback cache, and add `importLegacyLocalWorkspace()` run once after first login. `revision` is now assigned by the server, not `previous.revision + 1` | Source of truth moves to SQLite; `revision` incremented client-side is wrong the moment two browsers exist | **Yes** — sync→async. Call site: `main.tsx` `useState(() => loadWorkspace())` becomes a `useEffect` load + loading state |
 | **`architecture.ts`** | `ArchitectureComponent[]` becomes `ArchGraph` (`nodes` + `edges` + `position`). `loadComponents`/`saveComponents` → `loadDesign(id)`/`saveDesign(id, graph)` over `/api/designs/{id}`. `seedComponents` stays as the empty-canvas starter. `createComponent`'s `Date.now()` ID is replaced by a collision-safe `crypto.randomUUID()` | Edges and positions are `REQ-DESIGN-003/004/005`; the current model has neither. `Date.now()` collides on a fast double-click | **Yes** — shape change. A `migrateComponentsToGraph()` helper converts existing localStorage data in one pass (nodes laid out on a grid, no edges) |
 | **`sizing.ts`** ✅ **done (v2.0)** | Keep `SizingResult`'s shape (it already has `range`/`confidence`/`warnings`/`formulaVersion` — better than the architects' proposal). Add the corrected engine (§3.6) with `assumptions: string[]` and `formula: string` **required** by the type. `sizeApi(peakRps, capacityPerInstance, ...)` is replaced by `sizeComponent(inputs, benchmarks)` taking **dual read/write capacity**. Benchmarks arrive from `GET /api/benchmarks`, not from a constant | The current single `capacityPerInstance` cannot consume the dual read/write benchmarks the design itself defines (`B3b`); `sizeStorage` has no compression term (`B3c`) and applies replication to storage only (`B3a`); neither applies a failure-domain spare (`B3d`) | **Yes** — but the module is currently *unused* by `main.tsx`, so there are no call sites to break. Cheapest possible moment to fix it |
 | **`knowledge.ts`** | `searchKnowledge()` stays exactly as-is and becomes the **offline/fallback** path. Primary search becomes `GET /api/patterns?q=` (FTS5). `KnowledgeRecord` gains required `sourceUrl`, `sourceCompany`, `sourceTitle` (currently `source?: string`, optional and free-text) | `REQ-HUB-005`: no entry may render without attribution. Optional `source?: string` cannot enforce that | **Minor** — `source?` widening to three required fields. The 4 hard-coded records in `main.tsx` move into the seed content set |
@@ -407,14 +417,14 @@ this confidence-derived band.
 | 0.7 | ~~CI: `pytest`, `npm test`, `tsc -b`, `npm run build`~~ | E2 | 0.5 | ~~0.5~~ **done** | `.github/workflows/ci.yml`: job `backend` = `ruff check` + `pytest` on a **3.12 / 3.10 matrix** (M-9 closed — 3.12 is the image, 3.10 is the documented floor, both must pass); job `frontend` = `npm ci` → `tsc -b` → `vitest` → `tsc -b && vite build` on **Node 24**. `ruff` added and the codebase made clean (15 findings fixed). `mypy --strict` deliberately deferred, see §7.2 |
 | 0.8 | Docker build of the combined image; run on the on-prem host | E2 | 0.1 | 1 · **local half done (v1.4)** | **Verified locally 2026-09-23, Docker 29.8.0:** `docker build -f backend/Dockerfile .` succeeds (the `node:24-alpine` bump is no longer unverified); `docker run` → container `healthy`, SPA at `/` (200, `text/html`), `/api/health` 200 schema 003, full CRUD exercised with curl (§5). **Open:** run on the on-prem host, Compose file, TLS in front (the image sets `ARCHPILOT_COOKIE_SECURE=true`) |
 
-### Phase 1 — Persistence spine (9 pd) · **6 pd delivered (1.1, 1.2, 1.3, 1.6), 3 pd open (1.4, 1.5)** · depends on Phase 0
+### Phase 1 — Persistence spine (9 pd) · **7.5 pd delivered (1.1, 1.2, 1.3, 1.4, 1.6), 1.5 pd open (1.5)** · depends on Phase 0
 
 | # | Task | Owner | Depends on | Effort | Verification |
 |---|---|---|---|---|---|
 | 1.1 | ~~**Split `main.tsx`** into `src/features/*` — pure refactor~~ | E1 | 0.5 | ~~2~~ **done** | 292 lines → 25 files (`src/app/`, `src/ui/`, `src/features/<module>/`). **Proved** by a throwaway before/after jsdom diff of all 36 states (16 modules × VI/EN + 4 modal states): identical, `sha256 c3d5f0bf…c442d62b` on both sides. `tsc -b` clean; `vite build` clean. Six kept shell tests replace the throwaway harness |
 | 1.2 | ~~`src/api/client.ts` + `auth.ts`; login screen; 401 redirect~~ | E1 | 0.3, 1.1 | ~~1.5~~ **done** | Through the Vite proxy: `/api/auth/me` → 401, login → 200 with both cookies, `/me` with the cookies → 200 (refresh keeps the session). 21 client tests + 13 login-flow tests (jsdom, real `<App/>`): gate, wrong password, 429, unreachable (network error **and** the proxy's empty 502), logout sends `x-csrf-token`, a later 401 routes back to login. First user: `scripts/create_user.py` (prompt or `--password-stdin`, never argv) |
 | 1.3 | ~~`GET/PUT /api/workspaces/current`~~ | E2 | 0.2 | ~~1~~ **done** | `pytest` (16): user B cannot read **or overwrite** user A's workspace; stale revision → 409 and no overwrite; `revision: 0` cannot clobber; two racing writers → exactly one wins (negative control: without the IMMEDIATE transaction both "win") |
-| 1.4 | Rewrite `store.ts` async + write-through cache + legacy import | E1 | 1.2, 1.3 | 1.5 | Existing `localStorage` workspace appears server-side after first login |
+| 1.4 | ~~Rewrite `store.ts` async + write-through cache + legacy import~~ | E1 | 1.2, 1.3 | ~~1.5~~ **done (v1.5)** | `src/domain/store.test.ts` (14): legacy `archpilot.workspace.v1` is PUT with `revision: 0` on first login and appears server-side, exactly once (a second user on the same browser does not re-import; legacy data is never deleted); not imported over an existing server workspace; 404 → `null`; 409 → newer record reloaded + reported, nothing overwritten; unreachable → owner-scoped cache + pending edit pushed on next load (or conflict if stale). `WorkspaceModal.test.tsx` (5) through the real `<App/>`. Negative control: dropping the owner check on the cache fails 2 tests. Also verified with curl against the container (§5) |
 | 1.5 | `src/domain/graph.ts` — `ArchGraph`, palette, `validateGraph()` | E1 | 0.6 | 1.5 | Unit tests for the 4 validation rules |
 | 1.6 | ~~Designs CRUD API, owner-scoped, **404 for non-owners**~~ | E2 | 1.3 | ~~1.5~~ **done** | `pytest` (38): cross-user read/update/delete → 404 with the same body as a missing id (negative control: dropping the owner filter fails 4 tests); **every `archGraph` fixture in the shared manifest is POSTed to the live endpoint and gets the same verdict** as in the jsonschema/ajv suites; stale revision → 409; list paginated and capped at 100; soft delete. +3 live-response contract tests (casing, timestamps, graph, and the 404/409/422 error envelopes) |
 
@@ -432,14 +442,14 @@ this confidence-derived band.
 | 2.8 | Undo/redo depth 50 (`REQ-DESIGN-009`) | E1 | 2.4 | 1.5 | `Ctrl+Z` reverses 50 actions |
 | 2.9 | Non-blocking validation warnings in the status bar (`REQ-DESIGN-007`) | E1 | 1.5 | 0.5 | Orphan node warns; save still succeeds |
 
-### Phase 3 — Pillar B: sizing studio (8 pd) · **2.5 pd delivered** · depends on Phase 1, parallel with Phase 2
+### Phase 3 — Pillar B: sizing studio (8 pd) · **5.5 pd delivered (3.1–3.4)** · depends on Phase 1, parallel with Phase 2
 
 | # | Task | Owner | Depends on | Effort | Verification |
 |---|---|---|---|---|---|
 | 3.1 | ~~**Corrected engine in `sizing.ts`** — B3(a)(b)(c)(d) + required `formula`/`assumptions`~~ | E2 | 0.5 | ~~2~~ **done** | 34 tests, one group per B3 term with the v1.0→v2.0 delta asserted; worked example 5000 QPS / 2 KiB / 9:1 / 12 mo → **4 nodes, ~114.6 TiB uncompressed** |
 | 3.2 | ~~Confidence-derived ranges replacing the fixed 0.8/1.3 band (`M8`)~~ | E2 | 3.1 | ~~0.5~~ **done** | `estimated` → ±50% (`3–6 node (point estimate 4)`); `measured` → ±10% (`4–5`). Folded into 3.1: leaving a hard-coded band inside a file being rewritten was not defensible |
-| 3.3 | `benchmarks` seed + `GET /api/benchmarks`; every `declared` row cited (`M7`) | E2 | 0.2 | 1 | Trigger test already passing; seeding an uncited `declared` row fails |
-| 3.4 | Sizing UI: two-column, live recompute, assumptions beside every number | E1 | 3.1, 1.1 | 2 | No number renders without its formula |
+| 3.3 | ~~`benchmarks` seed + `GET /api/benchmarks`; every `declared` row cited (`M7`)~~ | E2 | 0.2 | ~~1~~ **done (v1.5)** | `tests/test_benchmarks.py` (19): **seeding an uncited `declared` row fails and writes nothing**; a CHECK typo fails too (no `INSERT OR IGNORE`); idempotent; never overwrites a user-edited row (a trigger flips `origin` to `user` on any content edit); never resurrects a deleted row (`benchmark_seed_log`); skips a slot a user row holds; every row needs a non-blank `source_title`; seed rows are all `estimated`, URL-less, labelled "generic planning heuristic". Endpoint: 401 without session, same list for two users, filter, 405 on POST, restart does not duplicate. Negative control: ignoring the seed log fails 4 tests |
+| 3.4 | ~~Sizing UI: two-column, live recompute, assumptions beside every number~~ | E1 | 3.1, 1.1 | ~~2~~ **done (v1.5)** | **No number renders without its formula**: `SizingScreen.test.tsx` (12) asserts every card has formula + substituted formula + ≥1 assumption + a confidence tag; plus live recompute, dropdown fed by `/api/benchmarks` (and the built-in fallback when unreachable), measured toggle (±50% → ±10%), shortcut note (demo scenario: 6 vs 11 nodes, 45% too small), hints, accessible validation, VI/EN. `sizingCalculator.test.ts` (22). The 34 engine tests are unchanged and green |
 | 3.5 | 4 workload profiles (`REQ-CALC-005`) | E2 | 3.1 | 0.5 | Selecting a profile pre-fills; user can override |
 | 3.6 | Attach scenario to a node + `benchmark_snapshot_json` pinning (`REQ-CALC-007`, `M8`) | E2 | 1.6, 3.3 | 1.5 | Reopening a design shows the attached sizing, unchanged after a benchmark edit |
 | 3.7 | `POST /api/sizings/review` — deterministic rules, **no LLM** | E2 | 3.1 | 0.5 | Rules fire on `peakFactor = 1.0`, retention > 24 mo with `compressionRatio = 1.0` |
@@ -501,15 +511,15 @@ this confidence-derived band.
 | Track | pd | Calendar |
 |---|---|---|
 | Phase 0 foundations (**6 pd of 7 done** — 0.8 is built and run locally; on-prem run remains) | 7 | Week 1 |
-| Phase 1 persistence spine (**6 pd of 9 done** — 1.1, 1.2, 1.3, 1.6) | 9 | Weeks 1–2 |
+| Phase 1 persistence spine (**7.5 pd of 9 done** — 1.1, 1.2, 1.3, 1.4, 1.6) | 9 | Weeks 1–2 |
 | Phase 2 canvas (E1) | 11 | Weeks 2–5 |
-| Phase 3 sizing (E2, parallel) | 8 | Weeks 2–4 |
+| Phase 3 sizing (**5.5 pd of 8 done** — 3.1–3.4) | 8 | Weeks 2–4 |
 | Content track (C, parallel) | 10 | Weeks 1–7 |
 | Phase 4 hub read side | 7 | Weeks 4–6 |
 | Phase 5 editorial + legal gate | 7 | Weeks 5–7 |
 | Phase 6 integration | 5 | Weeks 7–8 |
 | Phase 7 hardening + launch | 8 | Weeks 8–9 |
-| **Engineering total** | **62 pd** (**51.5 remaining** after 0.1–0.7, 1.1–1.3, 1.6, 3.1, 3.2) | |
+| **Engineering total** | **62 pd** (**47 remaining** after 0.1–0.7, 1.1–1.4, 1.6, 3.1–3.4) | |
 | **Content total** | **10 pd** | |
 
 Two engineers × 9 weeks ≈ 90 pd of raw capacity; 62 pd of planned work is ~69%
@@ -551,6 +561,14 @@ Observed on 2026-09-23 (Windows 10, Python 3.10.11, SQLite 3.40.1, Node 24.18.0)
 
 | Command | Result |
 |---|---|
+| `ruff check .` (v1.5) | `All checks passed!` |
+| `pytest` (v1.5) | **174 passed**, 95 s. New: `test_benchmarks.py` 19, `test_contracts.py` +1 (benchmark casing/timestamps). `test_schema_invariants.py`: the "estimated may omit a URL" fixture row now carries a `source_title`, as migration 004 requires |
+| `npm test` (v1.5) | **150 passed**, 9 files (`sizing` 34, `contract` 23, `App` 6, `api/client` 21, `LoginScreen` 13, **`store` 14, `WorkspaceModal` 5, `sizingCalculator` 22, `SizingScreen` 12**). `LoginScreen.test.tsx`'s fake backend learned `GET /api/workspaces/current` → 404 (the shell now asks for it) |
+| `npm run typecheck` / `npm run build` (v1.5) | clean · `index-*.js 335.46 kB (gzip 101.28 kB)` |
+| negative controls (v1.5) | cache owner check removed from `store.ts` → **2 tests fail**; seed-log check removed from `seed_benchmarks` → **4 tests fail**. Both restored |
+| container (v1.5): `docker build -f backend/Dockerfile -t archpilot:task-3x .`, `docker run -d --name archpilot-test-3x -p 18081:8000 -v archpilot-test-3x-data:/data` | healthy; log `applying migration 004_benchmark_seed.sql` → `benchmarks seed 2026-09-24.1: inserted 10, already seeded 0, skipped … 0`; `/api/health` `schemaVersion "004"`; `create_user tester3x --role member --password-stdin` → exit 0 |
+| curl, workspace (v1.5; `Secure` cookies over http, so the `Cookie` header is passed explicitly) | GET before first save → **404** `no workspace yet` · PUT rev 0 → 200 rev 1 · PUT rev 1 → 200 rev 2 · PUT rev 1 again → **409** `you sent revision 1 but the current revision is 2; reload and re-apply your change` · PUT without `x-csrf-token` → **403** · GET → 200 rev 2 (and still rev 2 after a container restart) |
+| curl, benchmarks (v1.5) | no cookie → **401** · as a `member` → 200, `total 10`: cache 80000/80000, database 8000/2000, object_store 1000/500, queue 20000/10000, service 1000/1000, every row `estimated`, `origin seed`, `sourceUrl null`, `sourceTitle "ArchPilot generic planning heuristic - not a vendor benchmark and not a measurement. …"` · `?componentType=queue` → 2 rows · POST → **405** · after `docker restart`: still `total 10` · `python -m scripts.seed_benchmarks` in the container → `inserted 0, already seeded 10` · the served bundle contains the calculator (`single-benchmark shortcut would say`, `/api/benchmarks`, `archpilot.workspace.cache.v2`). Container, volume and image removed afterwards; `archpilot-v1` untouched |
 | `ruff check .` (v1.4) | `All checks passed!` |
 | `pytest` (v1.4) | **154 passed**, 1 warning (the same starlette-internal `anyio` deprecation), 74 s. New: `test_workspaces.py` 16, `test_designs.py` 38, `test_create_user_script.py` 7, `test_contracts.py` +3 |
 | `npm test` (v1.4) | **97 passed**, 5 files (`sizing` 34, `contract` 23, `App` 6, `api/client` 21, `features/auth/LoginScreen` 13) |
@@ -606,13 +624,13 @@ and an uncited `declared` benchmark rejected.
 | R7 | Single container is a single point of failure | Med | Low | Deep health check + `restart: unless-stopped`; `VACUUM INTO` nightly + Litestream (7.4) takes RPO from 24 h to seconds | E2 |
 | R8 | Rollback after a forward-only migration | Low | High | Rollback = restore-from-backup, **never** an image rollback. Backup before migrate. Documented in `backend/README.md` and the 7.8 runbook | E2 |
 | R9 | 9 weeks is the schedule the red-team called unavailable at full scope | Med | Med | All the cuts are banked (no LLM −5 pd, no SSO −2 pd, 12 not 18 patterns −3 pd, no CSV −1 pd, no second reviewer −1 pd) and a 3 pd remediation line is in Phase 7 | PO |
-| R10 | Sizing numbers pasted into a budget as if exact | Med | High | **Partly mitigated in code.** `SizingResult` now requires `assumptions: string[]` and `formula: string` — the type makes an unexplained number unrepresentable — and `range` is derived from the weakest input benchmark's confidence tag, not a hard-coded band. **Still to do:** the disclaimer inside the export envelope (task 2.7) and the UI rendering ranges rather than points (task 3.4) | E2 |
+| R10 | Sizing numbers pasted into a budget as if exact | Med | High | **Mostly mitigated in code.** `SizingResult` requires `assumptions` and `formula`; `range` comes from the weakest benchmark's confidence tag; and **since v1.5 the UI renders the range and the confidence tag next to every number**, with the substituted formula and the assumptions on the same card (task 3.4, tested). **Still to do:** the disclaimer inside the export envelope (task 2.7) | E2 |
 
 ---
 
 ## 7. Status board — done vs still open
 
-Updated 2026-09-23 at v1.4 (tasks 1.2, 1.3, 1.6). This section supersedes the
+Updated 2026-09-24 at v1.5 (tasks 1.4, 3.3, 3.4; v1.4 added 1.2, 1.3, 1.6). This section supersedes the
 v1.0 stub list.
 
 ### 7.1 Done and tested
@@ -634,16 +652,19 @@ v1.0 stub list.
 | **SPA auth (task 1.2)** | `src/api/client.ts` (credentials, CSRF from cookie, request id, typed `ApiError` incl. `unreachable`, 401 → login hand-off), `src/api/auth.ts`, `src/features/auth/LoginScreen.tsx` (VI/EN, labelled fields, Enter submits, focus management, `role="alert"` errors), auth gate + Logout + real user name in `src/app/App.tsx`, `/api` dev proxy in `vite.config.ts`. The rest of the app behaves as before once signed in (`store.ts` untouched) |
 | **First user** | `backend/scripts/create_user.py` — prompt (twice) or `--password-stdin`; never argv, never env; refuses without a TTY instead of hanging; migrates a fresh DB first |
 | **Docker (task 0.8, local half)** | Image built and run under Docker 29.8.0; healthy; SPA at `/`; full CRUD exercised with curl. The contract file is copied to `/srv/contracts/`, and the app refuses to start without it |
-| Test suites | **154 pytest** (`ArchPilot/backend`) · **97 vitest** (`ArchPilot`: 34 sizing + 23 contract + 6 shell + 21 client + 13 login flow) · `ruff check`, `tsc -b` and `vite build` clean. **CI caveat:** see §7.2 item 5c |
+| **Workspace store (task 1.4)** | `src/domain/store.ts` async on `src/api/workspace.ts`. Server is the source of truth; `localStorage` key `archpilot.workspace.cache.v2` is an owner-scoped cache, read only when the server is unreachable, cleared on logout. One-time import of the legacy `archpilot.workspace.v1` record on first login (normalised to what the server accepts; never deleted; a marker records the decision). 409 → newer record reloaded, the modal stays open with the typed values and says what happened. Unreachable → edit kept as `pending`, sidebar shows "Not saved to the server" with **Retry**, pushed automatically on the next load (as a conflict if it went stale). `src/features/workspace/useWorkspace.ts` replaces the old `useState(() => loadWorkspace())` |
+| **Benchmarks (task 3.3)** | Migration `004_benchmark_seed.sql` (`origin` column, `benchmark_seed_log`, non-blank `source_title` on every row, edit → `origin=user` trigger). `app/repositories/benchmarks.py` seed: 5 component types × read/write, all `estimated`, URL-less, cited as a generic planning heuristic; runs at every start-up and via `scripts/seed_benchmarks.py`; never updates, never resurrects. `GET /api/benchmarks` for any signed-in user |
+| **Sizing calculator (task 3.4)** | `src/features/sizing/SizingScreen.tsx` replaces the hard-coded HTML: inputs left (peak read/write QPS, payload, peak factor, retention, RF, compression, per-node read/write with "load from benchmark", spare nodes, measured toggle), cards right (nodes, storage, cluster write load, payload bandwidth, review hints). Each card: number + range + confidence tag + formula + substituted formula + assumptions. Shortcut note when a single-benchmark sizing would under-size. `src/domain/sizingCalculator.ts` + `src/domain/benchmarks.ts` hold the logic; the engine is untouched |
+| Test suites | **174 pytest** (`ArchPilot/backend`) · **150 vitest** (`ArchPilot`: 34 sizing + 23 contract + 6 shell + 21 client + 13 login + 14 store + 5 workspace shell + 22 calculator + 12 sizing screen) · `ruff check`, `tsc -b` and `vite build` clean. **CI caveat:** see §7.2 item 5c |
 
 ### 7.2 Still open — engineering
 
 | # | Item | Task | Note |
 |---|---|---|---|
-| 0 | **Remaining, in order (v1.4).** (1) **1.4** `store.ts` async rewrite + write-through cache + legacy import — the API it needs exists; (2) **canvas persistence UI** — 1.5 `graph.ts`, then 2.1–2.6 with 2.5 autosave onto `/api/designs`; (3) **3.3** benchmarks seed + `GET /api/benchmarks`; (4) **3.4** sizing UI; (5) **pattern hub API** 4.1/4.2; (6) **admin / legal-gate UI** 5.1–5.4; (7) **Litestream** 7.4 | — | Items 1 and 3 are independent and can run in parallel (E1 / E2) |
-| 1 | ~~No routers for designs, workspaces~~. **Still no routers for sizings, benchmarks, patterns or admin** | 3.3, 3.6, 4.1, 5.1–5.4 | Workspaces and designs **done at v1.4**. Next backend item: **3.3** benchmarks |
+| 0 | **Remaining, in order (v1.5).** ~~1.4~~, ~~3.3~~, ~~3.4~~ done. (1) **Interactive canvas** following the demo layout — 1.5 `graph.ts` + `validateGraph()`, then 2.1–2.6 (`@xyflow/react` shell, palette, labelled edges, inspector, autosave onto `/api/designs`, legacy component migration), 2.8 undo/redo, 2.9 status-bar warnings; (2) **3.6** attach a sizing scenario to a node + `benchmark_snapshot_json` pinning, with **3.7** reusing `reviewHints()` rules server-side or dropping the endpoint; (3) **pattern hub API** 4.1/4.2; (4) **admin / legal-gate UI** 5.1–5.4, including benchmark editing (NFR-EXT-001); (5) **Litestream** 7.4; (6) move CI into this repo (item 5c) | — | (1) is the big one (~11 pd). (2) and (3) are backend-led and can run in parallel with it |
+| 1 | ~~No routers for designs, workspaces, benchmarks~~. **Still no routers for sizings, patterns or admin** | 3.6, 4.1, 5.1–5.4 | Workspaces and designs done at v1.4, benchmarks (read-only) at v1.5 |
 | 2 | **No search endpoint.** `patterns_fts` is populated and tested; `search_published_patterns()` is specified (§3.4), not written | 4.2 | All search must route through this one function (`M1`) |
-| 3 | **Frontend wiring, partly done.** ~~`client.ts`, `auth.ts`~~ done at v1.4. **Still open:** `store.ts` async rewrite (1.4) — the workspace modal still saves to `localStorage` and still says so; `graph.ts` (1.5); `src/api/workspace.ts` / `designs.ts`. `sizing.ts` still has **no call site** and `SizingScreen.tsx` is still hard-coded HTML (3.4) | 1.4, 1.5, 3.4 | 1.4 is now unblocked on both sides |
+| 3 | **Frontend wiring, mostly done.** ~~`client.ts`, `auth.ts`~~ (v1.4), ~~`store.ts` async (1.4), `workspace.ts`, `benchmarks.ts`, Sizing calculator (3.4)~~ (v1.5). **Still open:** `graph.ts` (1.5), `designs.ts` + the canvas (2.x). **Known gaps in 3.4:** the engine's `assumptions` strings are English-only (the VI screen labels them as engine output); `headroom` (30%) and `indexOverhead` (30%) are engine defaults shown in the assumptions but not editable; scenarios are not saved yet (3.6) | 1.5, 2.x, 3.6 | — |
 | 3b | **Referential integrity of stored graphs is not checked server-side.** The API accepts a graph whose edge names a missing node, or two nodes with one id — JSON Schema cannot say otherwise (item 11) | 1.5 | When 1.5 decides which `validateGraph()` rules are hard errors (not warnings — `REQ-DESIGN-007` wants an orphan to warn and still save), mirror **only those** in the designs router. ~20 lines |
 | 3c | **No HTTP body-size limit.** The 1 MiB graph cap runs after the body is parsed; uvicorn itself has no limit | 7.x | Put `client_max_body_size` on the TLS proxy in front of the container (devops), or a small ASGI guard |
 | 4 | ~~**`main.tsx` is still one 292-line file**~~ | 1.1 | **Done at v1.3.** See §3.5.3 |
@@ -781,6 +802,31 @@ now has teeth, and the negative control proves it.
 | `ArchPilot/package.json`, `package-lock.json` | `jsdom` added as a devDependency (shell test only) |
 | `docs/development/systemsarchitect-build-scope.md` | this document — §3.5.3, §5, §7.1, §7.2 and the task tables carry the v1.3 record; there is no separate build note |
 
+### Files added / changed at v1.5 (tasks 1.4, 3.3, 3.4)
+
+| Path | Responsibility |
+|---|---|
+| `ArchPilot/backend/app/migrations/004_benchmark_seed.sql` | **new.** `benchmarks.origin`, `benchmark_seed_log`, citation-title triggers, edit → `origin=user` trigger |
+| `ArchPilot/backend/app/repositories/benchmarks.py` | **new.** Seed data (10 rows), `seed_benchmarks()`, `list_benchmarks()` |
+| `ArchPilot/backend/app/routers/benchmarks.py` | **new.** `GET /api/benchmarks` |
+| `ArchPilot/backend/app/schemas.py` | `BenchmarkOut`, `BenchmarkList` |
+| `ArchPilot/backend/app/main.py` | registers the router; seeds benchmarks at start-up (logged, non-fatal) |
+| `ArchPilot/backend/scripts/seed_benchmarks.py` | **new.** Manual/idempotent seed run |
+| `ArchPilot/backend/tests/test_benchmarks.py` | **new.** 19 tests |
+| `ArchPilot/backend/tests/test_contracts.py`, `test_schema_invariants.py` | +1 live-response test; one fixture row gains a `source_title` |
+| `ArchPilot/backend/README.md` | endpoint + layout + script entries |
+| `ArchPilot/src/api/workspace.ts`, `src/api/benchmarks.ts` | **new.** Resource modules |
+| `ArchPilot/src/domain/store.ts` | **rewritten.** Async, server-backed, owner-scoped cache, legacy import, conflict/offline handling |
+| `ArchPilot/src/domain/benchmarks.ts`, `src/domain/sizingCalculator.ts` | **new.** Pairing + calculator model |
+| `ArchPilot/src/features/workspace/useWorkspace.ts` | **new.** The hook the shell uses |
+| `ArchPilot/src/features/workspace/WorkspaceModal.tsx` | async save, saving state, conflict/error message, server-profile copy |
+| `ArchPilot/src/features/sizing/SizingScreen.tsx` | **rewritten.** The calculator |
+| `ArchPilot/src/app/App.tsx` | `useWorkspace(user.id)`, sync line + Retry under the switcher, cache cleared on logout |
+| `ArchPilot/src/styles.css` | sync line, modal message, calculator styles (appended) |
+| `ArchPilot/src/domain/store.test.ts`, `src/features/workspace/WorkspaceModal.test.tsx`, `src/domain/sizingCalculator.test.ts`, `src/features/sizing/SizingScreen.test.tsx` | **new.** 14 + 5 + 22 + 12 tests |
+| `ArchPilot/src/features/auth/LoginScreen.test.tsx` | fake backend answers `/api/workspaces/current` (404) |
+| `ArchPilot/docs/systemsarchitect-build-scope.md` | this document — v1.5 |
+
 ### Files added / changed at v1.4 (tasks 1.2, 1.3, 1.6)
 
 | Path | Responsibility |
@@ -812,6 +858,7 @@ now has teeth, and the negative control proves it.
 
 | Agent / role | What they need to do |
 |---|---|
+| **senior-developer-2 (v1.5)** | Review the v1.5 slice together with v1.4. Attack first: (a) the store's offline path — a pending edit is pushed automatically on the next load; is silent auto-push right, or should the user confirm? (b) the one-time legacy import goes to whichever user signs in first on that browser; (c) the seed runs at every start-up and logs rather than fails; (d) the peak → average conversion in `toWorkload` (floating-point at `ceil` boundaries); (e) engine assumptions shown in English on the VI screen |
 | **senior-developer-2 (v1.4)** | Review the v1.4 slice. Attack first: (a) the reversal of the contract's "no runtime validation" non-goal — `jsonschema` at runtime vs. a second pydantic definition; (b) GET `/api/workspaces/current` answering 404 before first save instead of auto-creating; (c) the "unreachable" heuristic in `client.ts` (any 5xx without our envelope, plus 502/503/504); (d) soft delete with no purge path |
 | **senior-developer-2** | **Done** — review delivered as `docs/development/reviews/review-systemsarchitect-backend.md` v1.0, approve-with-changes, 14 findings fixed in code. **Next:** re-review the two handed-back deliverables (`ArchPilot/contracts/` and `src/domain/sizing.ts` v2.0). Specific things to attack: the decision to close `archNode`/`archEdge` with `additionalProperties: false` against NFR-EXT-002's "readers ignore unknown fields"; whether `spareNodes` belongs outside the confidence band; and whether storage should use average rather than peak write QPS |
 | **ba-qa-analyst** | `TC-COMPLY-002`/`003` are green; `TC-COMPLY-005` (publish with no approval refused at the storage layer) and `TC-COMPLY-006` (a reviewed pattern cannot be deleted) are now testable. **`TC-FUNC-CALC-010` (replication applied to write throughput) is unblocked and already has an automated equivalent** — `sizing.test.ts` "a 3x replicated write path needs 3x the write capacity"; write the manual/acceptance form of it plus the other three B3 terms. `TC-COMPLY-004` still needs the seed script |

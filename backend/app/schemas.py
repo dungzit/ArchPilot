@@ -175,3 +175,35 @@ class DesignList(ApiModel):
     total: int
     limit: int
     offset: int
+
+
+# --------------------------------------------------------------------------
+# Benchmarks (task 3.3). Shared reference data, read by any signed-in user.
+# One row = one metric; the SPA pairs read_qps + write_qps into a NodeBenchmark.
+# --------------------------------------------------------------------------
+
+Confidence = Literal["measured", "declared", "estimated", "unverified"]
+
+
+class BenchmarkOut(ApiModel):
+    id: str
+    component_type: str
+    metric: str
+    value: float
+    unit: str
+    hardware_profile: str
+    basis: str
+    # The citation. `source_title` is always present (migration 004);
+    # `source_url` is required for measured/declared (migration 001) and is
+    # null for the generic 'estimated' heuristics the seed ships.
+    source_title: str
+    source_url: str | None = None
+    retrieved_date: str | None = None
+    confidence: Confidence
+    origin: Literal["seed", "user"]
+    updated_at: str
+
+
+class BenchmarkList(ApiModel):
+    items: list[BenchmarkOut]
+    total: int

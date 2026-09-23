@@ -207,3 +207,12 @@ def test_new_error_paths_obey_the_error_shape(user_a, user_b):
         assert response.status_code == expected_status, response.text
         validator_for("#/$defs/errorResponse").validate(response.json())
         assert response.json()["requestId"] == response.headers["x-request-id"]
+
+
+def test_benchmark_response_obeys_the_casing_and_timestamp_rules(user_a):
+    """Task 3.3: the new read-only resource obeys the same envelope rules."""
+    body = user_a.get("/api/benchmarks").json()
+    validator_for("#/$defs/camelCaseObject").validate(body)
+    assert body["items"], "startup seed should have produced rows"
+    for item in body["items"]:
+        validator_for("#/$defs/timestamp").validate(item["updatedAt"])
