@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "1.0",
+  "nodes": [
+    {
+      "id": "n_client",
+      "type": "client",
+      "label": "Web SPA",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "n_lb",
+      "type": "load_balancer",
+      "label": "Ingress",
+      "position": { "x": 220, "y": 0 }
+    },
+    {
+      "id": "n_checkout",
+      "type": "service",
+      "label": "Checkout API",
+      "position": { "x": 440, "y": 0 },
+      "rationale": "Split out of the monolith so checkout scales independently of catalogue browsing.",
+      "sizingScenarioId": "siz_7c1f2a",
+      "props": { "runtime": "java21", "replicas": 4 }
+    },
+    {
+      "id": "n_orders",
+      "type": "database",
+      "label": "Orders (Postgres)",
+      "position": { "x": 660, "y": -90 },
+      "rationale": "Strong consistency required for order state transitions."
+    },
+    {
+      "id": "n_events",
+      "type": "queue",
+      "label": "order-events",
+      "position": { "x": 660, "y": 90 }
+    },
+    {
+      "id": "n_note",
+      "type": "note",
+      "label": "Peak = Black Friday, 3x baseline",
+      "position": { "x": 440, "y": 200 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "n_client",
+      "target": "n_lb",
+      "label": "HTTPS",
+      "direction": "forward"
+    },
+    {
+      "id": "e2",
+      "source": "n_lb",
+      "target": "n_checkout",
+      "label": "routes to",
+      "direction": "forward"
+    },
+    {
+      "id": "e3",
+      "source": "n_checkout",
+      "target": "n_orders",
+      "label": "writes to",
+      "direction": "forward",
+      "rationale": "Synchronous write; the order id is returned to the caller."
+    },
+    {
+      "id": "e4",
+      "source": "n_checkout",
+      "target": "n_events",
+      "label": "publishes",
+      "direction": "forward"
+    },
+    {
+      "id": "e5",
+      "source": "n_checkout",
+      "target": "n_client",
+      "label": "",
+      "direction": "bidirectional"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "nodes": [
+    { "id": "n1", "type": "service", "label": "Checkout API", "position": { "x": 0, "y": 0 } },
+    { "id": "n2", "type": "database", "label": "Orders", "position": { "x": 200, "y": 0 } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n1", "target": "n2", "label": "writes to" }
+  ]
+}

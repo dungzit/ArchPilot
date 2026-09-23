@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archpilot.internal/contracts/archgraph.schema.json",
+  "title": "ArchPilot wire contract",
+  "version": "1.0.0",
+  "description": "Single source of truth for the shapes that cross the Python/TypeScript boundary. Build-scope decision D2 replaced the architects' shared `packages/core` with a Python backend, so nothing in the toolchain reconciles the two languages any more; this file is the replacement (decision D4). It covers (1) the ArchGraph shape shared by designs and patterns, and (2) three envelope rules, because the review of 2026-09-23 found that envelope drift - not graph drift - caused the first real bug. Validated by ArchPilot/backend/tests/test_contracts.py (jsonschema) and ArchPilot/src/contracts/contract.test.ts (ajv), both driven by fixtures/index.json. Deliberately NOT an OpenAPI document and deliberately not code-generated: at 2-4 users and one graph type a hand-maintained schema plus shared fixtures is right-sized.",
+
+  "$defs": {
+
+    "camelCaseKey": {
+      "title": "Envelope rule (a) - wire casing",
+      "description": "Every key that crosses the HTTP boundary is camelCase. The SPA's domain types are camelCase throughout (WorkspaceRecord.projectName, EntityEnvelope.schemaVersion, SizingResult.formulaVersion); Python is snake_case. The wire picks camelCase once, here. Backend side: app/schemas.py ApiModel sets alias_generator=to_camel.",
+      "type": "string",
+      "pattern": "^[a-z][A-Za-z0-9]*$"
+    },
+
+    "camelCaseObject": {
+      "description": "Recursively asserts envelope rule (a) over a whole response body. Point any live API response at this to prove no snake_case key slipped in at any depth.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
+      "additionalProperties": { "$ref": "#/$defs/camelCaseValue" }
+    },
+
+    "camelCaseValue": {
+      "anyOf": [
+        { "type": ["string", "number", "boolean", "null"] },
+        { "type": "array", "items": { "$ref": "#/$defs/camelCaseValue" } },
+        { "$ref": "#/$defs/camelCaseObject" }
+      ]
+    },
+
+    "timestamp": {
+      "title": "Envelope rule (c) - timestamp format",
+      "description": "ISO 8601, always UTC, always with an explicit offset - `2026-09-23T06:26:52+00:00` or `2026-09-23T06:26:52Z`. A naive local timestamp is rejected: JavaScript's Date parses `2026-09-23 06:26:52` as local time and `2026-09-23T06:26:52` as UTC, so an offset-less string means two clients disagree about the same instant. Backend side: datetime.now(timezone.utc).replace(microsecond=0).isoformat().",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,6})?(Z|[+]00:00)$"
+    },
+
+    "errorResponse": {
+      "title": "Envelope rule (b) - error shape",
+      "description": "Every non-2xx JSON body is exactly {detail} or {detail, requestId}. `detail` is a human-readable string, never an object or a list - FastAPI's default RequestValidationError body is a list and is normalised by app/main.py's exception handlers so this rule holds for 4xx as well as 5xx. `requestId` echoes the x-request-id response header so a user can quote one token in a bug report.",
+      "type": "object",
+      "required": ["detail"],
+      "properties": {
+        "detail": { "type": "string", "minLength": 1 },
+        "requestId": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+
+    "nodeType": {
+      "description": "Fixed palette (REQ-DESIGN-002). Adding a member is an additive, one-line edit here plus PALETTE in src/domain/graph.ts; that edit is the point of this file, not an obstacle to it. Renaming or removing one requires an ArchGraph schemaVersion bump.",
+      "type": "string",
+      "enum": [
+        "client",
+        "cdn",
+        "load_balancer",
+        "service",
+        "database",
+        "cache",
+        "queue",
+        "object_store",
+        "external_api",
+        "note"
+      ]
+    },
+
+    "position": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+
+    "archNode": {
+      "type": "object",
+      "required": ["id", "type", "label", "position"],
+      "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "type": { "$ref": "#/$defs/nodeType" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "position": { "$ref": "#/$defs/position" },
+        "rationale": { "type": "string", "maxLength": 4000 },
+        "sizingScenarioId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "props": {
+          "description": "The extension point (NFR-EXT-002). Adding a props key is additive and needs no change to this file; that is why the node object itself can afford to be closed.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
+          "additionalProperties": { "type": ["string", "number"] }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "archEdge": {
+      "type": "object",
+      "required": ["id", "source", "target", "label", "direction"],
+      "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "source": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "target": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "label": {
+          "description": "REQ-DESIGN-003. Required as a key, may be empty: an unlabelled edge is a warning in validateGraph(), not a contract violation.",
+          "type": "string",
+          "maxLength": 120
+        },
+        "direction": { "type": "string", "enum": ["forward", "bidirectional"] },
+        "rationale": { "type": "string", "maxLength": 4000 }
+      },
+      "additionalProperties": false
+    },
+
+    "archGraph": {
+      "title": "ArchGraph - the one graph shape",
+      "description": "A user design and a reference pattern serialise to the identical document (architects' decision D1), which is what makes REQ-HUB-007 'apply to canvas' a deep copy with new IDs and REQ-HUB-008 'compare' a set diff. KNOWN LIMIT: JSON Schema cannot express referential integrity, so 'every edge.source names an existing node.id' and 'node ids are unique' are NOT checked here - they belong to validateGraph() in src/domain/graph.ts (task 1.5). This file checks shape; validateGraph() checks consistency.",
+      "type": "object",
+      "required": ["schemaVersion", "nodes", "edges"],
+      "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
+      "properties": {
+        "schemaVersion": {
+          "description": "Pinned (NFR-EXT-002). Adding '1.1' here is the deliberate act that says a migration function exists in src/domain/graph.ts.",
+          "type": "string",
+          "enum": ["1.0"]
+        },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/archNode" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/archEdge" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "error": "Unprocessable Entity",
+  "code": 422,
+  "detail": [
+    { "type": "missing", "loc": ["body", "password"], "msg": "Field required" }
+  ]
+}

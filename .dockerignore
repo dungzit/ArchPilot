@@ -1,0 +1,27 @@
+# Both images build with ArchPilot/ as the context:
+#   docker build -f Dockerfile         -t archpilot-spa:dev .   (SPA + nginx)
+#   docker build -f backend/Dockerfile -t archpilot:dev     .   (SPA + FastAPI)
+# so this one file governs both.
+node_modules
+dist
+.git
+*.log
+
+# review-2 (2026-09-23): ArchPilot/Dockerfile uses `COPY . .`. Without the rules
+# below it copied the backend's Windows virtualenv, the developer SQLite
+# database and any local .env straight into the SPA image, and both builds
+# uploaded ~100 MB of context that neither of them reads.
+backend/.venv
+backend/data
+**/.env
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+*.db
+*.db-wal
+*.db-shm
+
+# Keep: backend/requirements.txt, backend/app, backend/scripts and backend/
+# migrations are COPYed explicitly by backend/Dockerfile. Do not exclude
+# backend/ wholesale.

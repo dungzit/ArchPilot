@@ -1,0 +1,13 @@
+-r requirements.txt
+# Test-only dependencies. httpx is required by fastapi.testclient.
+# jsonschema validates ../contracts/archgraph.schema.json in tests/test_contracts.py.
+# It is deliberately NOT a runtime dependency: the contract is a build-time guard
+# against Python/TypeScript drift, not a request-path validator (pydantic already
+# owns that). The runtime dependency count stays at three.
+pytest==8.3.4
+httpx==0.28.1
+jsonschema==4.23.0
+# Lint-only (task 0.7). Configured by backend/ruff.toml, run by
+# .github/workflows/ci.yml as `ruff check .`. `ruff format --check` is NOT in CI
+# yet - see the note at the bottom of ruff.toml.
+ruff==0.14.6

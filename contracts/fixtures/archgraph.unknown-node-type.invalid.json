@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "kubernetes_pod",
+      "label": "checkout-7f9c",
+      "position": { "x": 0, "y": 0 }
+    }
+  ],
+  "edges": []
+}

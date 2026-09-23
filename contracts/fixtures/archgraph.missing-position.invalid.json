@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "service",
+      "label": "Checkout API"
+    }
+  ],
+  "edges": []
+}

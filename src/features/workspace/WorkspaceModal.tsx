@@ -1,0 +1,16 @@
+import { useState } from 'react'
+import { CheckCircle2, ShieldCheck, X } from 'lucide-react'
+import { copy, type TextFn } from '../../ui/copy'
+import { saveWorkspace, type WorkspaceRecord } from '../../domain/store'
+
+export function WorkspaceModal({ text, workspace, onClose, onSave }: { text: TextFn; workspace: WorkspaceRecord | null; onClose: () => void; onSave: (workspace: WorkspaceRecord) => void }) {
+  const [name, setName] = useState(workspace?.name ?? 'Personal workspace')
+  const [projectName, setProjectName] = useState(workspace?.projectName ?? 'OrderFlow modernization')
+  const [systemName, setSystemName] = useState(workspace?.systemName ?? 'OrderFlow API')
+  const [deploymentTarget, setDeploymentTarget] = useState(workspace?.deploymentTarget ?? 'aws')
+  function persist() {
+    const next = saveWorkspace({ id: workspace?.id ?? 'workspace-personal', name, projectName, systemName, deploymentTarget })
+    onSave(next)
+  }
+  return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="modal workspace-modal"><div className="modal-header"><div><div className="eyebrow">WORKSPACE PROFILE</div><h2>{text(copy('Thiết lập workspace', 'Configure workspace'))}</h2><p>{text(copy('Thông tin này là context chung cho các quyết định và báo cáo.', 'This context is shared by decisions and reports.'))}</p></div><button className="icon-button" onClick={onClose}><X size={18} /></button></div><div className="modal-body"><div className="form-column"><label>{text(copy('Tên workspace', 'Workspace name'))}<input value={name} onChange={(event) => setName(event.target.value)} /></label><label>{text(copy('Tên project', 'Project name'))}<input value={projectName} onChange={(event) => setProjectName(event.target.value)} /></label><label>{text(copy('Hệ thống pilot', 'Pilot system'))}<input value={systemName} onChange={(event) => setSystemName(event.target.value)} /></label><label>{text(copy('Deployment target', 'Deployment target'))}<select value={deploymentTarget} onChange={(event) => setDeploymentTarget(event.target.value)}><option value="aws">AWS</option><option value="kubernetes">Kubernetes</option><option value="vmware">VMware</option><option value="on_premises">On-premises</option><option value="hybrid">Hybrid</option></select></label></div><div className="calculation-column"><div className="eyebrow">LOCAL PROFILE</div><div className="result-card primary-result"><span>{text(copy('Current target', 'Current target'))}</span><strong>{deploymentTarget}</strong><small>{text(copy('Lưu trong trình duyệt hiện tại', 'Saved in this browser'))}</small></div><div className="calculation-note"><ShieldCheck size={16} /><span>{text(copy('Prototype local chưa đồng bộ cloud. Dữ liệu sẽ được nối backend sau vertical slice.', 'The local prototype does not sync to the cloud yet. A backend follows the vertical slice.'))}</span></div></div></div><div className="modal-footer"><button className="secondary-button" onClick={onClose}>{text(copy('Hủy', 'Cancel'))}</button><button className="primary-button" onClick={persist}><CheckCircle2 size={16} /> {text(copy('Lưu workspace', 'Save workspace'))}</button></div></div></div>
+}

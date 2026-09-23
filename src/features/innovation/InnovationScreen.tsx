@@ -1,0 +1,12 @@
+import { ArrowUpRight, Plus, Search } from 'lucide-react'
+import { PageHeader } from '../../ui/PageHeader'
+import { copy, type TextFn } from '../../ui/copy'
+
+const technologyRows = [
+  { name: 'Amazon EKS', category: 'Container platform', state: 'Adopt', impact: 'High', color: 'green' },
+  { name: 'Amazon Aurora PostgreSQL', category: 'Data platform', state: 'Adopt', impact: 'High', color: 'green' },
+  { name: 'Amazon ElastiCache', category: 'Caching', state: 'Trial', impact: 'Medium', color: 'blue' },
+  { name: 'Apache Kafka', category: 'Event streaming', state: 'Assess', impact: 'High', color: 'orange' },
+]
+
+export function Innovation({ text }: { text: TextFn }) { return <div className="page-content"><PageHeader eyebrow="TECHNOLOGY RADAR" title={text(copy('Theo dõi điều đáng thử.', 'Track what is worth trying.'))} description={text(copy('Kết hợp public best practice với bối cảnh cloud, on-premises, Kubernetes và năng lực cá nhân của bạn.', 'Blend public best practices with your cloud, on-premises, Kubernetes context, and personal capability.'))} text={text} action={<button className="primary-button"><Plus size={17} /> {text(copy('Thêm technology', 'Add technology'))}</button>} /><div className="radar-layout"><section className="panel radar-panel"><div className="radar-visual"><div className="radar-ring ring-1" /><div className="radar-ring ring-2" /><div className="radar-ring ring-3" /><div className="radar-cross cross-h" /><div className="radar-cross cross-v" /><span className="radar-dot dot-1">EKS</span><span className="radar-dot dot-2">MSK</span><span className="radar-dot dot-3">Karpenter</span><span className="radar-dot dot-4">FinOps</span><span className="radar-center">YOU</span></div><div className="radar-legend"><span><i className="legend-dot green" /> Adopt</span><span><i className="legend-dot blue" /> Trial</span><span><i className="legend-dot orange" /> Assess</span><span><i className="legend-dot grey" /> Watch</span></div></section><section className="panel tech-list"><div className="section-heading compact"><div><div className="eyebrow">CURATED SIGNALS</div><h2>Technology candidates</h2></div><Search size={17} /></div>{technologyRows.map((row) => <div className="tech-row" key={row.name}><div className={`tech-logo ${row.color}`}>{row.name.slice(0, 2)}</div><div className="tech-copy"><strong>{row.name}</strong><small>{row.category}</small></div><span className={`radar-state ${row.color}`}>{row.state}</span><span className="impact">{row.impact}</span><ArrowUpRight size={15} /></div>)}</section></div></div> }

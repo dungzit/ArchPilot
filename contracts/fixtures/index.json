@@ -1,0 +1,128 @@
+{
+  "contract": "../archgraph.schema.json",
+  "description": "The shared fixture manifest. Both test suites read THIS file and iterate - ArchPilot/backend/tests/test_contracts.py (Python, jsonschema) and ArchPilot/src/contracts/contract.test.ts (TypeScript, ajv). If a fixture ever has to be copied into one of the suites, the contract is already broken. Cases marked expect=invalid must FAIL validation in both suites, and must fail on the keyword named in expectKeyword - a fixture that fails for an accidental reason proves nothing.",
+  "cases": [
+    {
+      "fixture": "archgraph.minimal.valid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "valid",
+      "rule": "graph-shape",
+      "why": "An empty canvas is a legal design. Nodes and edges are required keys, not required content."
+    },
+    {
+      "fixture": "archgraph.checkout-service.valid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "valid",
+      "rule": "graph-shape",
+      "why": "Exercises every optional field at once: rationale on a node and on an edge, sizingScenarioId (REQ-CALC-007), props with a string and a number, an empty edge label, and both edge directions."
+    },
+    {
+      "fixture": "envelope.camel-case.valid.json",
+      "schemaRef": "#/$defs/camelCaseObject",
+      "expect": "valid",
+      "rule": "casing",
+      "why": "Shape of a real login + health response. Proves the recursive casing check accepts nested objects, arrays of objects, numbers, booleans and null."
+    },
+    {
+      "fixture": "error.detail-only.valid.json",
+      "schemaRef": "#/$defs/errorResponse",
+      "expect": "valid",
+      "rule": "error-shape",
+      "why": "requestId is optional; FastAPI's own HTTPException body is {detail} and must stay legal."
+    },
+    {
+      "fixture": "error.with-request-id.valid.json",
+      "schemaRef": "#/$defs/errorResponse",
+      "expect": "valid",
+      "rule": "error-shape",
+      "why": "The 500 path adds requestId so a user can quote one token in a bug report."
+    },
+    {
+      "fixture": "timestamp.utc-offset.valid.json",
+      "schemaRef": "#/$defs/timestamp",
+      "expect": "valid",
+      "rule": "timestamp",
+      "why": "Exactly what datetime.now(timezone.utc).replace(microsecond=0).isoformat() emits today - LoginResponse.expiresAt."
+    },
+    {
+      "fixture": "timestamp.utc-zulu.valid.json",
+      "schemaRef": "#/$defs/timestamp",
+      "expect": "valid",
+      "rule": "timestamp",
+      "why": "Z is the other legal UTC spelling, and sub-second precision is allowed. Both are unambiguous."
+    },
+
+    {
+      "fixture": "archgraph.snake-case-key.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "casing",
+      "expectKeyword": "additionalProperties",
+      "why": "THE BUG THIS CONTRACT EXISTS FOR. schema_version / sizing_scenario_id is what a Python-shaped serialiser emits when nobody is enforcing the wire casing. Review finding M-5."
+    },
+    {
+      "fixture": "archgraph.unknown-node-type.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "enum",
+      "why": "The palette is fixed (REQ-DESIGN-002). A node type invented on one side of the language boundary must not silently reach the other."
+    },
+    {
+      "fixture": "archgraph.missing-position.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "required",
+      "why": "position is REQ-DESIGN-005 (reload in the same state). A node without one renders at 0,0 and the user's layout is silently lost."
+    },
+    {
+      "fixture": "archgraph.wrong-schema-version.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "enum",
+      "why": "NFR-EXT-002: a version bump must be a deliberate edit to this contract plus a migration function, not something a writer can assert unilaterally."
+    },
+    {
+      "fixture": "archgraph.edge-missing-direction.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "required",
+      "why": "REQ-DESIGN-003 edges are directional. An absent direction is not 'forward by default' - it is undefined, and the two languages would default it differently."
+    },
+    {
+      "fixture": "envelope.snake-case.invalid.json",
+      "schemaRef": "#/$defs/camelCaseObject",
+      "expect": "invalid",
+      "rule": "casing",
+      "expectKeyword": "pattern",
+      "why": "display_name / expires_at is the exact body the API emitted before review finding M-5. This fixture is the regression test for that bug at the envelope level."
+    },
+    {
+      "fixture": "error.legacy-shape.invalid.json",
+      "schemaRef": "#/$defs/errorResponse",
+      "expect": "invalid",
+      "rule": "error-shape",
+      "expectKeyword": "additionalProperties",
+      "why": "FastAPI's raw RequestValidationError body: detail is a list, plus extra keys. If the backend ever stops normalising it, the SPA's error handler reads detail as a string and renders [object Object]."
+    },
+    {
+      "fixture": "timestamp.naive.invalid.json",
+      "schemaRef": "#/$defs/timestamp",
+      "expect": "invalid",
+      "rule": "timestamp",
+      "expectKeyword": "pattern",
+      "why": "No T, no offset. new Date('2026-09-23 06:26:52') parses as LOCAL time in JS, so a Vietnamese client would read a session expiry 7 hours off."
+    },
+    {
+      "fixture": "timestamp.local-offset.invalid.json",
+      "schemaRef": "#/$defs/timestamp",
+      "expect": "invalid",
+      "rule": "timestamp",
+      "expectKeyword": "pattern",
+      "why": "Unambiguous but not UTC. The rule is UTC on the wire; local-time conversion is a rendering concern, and mixing the two makes stored timestamps non-comparable as strings (sessions.expires_at is compared as TEXT in SQL)."
+    }
+  ]
+}

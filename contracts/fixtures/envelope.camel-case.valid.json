@@ -1,0 +1,16 @@
+{
+  "user": {
+    "id": "usr_28eaecc0ea2948f3",
+    "username": "admin",
+    "displayName": "Admin",
+    "role": "admin"
+  },
+  "expiresAt": "2026-09-23T06:26:52+00:00",
+  "csrfToken": "8b0f1e2d3c4a5b6f",
+  "checks": [
+    { "name": "sqliteRead", "status": "ok", "latencyMs": 2.16 },
+    { "name": "sqliteWrite", "status": "ok", "latencyMs": 2.01 }
+  ],
+  "schemaVersion": "003",
+  "nested": { "deeply": { "stillCamelCase": true, "nullIsFine": null } }
+}

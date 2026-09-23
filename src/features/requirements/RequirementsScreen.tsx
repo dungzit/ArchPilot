@@ -1,0 +1,26 @@
+import { useState } from 'react'
+import { ArrowUpRight, CheckCircle2, Plus } from 'lucide-react'
+import { PageHeader } from '../../ui/PageHeader'
+import { copy, type TextFn } from '../../ui/copy'
+import { loadRequirements, saveRequirements, upsertRequirement, type LocalRequirement, type RequirementConfidence, type RequirementPriority, type RequirementType } from '../../domain/requirements'
+
+export function Requirements({ text }: { text: TextFn }) {
+  const [requirements, setRequirements] = useState<LocalRequirement[]>(() => loadRequirements())
+  const [draft, setDraft] = useState({ type: 'nfr' as RequirementType, title: '', statement: '', priority: 'must' as RequirementPriority, category: 'performance', metric: 'throughput', targetValue: '', unit: 'requests_per_second', confidence: 'declared' as RequirementConfidence })
+  const [message, setMessage] = useState('')
+
+  function addRequirement() {
+    if (!draft.title.trim() || !draft.statement.trim()) {
+      setMessage(text(copy('Cần nhập title và statement.', 'Title and statement are required.')))
+      return
+    }
+    const requirement: LocalRequirement = { ...draft, id: `${draft.type === 'nfr' ? 'NFR' : 'REQ'}-${String(requirements.length + 1).padStart(3, '0')}`, status: 'proposed', updatedAt: new Date().toISOString() }
+    const next = upsertRequirement(requirements, requirement)
+    setRequirements(next)
+    saveRequirements(next)
+    setDraft({ ...draft, title: '', statement: '', targetValue: '' })
+    setMessage(text(copy('Đã lưu requirement vào local workspace.', 'Requirement saved to the local workspace.')))
+  }
+
+  return <div className="page-content"><PageHeader eyebrow="REQUIREMENTS & NFR" title={text(copy('Đặc tả trước khi thiết kế.', 'Specify before you design.'))} description={text(copy('Ghi nhận yêu cầu theo format có thể truy vết đến architecture, sizing và test.', 'Capture requirements in a format traceable to architecture, sizing, and tests.'))} text={text} action={<button className="primary-button" onClick={addRequirement}><Plus size={17} /> {text(copy('Lưu requirement', 'Save requirement'))}</button>} /><div className="requirements-layout"><section className="panel requirement-form"><div className="eyebrow">NEW RECORD</div><h2>{text(copy('Requirement / NFR', 'Requirement / NFR'))}</h2><div className="form-grid"><label>Type<select value={draft.type} onChange={(event) => setDraft({ ...draft, type: event.target.value as RequirementType })}><option value="nfr">NFR</option><option value="functional">Functional</option><option value="constraint">Constraint</option><option value="assumption">Assumption</option></select></label><label>Priority<select value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value as RequirementPriority })}><option value="must">Must</option><option value="should">Should</option><option value="could">Could</option><option value="wont">Won't</option></select></label></div><label>Title<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="e.g. API peak throughput" /></label><label>Statement<textarea value={draft.statement} onChange={(event) => setDraft({ ...draft, statement: event.target.value })} placeholder="The system must..." rows={4} /></label><div className="form-grid"><label>Metric<input value={draft.metric} onChange={(event) => setDraft({ ...draft, metric: event.target.value })} /></label><label>Target value<input value={draft.targetValue} onChange={(event) => setDraft({ ...draft, targetValue: event.target.value })} placeholder="2000" /></label></div><div className="form-grid"><label>Unit<input value={draft.unit} onChange={(event) => setDraft({ ...draft, unit: event.target.value })} /></label><label>Confidence<select value={draft.confidence} onChange={(event) => setDraft({ ...draft, confidence: event.target.value as RequirementConfidence })}><option value="declared">Declared</option><option value="measured">Measured</option><option value="estimated">Estimated</option><option value="unverified">Unverified</option></select></label></div>{message && <div className="form-message">{message}</div>}<button className="primary-button full-button" onClick={addRequirement}><CheckCircle2 size={16} /> {text(copy('Lưu vào workspace', 'Save to workspace'))}</button></section><section className="panel requirement-list"><div className="section-heading compact"><div><div className="eyebrow">ORDERFLOW / REQUIREMENTS</div><h2>{requirements.length} records</h2></div><span className="status-pill teal">local persistence</span></div>{requirements.map((requirement) => <article className="requirement-row" key={requirement.id}><div className={`requirement-code ${requirement.type}`}>{requirement.type === 'nfr' ? 'NFR' : 'REQ'}</div><div className="requirement-copy"><div><strong>{requirement.id} · {requirement.title}</strong><span className={`status-pill ${requirement.priority === 'must' ? 'coral' : 'amber'}`}>{requirement.priority}</span></div><p>{requirement.statement}</p><small>{requirement.metric} {requirement.targetValue || 'not set'} {requirement.unit} · {requirement.confidence}</small></div><ArrowUpRight size={15} /></article>)}</section></div></div>
+}

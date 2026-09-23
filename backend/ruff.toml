@@ -1,0 +1,51 @@
+# Ruff config for the ArchPilot backend (task 0.7).
+#
+# Deliberately a small, enforceable rule set rather than "everything on". The
+# point of CI linting here is to catch real defects (unused imports, shadowed
+# builtins, mutable default args, bare excepts, f-strings in SQL) before review,
+# not to win a style argument. Anything that would need a wide `# noqa` sprawl
+# to adopt is left off and noted below.
+
+# The runtime image is python:3.12-slim, but the documented floor is 3.10 and
+# CI tests both. Target the FLOOR so ruff never suggests syntax that breaks the
+# older interpreter.
+target-version = "py310"
+line-length = 120
+extend-exclude = [".venv", "__pycache__", ".pytest_cache"]
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes - unused imports/names, undefined names
+    "I",    # isort - import ordering
+    "B",    # flake8-bugbear - mutable defaults, loop-variable capture, ...
+    "UP",   # pyupgrade - stale syntax for the target version
+    "C4",   # comprehension misuse
+    "SIM",  # obvious simplifications
+    "BLE",  # blind `except Exception` - the codebase already annotates the
+            # three places it does this on purpose with `# noqa: BLE001`
+    "S",    # flake8-bandit. Added by review-2: the header above already claimed
+            # "f-strings in SQL" were caught, but `S` was not selected, so S608
+            # was not running. Cost of turning it on: exactly two findings, both
+            # pre-existing, both safe, both now annotated with the reason.
+    "RUF",  # ruff-specific, incl. RUF100 (a `# noqa` that no longer applies)
+]
+
+[lint.per-file-ignores]
+# Tests deliberately build long literal SQL and long assertion messages.
+# S101 (assert) is what pytest IS. S106 is the literal password in the auth
+# fixtures - there is no secret to leak in a throwaway test database.
+"tests/*" = ["E501", "S101", "S106"]
+# Migrations are applied by string, not imported.
+"app/migrations/*" = ["ALL"]
+
+[lint.isort]
+known-first-party = ["app", "scripts", "tests"]
+
+# NOTE: `ruff format --check` is deliberately NOT in CI yet. It would rewrite 16
+# of 26 files, and a whole-tree reformat landing in the same change as a
+# refactor makes both unreviewable. Run `ruff format .` once, on its own, then
+# add the check to `.github/workflows/ci.yml`.
+[format]
+quote-style = "double"
