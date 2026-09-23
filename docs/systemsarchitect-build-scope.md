@@ -436,7 +436,7 @@ this confidence-derived band.
 
 | # | Task | Owner | Depends on | Effort | Verification |
 |---|---|---|---|---|---|
-| C.1 | **G0.2**: PO signs the 5-item content-IP policy → `docs/legal/pattern-content-policy.md` | PO | — | 0.5 | Policy committed |
+| C.1 | ~~**G0.2**: PO signs the 5-item content-IP policy~~ → `docs/pattern-content-policy.md`. **DONE 2026-09-23** — approved via chat, formal signature waived by PO, recorded in the doc's Sign-off section | PO | — | 0.5 | Policy committed |
 | C.2 | Shortlist 12 patterns, one per category + 3 doubles, with source URLs | C + Q | C.1 | 1 | PO review |
 | C.3 | Author 12 original summaries; diagrams written **as `ArchGraph` JSON by hand** (`M4` — do not wait for the canvas) | C | C.2, 0.6 | 7 | Word-count + self-check per entry |
 | C.4 | Self-certify each entry against the checklist (`NFR-LEGAL-001`) | C | C.3 | 1 | 12 `legal_reviews` rows with a matching `content_hash` |
@@ -625,7 +625,7 @@ handed-back tasks. This section supersedes the v1.0 stub list.
 
 | Gate | Owner | Blocks |
 |---|---|---|
-| **G0.2 — content-IP policy sign-off** (`docs/legal/pattern-content-policy.md`, task C.1) | **Product Owner** | **The entire content track (10 pd, C.2–C.5), which is the critical path.** Still unsigned. Nothing in the engineering work above unblocks it |
+| ~~G0.2 — content-IP policy sign-off~~ (`docs/pattern-content-policy.md`, task C.1) | **CLEARED 2026-09-23** — chat approval, formal signature waived | The content track (C.2–C.5) is now unblocked to start |
 | G3 — pre-launch legal audit of all 12 entries (task 7.5) | Q + PO | Launch |
 | Open question: deletion of reviewed patterns is now structurally impossible | PO / legal | Confirm takedown-as-unpublish satisfies a rights-holder demand |
 

@@ -5,7 +5,7 @@
 | **Author** | BA/QA Analyst |
 | **Date** | 2026-09-23 |
 | **Version** | 0.1 |
-| **Status** | Draft — awaiting Product Owner sign-off (gate G0.2) |
+| **Status** | **Approved (gate G0.2 cleared)** — via chat approval 2026-09-23, formal signature waived by Product Owner; see Sign-off section |
 | **Related docs** | `docs/requirements/systemsarchitect-requirements.md` (NFR-LEGAL-001/002, REQ-HUB-002/005), `docs/requirements/systemsarchitect-decisions.md` (decision 3), `docs/development/systemsarchitect-build-scope.md` (gate G0.2, task C.1/C.4, `content_hash` invariant) |
 
 ## Executive summary
@@ -57,7 +57,7 @@ If a published pattern entry is later found (or reported) to be non-compliant wi
 | NFR-LEGAL-001 (self-certification) | `legal_reviews` table, admin UI 5-checkbox form (task 5.3) | TC-COMPLY-002 | Pending |
 | NFR-LEGAL-002 (takedown path) | `takedown_requests` table, unpublish endpoint (task 5.4) | TC-COMPLY-003 | Pending |
 | REQ-HUB-005 (attribution always visible) | `patterns` schema NOT NULL + non-blank CHECK | TC-FUNC-HUB-005 | Pending |
-| G0.2 (this policy, signed) | This document | — | **Awaiting PO sign-off** |
+| G0.2 (this policy, signed) | This document | — | **Cleared — approved via chat 2026-09-23** |
 
 ## Step-by-step plan
 
@@ -80,6 +80,8 @@ If a published pattern entry is later found (or reported) to be non-compliant wi
 
 ## Sign-off
 
-**Approved by:** ____________________ (name) **Date:** ____________
+**Approved by:** Product Owner (dungvow@gmail.com), via chat instruction during the SystemsArchitect/ArchPilot build session — explicitly agreed to Sections 1–3 but waived the formal name/date signature block ("i'm agree but i can't sign-off so you can pass this step and continue"). Recorded here as the equivalent approval for this internal-only tool, in place of a written signature.
 
-**Scope of approval:** Approved for **internal-only distribution to the current 2–4 named users** of ArchPilot. This approval must be **revisited if the audience or distribution model changes** (e.g., grows beyond the current named users, or moves toward external/public release).
+**Date:** 2026-09-23
+
+**Scope of approval:** Approved for **internal-only distribution to the current 2–4 named users** of ArchPilot. This approval must be **revisited if the audience or distribution model changes** (e.g., grows beyond the current named users, or moves toward external/public release). *Note: because the formal signature was explicitly waived, if a stricter audit trail is ever needed (e.g., audience grows, or this is challenged externally), a proper written sign-off should be obtained retroactively.*
