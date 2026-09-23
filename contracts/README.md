@@ -29,8 +29,9 @@ So the contract carries both.
 
 | Suite | Validator | Command |
 |---|---|---|
-| Python | `jsonschema` (test-only dependency) | `cd backend && .venv/Scripts/python.exe -m pytest tests/test_contracts.py` |
+| Python | `jsonschema` | `cd backend && .venv/Scripts/python.exe -m pytest tests/test_contracts.py` |
 | TypeScript | `ajv` (devDependency) | `npm test` |
+| **Backend at runtime** (since task 1.6) | `jsonschema`, via `backend/app/contract.py` | every `POST`/`PUT /api/designs` body's `graph` is checked against `#/$defs/archGraph` in **this file**; a violation is a 422 naming the path (`nodes[1].type: ...`) |
 
 Both read **these files**, not copies. Both run every fixture. Both assert that
 the invalid fixtures fail *on the intended keyword* — a fixture that fails for an
@@ -51,9 +52,18 @@ The Python suite additionally validates **live API responses** against rules (a)
 
 - **No OpenAPI / no codegen.** At 2–4 users and one graph type, a generator and
   its pipeline cost more than the drift they prevent. Reviewed and agreed.
-- **No runtime validation from this file.** pydantic validates requests at the
-  boundary; this is a build-time guard. The backend's runtime dependency count
-  stays at three.
+- ~~**No runtime validation from this file.**~~ **Reversed at task 1.6.** The
+  designs API has to validate user-authored graphs, and the only alternative to
+  reading this file was a second, pydantic definition of `ArchGraph` in Python
+  — the exact drift this directory exists to prevent. So the backend loads this
+  file at start-up (`backend/app/contract.py`; the container copies it to
+  `/srv/contracts/`) and refuses to start without it. Cost: `jsonschema` became
+  a runtime dependency (3 → 4). `backend/tests/test_designs.py` POSTs **every
+  `archGraph` fixture in the manifest** to the live endpoint and asserts the
+  same verdict, so the runtime check cannot quietly diverge from the test
+  suites. The envelope rules (casing, error shape, timestamps) are still
+  asserted in tests only; they are properties of our own responses, not of
+  user input.
 - **No referential integrity.** JSON Schema cannot express "every `edge.source`
   names an existing `node.id`" or "node ids are unique". Those belong to
   `validateGraph()` in `src/domain/graph.ts` (task 1.5). This file checks shape;

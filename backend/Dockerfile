@@ -47,6 +47,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/app ./app
 COPY backend/scripts ./scripts
+# Task 1.6: app/contract.py validates design bodies against this file at request
+# time and refuses to start without it (it looks in /srv/contracts first).
+COPY contracts/archgraph.schema.json ./contracts/archgraph.schema.json
 COPY --from=spa /spa/dist ./static
 
 RUN useradd --system --uid 10001 archpilot && mkdir -p /data && chown -R archpilot /data /srv

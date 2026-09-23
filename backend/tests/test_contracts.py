@@ -150,3 +150,60 @@ def test_error_bodies_carry_the_request_id_that_the_header_carries(client):
     body = response.json()
     validator_for("#/$defs/errorResponse").validate(body)
     assert body["requestId"] == "contract-test-1" == response.headers["x-request-id"]
+
+
+# --------------------------------------------------------------------------
+# Tasks 1.3 / 1.6: the new resources obey the same envelope rules, and a
+# stored graph comes back still satisfying the ArchGraph contract.
+# --------------------------------------------------------------------------
+
+_GRAPH = load_fixture("archgraph.checkout-service.valid.json")
+_WORKSPACE_BODY = {
+    "name": "Contract ws",
+    "projectName": "p",
+    "systemName": "s",
+    "deploymentTarget": "on_premises",
+    "revision": 0,
+}
+
+
+def test_workspace_response_obeys_the_casing_and_timestamp_rules(user_a):
+    body = user_a.put("/api/workspaces/current", json=_WORKSPACE_BODY).json()
+    validator_for("#/$defs/camelCaseObject").validate(body)
+    validator_for("#/$defs/timestamp").validate(body["updatedAt"])
+    validator_for("#/$defs/camelCaseObject").validate(user_a.get("/api/workspaces/current").json())
+
+
+def test_design_responses_obey_the_casing_and_timestamp_rules_and_carry_a_valid_graph(user_a):
+    created = user_a.post("/api/designs", json={"name": "contract", "graph": _GRAPH}).json()
+    fetched = user_a.get(f"/api/designs/{created['id']}").json()
+    updated = user_a.put(
+        f"/api/designs/{created['id']}", json={"name": "contract 2", "graph": _GRAPH, "revision": 1}
+    ).json()
+    listed = user_a.get("/api/designs").json()
+    for body in (created, fetched, updated, listed):
+        validator_for("#/$defs/camelCaseObject").validate(body)
+    for body in (created, fetched, updated, *listed["items"]):
+        validator_for("#/$defs/timestamp").validate(body["createdAt"])
+        validator_for("#/$defs/timestamp").validate(body["updatedAt"])
+    for body in (created, fetched, updated):
+        validator_for("#/$defs/archGraph").validate(body["graph"])
+
+
+def test_new_error_paths_obey_the_error_shape(user_a, user_b):
+    """404 (non-owner), 409 (stale revision), 422 (contract violation) and 404
+    (no workspace yet) - every new error path the SPA's ApiError has to parse."""
+    design = user_a.post("/api/designs", json={"name": "x", "graph": _GRAPH}).json()
+    path = f"/api/designs/{design['id']}"
+    user_a.put(path, json={"name": "x", "graph": _GRAPH, "revision": 1})
+    broken = load_fixture("archgraph.snake-case-key.invalid.json")
+    responses = {
+        404: user_b.get(path),
+        409: user_a.put(path, json={"name": "x", "graph": _GRAPH, "revision": 1}),
+        422: user_a.post("/api/designs", json={"name": "x", "graph": broken}),
+    }
+    responses_ws = user_b.get("/api/workspaces/current")
+    for expected_status, response in [*responses.items(), (404, responses_ws)]:
+        assert response.status_code == expected_status, response.text
+        validator_for("#/$defs/errorResponse").validate(response.json())
+        assert response.json()["requestId"] == response.headers["x-request-id"]

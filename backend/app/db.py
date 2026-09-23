@@ -18,6 +18,7 @@ import logging
 import re
 import sqlite3
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -50,6 +51,25 @@ def connect(db_path: Path | str | None = None, *, read_only: bool = False) -> sq
     if read_only:
         conn.execute("PRAGMA query_only = ON")
     return conn
+
+
+@contextmanager
+def immediate_transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
+    """``BEGIN IMMEDIATE`` ... ``COMMIT``, rolled back on any exception.
+
+    Connections are opened in autocommit mode (``isolation_level=None``), so a
+    read-check-write sequence - "is the revision still 3? then write 4" - is
+    only atomic inside an explicit transaction. ``IMMEDIATE`` takes the write
+    lock up front, which serialises two concurrent writers instead of letting
+    both pass the check and then fail (or worse, both succeed) at write time.
+    """
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield conn
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
 
 
 def get_connection() -> Iterator[sqlite3.Connection]:

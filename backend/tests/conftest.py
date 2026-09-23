@@ -81,3 +81,54 @@ def login(client, seeded_user):
         return {"x-csrf-token": response.json()["csrfToken"]}
 
     return _login
+
+
+# --------------------------------------------------------------------------
+# Two-user fixtures for the owner-scoping tests (tasks 1.3 / 1.6). Each user
+# gets their own TestClient - their own cookie jar - against the same app and
+# the same database, which is what two browsers on two desks look like.
+# --------------------------------------------------------------------------
+
+SECOND_USER = {"username": "intruder", "password": "another-long-password"}
+
+
+def _logged_in_client(app, username: str, password: str):
+    from fastapi.testclient import TestClient
+
+    test_client = TestClient(app)
+    test_client.__enter__()
+    response = test_client.post("/api/auth/login", json={"username": username, "password": password})
+    assert response.status_code == 200, response.text
+    # A browser SPA echoes the CSRF cookie on every mutation; so does this client.
+    test_client.headers["x-csrf-token"] = response.json()["csrfToken"]
+    return test_client
+
+
+@pytest.fixture()
+def second_user(migrated_db, temp_settings):
+    from app.repositories import users as users_repo
+
+    user_id = users_repo.create_user(
+        migrated_db,
+        username=SECOND_USER["username"],
+        password=SECOND_USER["password"],
+        role="member",
+        iterations=temp_settings.pbkdf2_iterations,
+    )
+    return {"id": user_id, **SECOND_USER}
+
+
+@pytest.fixture()
+def user_a(client, seeded_user):
+    """``architect``, logged in, CSRF header preset."""
+    test_client = _logged_in_client(client.app, seeded_user["username"], seeded_user["password"])
+    yield test_client
+    test_client.__exit__(None, None, None)
+
+
+@pytest.fixture()
+def user_b(client, second_user):
+    """``intruder``, a different member, logged in, CSRF header preset."""
+    test_client = _logged_in_client(client.app, second_user["username"], second_user["password"])
+    yield test_client
+    test_client.__exit__(None, None, None)

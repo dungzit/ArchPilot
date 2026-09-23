@@ -20,11 +20,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__
 from .config import BACKEND_ROOT, get_settings
+from .contract import load_contract
 from .csrf import CSRF_HEADER, enforce_csrf
 from .db import connect, init_database
 from .logging_config import configure_logging
 from .repositories import users as users_repo
-from .routers import auth, health
+from .routers import auth, designs, health, workspaces
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,10 @@ def _flatten_validation_error(exc: RequestValidationError) -> str:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # Designs are validated against contracts/archgraph.schema.json at request
+    # time. A container built without that file must fail here, at start-up,
+    # not with a 500 on somebody's first save.
+    load_contract()
 
     app = FastAPI(
         title="ArchPilot Backend",
@@ -204,6 +209,8 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(workspaces.router)
+    app.include_router(designs.router)
 
     # Single-container deployment: if the built SPA is present, serve it from
     # the same origin. Then no CORS is involved and the session cookie is

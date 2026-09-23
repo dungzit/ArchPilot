@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArchPilot SystemsArchitect Demo</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --panel2:#f0f2f5; --line:#dfe3e8; --text:#1c2430; --muted:#5f6b7a;
+  --accent:#2f6fed; --accent-soft:#e6eefe; --ok:#1f8a4c; --ok-soft:#e3f5ea; --warn:#b26a00; --warn-soft:#fff3dc;
+  --bad:#c0392b; --bad-soft:#fdeaea; --shadow:0 1px 2px rgba(0,0,0,.06); --pop:0 8px 24px rgba(0,0,0,.16);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12161c; --panel:#1a2029; --panel2:#222a36; --line:#2c3644; --text:#e6ebf2; --muted:#93a0b2;
+    --accent:#6b9bff; --accent-soft:#1f2c47; --ok:#4cc98a; --ok-soft:#173326; --warn:#f0b04a; --warn-soft:#3a2c12;
+    --bad:#ef7a6c; --bad-soft:#3a1c1a; --shadow:none; --pop:0 8px 24px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12161c; --panel:#1a2029; --panel2:#222a36; --line:#2c3644; --text:#e6ebf2; --muted:#93a0b2;
+  --accent:#6b9bff; --accent-soft:#1f2c47; --ok:#4cc98a; --ok-soft:#173326; --warn:#f0b04a; --warn-soft:#3a2c12;
+  --bad:#ef7a6c; --bad-soft:#3a1c1a; --shadow:none; --pop:0 8px 24px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.pc:focus-visible,.node:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ic{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* shell */
+.app{display:grid;grid-template-columns:184px 1fr;height:100vh;min-height:640px}
+.rail{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:14px 10px;gap:4px}
+.brand{font-weight:700;font-size:15px;padding:4px 10px 12px}
+.brand small{display:block;font-weight:500;color:var(--muted);font-size:11px}
+.nav{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;border:0;background:none;text-align:left;cursor:pointer;color:var(--muted);width:100%}
+.nav:hover{background:var(--panel2)}
+.nav[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.rail .spacer{flex:1}
+.demo-tag{font-size:11px;color:var(--muted);padding:8px 10px;border-top:1px solid var(--line)}
+.col{display:flex;flex-direction:column;min-width:0;min-height:0}
+.topbar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.topbar .pname{font-size:15px;font-weight:600;border:1px solid transparent;background:transparent;border-radius:8px;padding:5px 8px;width:230px;max-width:100%}
+.topbar .pname:hover{border-color:var(--line)}
+.topbar .pname:focus{border-color:var(--accent);background:var(--panel)}
+.envchip{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.tsp{flex:1}
+.tbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;white-space:nowrap}
+.tbtn:hover:not(:disabled){border-color:var(--accent)}
+.tbtn:disabled{opacity:.4;cursor:not-allowed}
+.tbtn.undo .lbl,.tbtn.redo .lbl,#themeBtn .lbl{display:none}
+.badge{min-width:20px;text-align:center;font-size:11.5px;font-weight:700;padding:0 6px;border-radius:999px;background:var(--warn);color:var(--panel);line-height:18px}
+.badge.zero{background:var(--ok)}
+.badge.err{background:var(--bad)}
+.mwrap{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 4px);min-width:210px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--pop);padding:4px;z-index:30}
+.menu button{display:block;width:100%;text-align:left;background:none;border:0;padding:7px 10px;border-radius:6px;cursor:pointer}
+.menu button:hover,.menu button:focus-visible{background:var(--panel2)}
+.menu .mi-note{font-size:11.5px;color:var(--muted);padding:4px 10px 6px;border-top:1px solid var(--line);margin-top:4px}
+main{flex:1;min-height:0;overflow:auto;padding:12px 16px;display:flex;flex-direction:column}
+.banner{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn);border-radius:8px;padding:6px 12px;font-size:12px;margin-bottom:10px;flex:none}
+h1{font-size:18px;margin:0 0 2px}
+.sub{color:var(--muted);margin:0 0 14px}
+.view{display:none}.view.on{display:block}
+#view-canvas.on{display:flex;flex-direction:column;flex:1;min-height:0}
+
+/* shared */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.btn{padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.sm{padding:3px 9px;font-size:12.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.muted{color:var(--muted)}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+input[type=text],input[type=number],select,textarea{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+textarea{min-height:90px;resize:vertical}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);flex:none}
+.tabs.bottom{border-bottom:0;border-top:1px solid var(--line);padding:0 6px;background:var(--panel2)}
+.tab{background:none;border:0;padding:8px 10px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.tabs.bottom .tab{border-bottom:0;border-top:2px solid transparent;margin-top:-1px}
+.tab[aria-selected="true"]{color:var(--accent);border-color:var(--accent);font-weight:600}
+.tab .badge{line-height:16px;font-size:11px}
+.h3{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:22px 14px;font-size:13px}
+.empty strong{display:block;color:var(--text);margin-bottom:4px}
+
+/* canvas workspace */
+.ws{display:grid;grid-template-columns:180px minmax(0,1fr) 330px;grid-template-areas:"left mid right";gap:12px;flex:1;min-height:0}
+.left{grid-area:left}.mid{grid-area:mid}.right{grid-area:right}
+.panel{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.pbody{flex:1;min-height:0;overflow:auto;padding:10px}
+.pal{display:flex;flex-direction:column;gap:6px}
+.pbtn{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;text-align:left;width:100%}
+.pbtn:hover{border-color:var(--accent)}
+.dot{width:10px;height:10px;border-radius:3px;flex:none}
+.layers{display:flex;flex-direction:column;gap:4px}
+.layer{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid transparent;border-radius:8px;background:none;cursor:pointer;text-align:left;width:100%}
+.layer:hover{background:var(--panel2)}
+.layer[aria-current="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.layer small{display:block;color:var(--muted);font-size:11px;line-height:1.2}
+.layer .warnmark{margin-left:auto;color:var(--warn);font-weight:700}
+.mbody{flex:1;min-height:0;display:flex;flex-direction:column}
+.mbody[hidden]{display:none}
+.dtool{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap;flex:none}
+.vp{position:relative;flex:1;min-height:0;overflow:hidden}
+.vp svg{display:block;width:100%;height:100%;background:
+  linear-gradient(var(--line) 1px,transparent 1px) 0 0/24px 24px,
+  linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/24px 24px;touch-action:none}
+.vp .empty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;background:var(--panel);border:1px dashed var(--line);border-radius:10px;max-width:80%}
+.node{cursor:grab}
+.node rect.bg{fill:var(--panel);stroke-width:2}
+.node.sel rect.bg{stroke-width:3;filter:drop-shadow(0 0 4px var(--accent))}
+.node text{fill:var(--text);font-size:13px;pointer-events:none}
+.node .flag circle{fill:var(--warn);stroke:var(--panel);stroke-width:2}
+.node .flag.err circle{fill:var(--bad)}
+.node .flag text{fill:#fff;font-size:11px;font-weight:700;text-anchor:middle}
+.edge{stroke:var(--muted);stroke-width:1.6;fill:none;marker-end:url(#arrow)}
+.codebar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap;flex:none}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{background:var(--panel);border:0;padding:4px 12px;cursor:pointer;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.code{margin:0;padding:12px;flex:1;min-height:0;overflow:auto;font:12.5px/1.5 ui-monospace,Consolas,monospace;background:var(--panel2);white-space:pre;tab-size:2}
+.plist{list-style:none;margin:0;padding:8px;overflow:auto;flex:1;min-height:0;display:flex;flex-direction:column;gap:6px}
+.prob{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;padding:8px 10px;border:1px solid var(--line);border-left-width:4px;border-radius:8px;background:var(--panel);cursor:pointer}
+.prob:hover{border-color:var(--accent)}
+.prob.warn{border-left-color:var(--warn)}.prob.error{border-left-color:var(--bad)}
+.prob small{display:block;color:var(--muted);font-size:11.5px}
+.sev{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;flex:none;width:44px}
+.prob.warn .sev{color:var(--warn)}.prob.error .sev{color:var(--bad)}
+.pnote{font-size:12px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);flex:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* assistant */
+.asst{position:relative}
+.ahead{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);flex:none}
+.ahead strong{flex:1;font-size:13px}
+.ibtn{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;padding:0 8px;gap:6px}
+.ibtn:hover{border-color:var(--accent)}
+.anote{font-size:11.5px;color:var(--muted);padding:6px 10px;border-bottom:1px solid var(--line);background:var(--panel2);flex:none}
+.log{flex:1;min-height:0;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:100%;display:flex;flex-direction:column;gap:4px}
+.msg.user{align-items:flex-end}
+.who{font-size:11px;color:var(--muted)}
+.bub{padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);overflow-wrap:anywhere}
+.bub p{margin:0 0 4px}.bub p:last-child{margin:0}
+.msg.user .bub{background:var(--accent);border-color:var(--accent);color:#fff}
+.bub ul{margin:4px 0 0;padding-left:18px}
+.bub li{margin:2px 0}
+.lnk{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;text-align:left;text-decoration:underline}
+.fx{margin:6px 0 0;padding:6px 8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font:11.5px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.how{font-size:12.5px;color:var(--muted)}
+.how summary{cursor:pointer;padding:2px 0}
+.how ol{margin:4px 0 0;padding-left:20px}
+.pcard{margin-top:8px;padding:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.pcard b{display:block}
+.urow{display:flex;gap:6px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:8px 10px 0;flex:none}
+.qc{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
+.qc:hover{border-color:var(--accent);color:var(--accent)}
+.composer{position:relative;padding:8px 10px 10px;flex:none;display:flex;gap:6px;align-items:flex-end}
+.composer textarea{min-height:0;height:52px;resize:none}
+.mention{position:absolute;left:10px;right:10px;bottom:calc(100% - 4px);max-height:190px;overflow:auto;margin:0;padding:4px;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--pop);z-index:25}
+.mention li{padding:6px 8px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.mention li[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+.mention li.none{cursor:default;color:var(--muted)}
+.mention small{color:var(--muted);margin-left:auto}
+.hist{position:absolute;left:0;right:0;top:0;bottom:0;background:var(--panel);z-index:20;display:flex;flex-direction:column}
+.hlist{list-style:none;margin:0;padding:8px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.hitem{width:100%;text-align:left;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer}
+.hitem:hover{border-color:var(--accent)}
+.hitem small{display:block;color:var(--muted);font-size:11.5px}
+.hitem.cur{background:var(--accent-soft);border-color:var(--accent)}
+
+/* sizing */
+.two{display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:14px}
+.form{padding:14px}
+.results{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;align-content:start}
+.res{padding:14px}
+.res h3{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.big{font-size:26px;font-weight:700;margin:4px 0}
+.formula{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:var(--panel2);border-radius:6px;padding:6px 8px;margin:6px 0;overflow-wrap:anywhere}
+.res ul{margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:12.5px}
+.compare{background:var(--warn-soft);border:1px solid var(--warn);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:12.5px;margin-top:8px}
+
+/* hub */
+.hub{display:grid;grid-template-columns:210px 1fr;gap:14px}
+.filters{padding:12px;align-self:start}
+.filters h3{margin:10px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.filters h3:first-child{margin-top:0}
+.cat{display:flex;align-items:center;gap:6px;padding:3px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.pc{padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.pc:hover{border-color:var(--accent)}
+.pc h4{margin:0;font-size:14px}
+.src{font-size:12px;color:var(--muted)}
+.detail{padding:16px;margin-bottom:14px}
+.attr{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:8px 12px;font-size:12.5px;margin:10px 0}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.mini{width:100%;height:auto;background:var(--panel2);border-radius:8px}
+
+/* admin */
+.admin{max-width:720px}
+.chk{display:flex;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--panel);cursor:pointer}
+.hash{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:var(--panel2);padding:4px 8px;border-radius:6px}
+.toast{position:fixed;right:18px;bottom:18px;background:var(--text);color:var(--bg);padding:10px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:80vw}
+.toast.on{opacity:1}
+
+@media (max-width:1180px){
+  .ws{grid-template-columns:160px minmax(0,1fr) 300px}
+}
+@media (max-width:1000px){
+  .two,.hub{grid-template-columns:1fr}
+  .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:auto;min-height:0}
+  .rail{flex-direction:row;flex-wrap:wrap;align-items:center;padding:8px 10px}
+  .brand{padding:4px 8px}
+  .nav{width:auto}
+  .rail .spacer,.demo-tag{display:none}
+  main{overflow:visible;padding:10px 12px}
+  #view-canvas.on{display:block}
+  .topbar{padding:8px 12px}
+  .topbar .pname{width:100%;order:-1}
+  .tsp{display:none}
+  .ws{display:flex;flex-direction:column}
+  .mid{order:1}.left{order:2}.right{order:3}
+  .mid{height:500px}
+  .vp{overflow:auto}
+  .vp svg{min-width:580px;touch-action:pan-x pan-y}
+  .node{touch-action:none}
+  .left{max-height:280px}
+  .right{height:560px}
+  .panel .pbody.pal{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+}
+@media (max-width:480px){
+  .tbtn .lbl{display:none}
+  .tbtn.validate .lbl{display:inline}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" aria-label="Main navigation">
+    <div class="brand">ArchPilot<small>SystemsArchitect module</small></div>
+    <button class="nav" data-view="canvas" aria-current="page">&#9635; Canvas</button>
+    <button class="nav" data-view="sizing">&#9638; Sizing</button>
+    <button class="nav" data-view="hub">&#9776; Pattern hub</button>
+    <button class="nav" data-view="admin">&#9873; Editorial gate</button>
+    <div class="spacer"></div>
+    <div class="demo-tag">Draft v0.1 demo &middot; placeholder data only</div>
+  </aside>
+
+  <div class="col">
+    <header class="topbar" aria-label="Project toolbar">
+      <input class="pname" id="pname" type="text" value="Feed service design" aria-label="Project name (editable)" maxlength="60">
+      <span class="envchip" title="This tool only edits a diagram. It never applies, deploys or destroys anything.">Draft &middot; design only</span>
+      <span class="tsp"></span>
+      <button class="tbtn undo" id="undoBtn" type="button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 3 6l3 3M3 6h6a4 4 0 0 1 0 8H6"/></svg><span class="lbl">Undo</span></button>
+      <button class="tbtn redo" id="redoBtn" type="button" aria-label="Redo" title="Redo (Ctrl+Y)" disabled><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3l3 3-3 3M13 6H7a4 4 0 0 0 0 8h3"/></svg><span class="lbl">Redo</span></button>
+      <button class="tbtn validate" id="validateBtn" type="button" title="Run the rule-based checks and open the Problems tab"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg><span class="lbl">Validate</span><span class="badge zero" id="vBadge" aria-hidden="true">0</span></button>
+      <div class="mwrap">
+        <button class="tbtn" id="exportBtn" type="button" aria-haspopup="menu" aria-expanded="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg><span class="lbl">Export</span></button>
+        <div class="menu" id="exportMenu" role="menu" hidden>
+          <button type="button" role="menuitem" data-exp="json">Download JSON</button>
+          <button type="button" role="menuitem" data-exp="mermaid">Download Mermaid (.mmd)</button>
+          <button type="button" role="menuitem" data-exp="open">Open JSON in a new tab</button>
+          <div class="mi-note">Exports the diagram only. Nothing is deployed.</div>
+        </div>
+      </div>
+      <button class="tbtn" id="themeBtn" type="button" title="Toggle light or dark theme" aria-label="Toggle light or dark theme"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.2"/><path d="M8 2.8v10.4" /></svg><span class="lbl">Theme</span></button>
+    </header>
+
+    <main>
+      <div class="banner"><strong>Prototype demo.</strong> All patterns, numbers and company names are placeholders to show the layout. Real hub entries must be original write-ups with a real citation, per the content policy.</div>
+
+      <!-- CANVAS -->
+      <section class="view on" id="view-canvas" aria-label="Design canvas workspace">
+        <div class="ws">
+          <div class="card panel left">
+            <div class="tabs" role="tablist" id="leftTabs" aria-label="Left panel">
+              <button class="tab" role="tab" id="lt-comp" aria-selected="true" aria-controls="lp-comp" data-tab="comp">Components</button>
+              <button class="tab" role="tab" id="lt-lay" aria-selected="false" aria-controls="lp-lay" data-tab="lay">Layers</button>
+            </div>
+            <div class="pbody pal" id="lp-comp" role="tabpanel" aria-labelledby="lt-comp"></div>
+            <div class="pbody" id="lp-lay" role="tabpanel" aria-labelledby="lt-lay" hidden></div>
+          </div>
+
+          <div class="card panel mid">
+            <div class="mbody" id="dp-diagram" role="tabpanel" aria-labelledby="dt-diagram">
+              <div class="dtool">
+                <button class="btn sm" id="connectBtn" type="button">Connect two nodes</button>
+                <button class="btn sm danger" id="clearBtn" type="button">Clear canvas</button>
+                <span class="muted" id="hint" aria-live="polite"></span>
+              </div>
+              <div class="vp">
+                <svg id="svg" viewBox="0 0 760 520" preserveAspectRatio="xMidYMid meet" role="group" aria-label="Architecture diagram canvas. Use the Layers list to select nodes with the keyboard.">
+                  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" style="color:var(--muted)"/></marker></defs>
+                  <g id="edges"></g><g id="nodes"></g>
+                </svg>
+                <div class="empty" id="emptyCanvas" hidden><strong>The canvas is empty</strong>Add a component from the palette, apply a pattern from the Pattern hub, or ask the Assistant.</div>
+              </div>
+            </div>
+            <div class="mbody" id="dp-code" role="tabpanel" aria-labelledby="dt-code" hidden>
+              <div class="codebar">
+                <div class="seg" role="tablist" id="codeTabs" aria-label="Code format">
+                  <button role="tab" aria-selected="true" data-tab="json" type="button">JSON</button>
+                  <button role="tab" aria-selected="false" data-tab="mermaid" type="button">Mermaid</button>
+                </div>
+                <button class="btn sm" id="copyCode" type="button">Copy</button>
+                <span class="muted" style="font-size:12px">Regenerated from the diagram on every change. Fixed templates, nothing is deployed.</span>
+              </div>
+              <pre class="code" id="codeOut" tabindex="0" aria-label="Generated code"></pre>
+            </div>
+            <div class="mbody" id="dp-problems" role="tabpanel" aria-labelledby="dt-problems" hidden>
+              <div class="pnote"><span id="lastVal">Rule-based validation (5 rules). Not a real terraform validate.</span><button class="btn sm" id="revalidate" type="button">Run validation</button></div>
+              <ul class="plist" id="plist"></ul>
+            </div>
+            <div class="tabs bottom" role="tablist" id="dockTabs" aria-label="Canvas dock">
+              <button class="tab" role="tab" id="dt-diagram" aria-selected="true" aria-controls="dp-diagram" data-tab="diagram">Diagram</button>
+              <button class="tab" role="tab" id="dt-code" aria-selected="false" aria-controls="dp-code" data-tab="code">Code</button>
+              <button class="tab" role="tab" id="dt-problems" aria-selected="false" aria-controls="dp-problems" data-tab="problems">Problems <span class="badge zero" id="pBadge">0</span></button>
+            </div>
+          </div>
+
+          <div class="card panel right">
+            <div class="tabs" role="tablist" id="rightTabs" aria-label="Right panel">
+              <button class="tab" role="tab" id="rt-insp" aria-selected="false" aria-controls="rp-insp" data-tab="insp">Inspector</button>
+              <button class="tab" role="tab" id="rt-asst" aria-selected="true" aria-controls="rp-asst" data-tab="asst">Assistant</button>
+            </div>
+            <div class="mbody" id="rp-insp" role="tabpanel" aria-labelledby="rt-insp" hidden>
+              <div class="tabs" role="tablist" id="inspTabs" aria-label="Inspector sections" style="padding:0 6px">
+                <button class="tab" role="tab" aria-selected="true" data-tab="props">Properties</button>
+                <button class="tab" role="tab" aria-selected="false" data-tab="size">Sizing</button>
+                <button class="tab" role="tab" aria-selected="false" data-tab="notes">Notes</button>
+              </div>
+              <div class="pbody" id="insp-body"></div>
+            </div>
+            <div class="mbody asst" id="rp-asst" role="tabpanel" aria-labelledby="rt-asst">
+              <div class="ahead">
+                <strong>Assistant</strong>
+                <button class="ibtn" id="histBtn" type="button" aria-expanded="false" aria-controls="hist" title="Chat history"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.2l2 1.3"/></svg><span class="lbl">History</span></button>
+                <div class="mwrap">
+                  <button class="ibtn" id="chatMenuBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Chat menu"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="3.5" r=".6"/><circle cx="8" cy="8" r=".6"/><circle cx="8" cy="12.5" r=".6"/></svg></button>
+                  <div class="menu" id="chatMenu" role="menu" hidden>
+                    <button type="button" role="menuitem" data-cm="export">Export transcript (.txt)</button>
+                    <button type="button" role="menuitem" data-cm="copyid">Copy conversation id</button>
+                    <button type="button" role="menuitem" data-cm="new">New chat</button>
+                  </div>
+                </div>
+              </div>
+              <div class="anote">Rule-based assistant (v0.1). AI-assisted mode planned for a later phase.</div>
+              <div class="log" id="chatLog" role="log" aria-live="polite" aria-label="Assistant conversation"></div>
+              <div class="chips" id="chips">
+                <button class="qc" type="button" data-q="validate">Validate design</button>
+                <button class="qc" type="button" data-q="suggest">Suggest a pattern</button>
+                <button class="qc" type="button" data-q="size">Size this design</button>
+                <button class="qc" type="button" data-q="explain">Explain @node</button>
+              </div>
+              <div class="composer">
+                <ul class="mention" id="mention" role="listbox" aria-label="Nodes" hidden></ul>
+                <textarea id="chatIn" rows="2" placeholder="Try: add cache after @Feed API   (type @ to pick a node)" aria-label="Message to the rule-based assistant" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="mention"></textarea>
+                <button class="btn primary" id="sendBtn" type="button">Send</button>
+              </div>
+              <div class="hist" id="hist" hidden>
+                <div class="ahead"><strong>Chat history</strong><button class="btn sm" id="newChat" type="button">New chat</button><button class="btn sm" id="histClose" type="button">Close</button></div>
+                <div class="anote">Demo sessions, kept in memory only. They disappear on reload.</div>
+                <ul class="hlist" id="hlist"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SIZING -->
+      <section class="view" id="view-sizing">
+        <h1>Sizing calculator</h1>
+        <p class="sub">Change any input and every result recomputes. Each number shows its formula and assumptions.</p>
+        <div class="two">
+          <div class="card form" id="sizeForm"></div>
+          <div class="results" id="sizeResults"></div>
+        </div>
+      </section>
+
+      <!-- HUB -->
+      <section class="view" id="view-hub">
+        <h1>Pattern hub</h1>
+        <p class="sub">Curated reference architectures. Every published entry carries an attribution banner.</p>
+        <div id="hubDetail"></div>
+        <div class="hub">
+          <div class="card filters">
+            <h3>Search</h3>
+            <input type="text" id="q" placeholder="cache, queue, cdn..." aria-label="Search patterns">
+            <h3>Category</h3>
+            <div id="cats"></div>
+          </div>
+          <div class="grid" id="grid"></div>
+        </div>
+      </section>
+
+      <!-- ADMIN -->
+      <section class="view" id="view-admin">
+        <h1>Editorial gate</h1>
+        <p class="sub">A pattern can only become published after the author self-certifies all five items. Editing it afterwards resets it to draft.</p>
+        <div class="admin card" style="padding:16px">
+          <label for="adminPick" style="margin-top:0">Entry</label>
+          <select id="adminPick"></select>
+          <p>Status: <span class="tag" id="adminStatus">draft</span></p>
+          <p class="muted" style="margin:4px 0">Content hash (approval is tied to this exact text)</p>
+          <div class="hash" id="adminHash"></div>
+          <h3 style="margin:16px 0 8px;font-size:13px">Self-certification checklist</h3>
+          <div id="checks"></div>
+          <div class="row">
+            <button class="btn primary" id="publishBtn" type="button" disabled>Publish</button>
+            <button class="btn" id="editBtn" type="button">Simulate an edit</button>
+            <button class="btn danger" id="unpubBtn" type="button">Unpublish (takedown)</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+var TYPES={
+  client:{label:"Client",color:"#8a94a6"},cdn:{label:"CDN",color:"#7b61ff"},lb:{label:"Load balancer",color:"#0f9fb8"},
+  api:{label:"API service",color:"#2f6fed"},cache:{label:"Cache",color:"#e58a00"},queue:{label:"Queue",color:"#c2456e"},
+  worker:{label:"Worker",color:"#1f8a4c"},db:{label:"Database",color:"#7a4fd0"},storage:{label:"Object storage",color:"#5a7d2a"}
+};
+var NS="http://www.w3.org/2000/svg";
+function $(id){return document.getElementById(id)}
+var toastEl=$("toast"),toastT;
+function toast(m){toastEl.textContent=m;toastEl.classList.add("on");clearTimeout(toastT);toastT=setTimeout(function(){toastEl.classList.remove("on")},2400)}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function escRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}
+function copyText(t,msg){
+  function fb(){var ta=document.createElement("textarea");ta.value=t;ta.style.cssText="position:fixed;opacity:0;top:0";document.body.appendChild(ta);ta.select();var ok=false;try{ok=document.execCommand("copy")}catch(e){}ta.remove();toast(ok?msg:"Copy failed: select the text and copy it manually")}
+  try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){toast(msg)},fb);return}}catch(e){}
+  fb();
+}
+function openText(t){var w=window.open("","_blank");if(w){w.document.write("<pre>"+esc(t)+"</pre>");w.document.close()}else toast("Popup blocked - allow popups to view the text")}
+function download(name,text,type){
+  try{var b=new Blob([text],{type:type||"text/plain"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},1500);toast("Downloaded "+name)}
+  catch(e){openText(text)}
+}
+function fmtTime(ts){return new Date(ts).toLocaleString([], {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}
+
+/* generic accessible tabs: buttons role=tab, optional aria-controls panels */
+function makeTabs(list,onSel){
+  var btns=[].slice.call(list.querySelectorAll('[role="tab"]'));
+  function sel(b,focus){
+    btns.forEach(function(x){
+      var on=x===b;x.setAttribute("aria-selected",on?"true":"false");x.tabIndex=on?0:-1;
+      var pid=x.getAttribute("aria-controls"),p=pid&&$(pid);if(p)p.hidden=!on;
+    });
+    if(focus)b.focus();if(onSel)onSel(b.dataset.tab);
+  }
+  btns.forEach(function(b,i){
+    b.addEventListener("click",function(){sel(b)});
+    b.addEventListener("keydown",function(e){
+      var d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0;
+      if(e.key==="Home"){d=-btns.length}if(e.key==="End"){d=btns.length}
+      if(!d)return;e.preventDefault();var n=Math.max(0,Math.min(btns.length-1,i+(Math.abs(d)>1?(d<0?-i:btns.length-1-i):d)));sel(btns[n],true);
+    });
+  });
+  var cur=btns.filter(function(b){return b.getAttribute("aria-selected")==="true"})[0]||btns[0];
+  sel(cur);
+  return {select:function(name){var b=btns.filter(function(x){return x.dataset.tab===name})[0];if(b)sel(b)}};
+}
+/* menus */
+function closeMenus(){document.querySelectorAll(".menu").forEach(function(m){m.hidden=true});document.querySelectorAll("[aria-haspopup]").forEach(function(b){b.setAttribute("aria-expanded","false")})}
+function menu(btn,pn){
+  btn.addEventListener("click",function(e){e.stopPropagation();var open=pn.hidden;closeMenus();pn.hidden=!open;btn.setAttribute("aria-expanded",open?"true":"false");if(open){var f=pn.querySelector("button");if(f)f.focus()}});
+  pn.addEventListener("click",function(){closeMenus()});
+  pn.addEventListener("keydown",function(e){
+    var items=[].slice.call(pn.querySelectorAll("button")),i=items.indexOf(document.activeElement);
+    if(e.key==="ArrowDown"){e.preventDefault();items[(i+1)%items.length].focus()}
+    if(e.key==="ArrowUp"){e.preventDefault();items[(i-1+items.length)%items.length].focus()}
+    if(e.key==="Escape"){closeMenus();btn.focus()}
+  });
+}
+document.addEventListener("click",closeMenus);
+
+/* ---------- navigation ---------- */
+var navs=document.querySelectorAll(".nav");
+function show(v){
+  document.querySelectorAll(".view").forEach(function(e){e.classList.toggle("on",e.id==="view-"+v)});
+  navs.forEach(function(b){if(b.dataset.view===v)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
+  if(v==="sizing")renderSizing();
+}
+navs.forEach(function(b){b.addEventListener("click",function(){show(b.dataset.view)})});
+$("themeBtn").addEventListener("click",function(){
+  var r=document.documentElement,dark=(r.dataset.theme==="dark")||(!r.dataset.theme&&matchMedia("(prefers-color-scheme: dark)").matches);
+  r.dataset.theme=dark?"light":"dark";
+});
+
+/* ---------- graph state + undo/redo history ---------- */
+var g={nodes:[],edges:[]},sel=null,connecting=null,tab="props",PR=[],lastValidated=null;
+var W=120,H=44,CW=760,CH=520;
+function byId(id){return g.nodes.filter(function(n){return n.id===id})[0]}
+function snap(){return JSON.stringify({nodes:g.nodes,edges:g.edges})}
+function restore(s){var o=JSON.parse(s);g.nodes=o.nodes;g.edges=o.edges;if(!byId(sel))sel=null;connecting=null;setHint("")}
+var hist=[],hi=-1;
+function resetHist(){hist=[snap()];hi=0;updateUndo()}
+function commit(){
+  var s=snap();if(hist[hi]===s)return;
+  hist=hist.slice(0,hi+1);hist.push(s);if(hist.length>100)hist.shift();hi=hist.length-1;updateUndo();
+}
+function undo(){if(hi>0){hi--;restore(hist[hi]);drawAll();return true}return false}
+function redo(){if(hi<hist.length-1){hi++;restore(hist[hi]);drawAll();return true}return false}
+function updateUndo(){$("undoBtn").disabled=!(hi>0);$("redoBtn").disabled=!(hi<hist.length-1)}
+$("undoBtn").addEventListener("click",function(){undo()});
+$("redoBtn").addEventListener("click",function(){redo()});
+document.addEventListener("keydown",function(e){
+  var t=e.target&&e.target.tagName;if(t==="INPUT"||t==="TEXTAREA"||t==="SELECT")return;
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==="z"){e.preventDefault();undo()}
+  else if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==="y"||(e.shiftKey&&e.key.toLowerCase()==="z"))){e.preventDefault();redo()}
+});
+function newId(){var m=0;g.nodes.forEach(function(n){m=Math.max(m,parseInt(n.id.slice(1),10)||0)});return "n"+(m+1)}
+function loadGraph(n,e){
+  g={nodes:n.map(function(x){return Object.assign({notes:""},x)}),edges:e.map(function(x){return x.slice()})};
+  sel=null;connecting=null;setHint("");commit();drawAll();
+}
+function patGraph(p){return {n:p.n.map(function(n,i){return {id:"n"+(i+1),type:n[0],label:n[1],x:n[2],y:n[3]}}),e:p.e.map(function(e){return ["n"+(e[0]+1),"n"+(e[1]+1)]})}}
+function applyPattern(p){var x=patGraph(p);loadGraph(x.n,x.e)}
+function uniqueLabel(base){var l=base,i=2;while(g.nodes.some(function(n){return n.label.toLowerCase()===l.toLowerCase()})){l=base+" "+i++}return l}
+function overlaps(x,y){return g.nodes.some(function(n){return Math.abs(n.x-x)<W+14&&Math.abs(n.y-y)<H+14})}
+function freeSpot(x,y){
+  function cl(v,a,b){return Math.max(a,Math.min(b,v))}
+  var offs=[[0,0],[0,70],[0,-70],[0,140],[0,-140],[150,0],[-150,0],[150,70],[150,-70],[-150,70],[-150,-70]];
+  for(var i=0;i<offs.length;i++){var nx=cl(x+offs[i][0],0,CW-W),ny=cl(y+offs[i][1],0,CH-H);if(!overlaps(nx,ny))return [nx,ny]}
+  for(var yy=20;yy<CH-H;yy+=60)for(var xx=20;xx<CW-W;xx+=140)if(!overlaps(xx,yy))return [xx,yy];
+  return [cl(x,0,CW-W),cl(y,0,CH-H)];
+}
+function addNode(t,at){
+  var id=newId(),pos=at||freeSpot(80+((g.nodes.length*157)%520),60+((g.nodes.length*83)%300));
+  g.nodes.push({id:id,type:t,label:uniqueLabel(TYPES[t].label),x:pos[0],y:pos[1],notes:""});
+  return g.nodes[g.nodes.length-1];
+}
+
+/* ---------- validation (rule-based) ---------- */
+var RULES=[
+ ["R1","Unconnected nodes"],["R2","Cycles in the graph"],["R3","API without a load balancer"],["R4","API-to-database without a cache"],["R5","Single database node"]
+];
+function nlabel(id){var n=byId(id);return n?n.label:id}
+function validate(){
+  var out=[],deg={},adj={};
+  g.nodes.forEach(function(n){adj[n.id]=[]});
+  g.edges.forEach(function(e){deg[e[0]]=(deg[e[0]]||0)+1;deg[e[1]]=(deg[e[1]]||0)+1;if(adj[e[0]])adj[e[0]].push(e[1])});
+  var counts={};
+  function typeOf(id){var n=byId(id);return n&&n.type}
+  // R1
+  if(g.nodes.length>1)g.nodes.forEach(function(n){if(!deg[n.id])out.push({rule:"R1",sev:"warn",title:'"'+n.label+'" is not connected',detail:"No edge touches this node.",nodes:[n.id]})});
+  // R2 cycles (DFS with colours)
+  var color={},path=[],seen={};
+  function dfs(u){
+    color[u]=1;path.push(u);
+    (adj[u]||[]).forEach(function(v){
+      if(color[v]===1){
+        var cyc=path.slice(path.indexOf(v)),key=cyc.slice().sort().join(",");
+        if(!seen[key]){seen[key]=1;out.push({rule:"R2",sev:"error",title:"Circular dependency: "+cyc.map(nlabel).concat([nlabel(v)]).join(" → "),detail:"A request can loop forever between these nodes.",nodes:cyc})}
+      }else if(!color[v]&&adj[v])dfs(v);
+    });
+    path.pop();color[u]=2;
+  }
+  g.nodes.forEach(function(n){if(!color[n.id])dfs(n.id)});
+  // R3
+  var apis=g.nodes.filter(function(n){return n.type==="api"}),lbs=g.nodes.filter(function(n){return n.type==="lb"});
+  if(apis.length&&!lbs.length)out.push({rule:"R3",sev:"warn",title:"No load balancer in front of the API",detail:"Add a load balancer so the API tier can scale and fail over.",nodes:apis.map(function(n){return n.id})});
+  // R4
+  apis.forEach(function(a){
+    var toDb=(adj[a.id]||[]).filter(function(id){return typeOf(id)==="db"}),toCache=(adj[a.id]||[]).some(function(id){return typeOf(id)==="cache"});
+    if(toDb.length&&!toCache)out.push({rule:"R4",sev:"warn",title:'"'+a.label+'" reads the database directly, no cache',detail:"Direct edge to "+toDb.map(nlabel).join(", ")+" and no cache attached to this API.",nodes:[a.id].concat(toDb)});
+  });
+  // R5
+  var dbs=g.nodes.filter(function(n){return n.type==="db"});
+  if(dbs.length===1)out.push({rule:"R5",sev:"warn",title:"Single database node",detail:"No replica planned: the database is a single point of failure.",nodes:[dbs[0].id]});
+  return out;
+}
+function runValidate(){
+  PR=validate();lastValidated=new Date();
+  return PR;
+}
+
+/* ---------- canvas drawing ---------- */
+var svg=$("svg"),gN=$("nodes"),gE=$("edges");
+function setHint(t){$("hint").textContent=t}
+function drawAll(){drawGraph();drawLayers();drawCode();drawProblems();drawInspector();updateUndo()}
+function drawLive(){drawGraph();drawLayers();drawCode();drawProblems()}
+function drawGraph(){
+  gE.innerHTML="";gN.innerHTML="";
+  var flags={};PR.forEach(function(p){p.nodes.forEach(function(id){flags[id]=(flags[id]==="error"||p.sev==="error")?"error":"warn"})});
+  g.edges.forEach(function(e){
+    var a=byId(e[0]),b=byId(e[1]);if(!a||!b)return;
+    var x1=a.x+W/2,y1=a.y+H/2,x2=b.x+W/2,y2=b.y+H/2,dx=x2-x1,dy=y2-y1,s=Math.max(Math.abs(dx)/(W/2),Math.abs(dy)/(H/2))||1;
+    var l=document.createElementNS(NS,"line");
+    l.setAttribute("class","edge");
+    l.setAttribute("x1",x1+dx/s);l.setAttribute("y1",y1+dy/s);l.setAttribute("x2",x2-dx/s);l.setAttribute("y2",y2-dy/s);gE.appendChild(l);
+  });
+  g.nodes.forEach(function(n){
+    var el=document.createElementNS(NS,"g");
+    el.setAttribute("class","node"+(sel===n.id?" sel":""));el.setAttribute("transform","translate("+n.x+","+n.y+")");
+    el.setAttribute("tabindex","0");el.setAttribute("role","button");el.setAttribute("aria-label",n.label+", "+TYPES[n.type].label+(flags[n.id]?", has a problem":""));
+    el.innerHTML='<rect class="bg" width="'+W+'" height="'+H+'" rx="9" stroke="'+TYPES[n.type].color+'"></rect>'+
+      '<rect x="0" y="0" width="6" height="'+H+'" rx="3" fill="'+TYPES[n.type].color+'" stroke="none"></rect>'+
+      '<text x="16" y="19" font-weight="600">'+esc(n.label)+'</text><text x="16" y="35" fill="var(--muted)" style="font-size:11px">'+esc(TYPES[n.type].label)+'</text>'+
+      (flags[n.id]?'<g class="flag'+(flags[n.id]==="error"?" err":"")+'"><circle cx="'+W+'" cy="2" r="9"></circle><text x="'+W+'" y="6">!</text></g>':"");
+    el.addEventListener("pointerdown",function(ev){nodeDown(ev,n)});
+    el.addEventListener("keydown",function(ev){if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();sel=n.id;drawAll();var again=gN.querySelector(".sel");if(again)again.focus()}});
+    gN.appendChild(el);
+  });
+  $("emptyCanvas").hidden=g.nodes.length>0;
+}
+function pt(ev){var p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;return p.matrixTransform(svg.getScreenCTM().inverse())}
+function nodeDown(ev,n){
+  ev.preventDefault();
+  if(connecting){
+    if(connecting!==n.id&&!g.edges.some(function(e){return e[0]===connecting&&e[1]===n.id}))g.edges.push([connecting,n.id]);
+    connecting=null;setHint("");commit();drawAll();return;
+  }
+  sel=n.id;var s=pt(ev),ox=s.x-n.x,oy=s.y-n.y,moved=false;
+  function mv(e){var p=pt(e);var nx=Math.max(0,Math.min(CW-W,p.x-ox)),ny=Math.max(0,Math.min(CH-H,p.y-oy));if(nx!==n.x||ny!==n.y)moved=true;n.x=nx;n.y=ny;drawGraph();drawCode()}
+  function up(){window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",up);if(moved)commit();drawAll()}
+  window.addEventListener("pointermove",mv);window.addEventListener("pointerup",up);drawAll();
+}
+svg.addEventListener("pointerdown",function(e){if(e.target===svg){sel=null;connecting=null;setHint("");drawAll()}});
+$("connectBtn").addEventListener("click",function(){
+  if(!sel){toast("Select a node first, then click Connect");return}
+  connecting=sel;setHint("Now click the target node...");
+});
+$("clearBtn").addEventListener("click",function(){if(g.nodes.length)loadGraph([],[]);else toast("The canvas is already empty")});
+
+/* palette + layers */
+var pal=$("lp-comp");
+Object.keys(TYPES).forEach(function(t){
+  var b=document.createElement("button");b.type="button";b.className="pbtn";
+  b.innerHTML='<span class="dot" style="background:'+TYPES[t].color+'"></span>'+esc(TYPES[t].label);
+  b.addEventListener("click",function(){var n=addNode(t);sel=n.id;commit();drawAll()});pal.appendChild(b);
+});
+var lp=$("lp-lay");
+function drawLayers(){
+  $("lt-lay").textContent="Layers ("+g.nodes.length+")";
+  if(!g.nodes.length){lp.innerHTML='<div class="empty"><strong>No layers yet</strong>Nodes you add will be listed here.</div>';return}
+  var flagged={};PR.forEach(function(p){p.nodes.forEach(function(id){flagged[id]=1})});
+  lp.innerHTML='<div class="layers">'+g.nodes.map(function(n){
+    return '<button type="button" class="layer" data-id="'+esc(n.id)+'" aria-current="'+(sel===n.id)+'"><span class="dot" style="background:'+TYPES[n.type].color+'"></span><span>'+esc(n.label)+'<small>'+esc(TYPES[n.type].label)+'</small></span>'+(flagged[n.id]?'<span class="warnmark" title="Has a problem" aria-label="has a problem">!</span>':"")+'</button>';
+  }).join("")+'</div>';
+}
+lp.addEventListener("click",function(e){var b=e.target.closest(".layer");if(!b)return;sel=b.dataset.id;drawAll()});
+
+/* code view */
+var codeMode="json";
+function toJson(){
+  return JSON.stringify({schemaVersion:"1.0",project:$("pname").value,nodes:g.nodes.map(function(n){return {id:n.id,type:n.type,label:n.label,position:{x:Math.round(n.x),y:Math.round(n.y)}}}),edges:g.edges.map(function(e){return {from:e[0],to:e[1]}})},null,2);
+}
+function toMermaid(){
+  var L=["flowchart LR"];
+  function q(s){return String(s).replace(/"/g,"'")}
+  g.nodes.forEach(function(n){var l=q(n.label);L.push("  "+n.id+(n.type==="db"?'[("'+l+'")]':n.type==="queue"?'[/"'+l+'"/]':'["'+l+'"]'))});
+  g.edges.forEach(function(e){L.push("  "+e[0]+" --> "+e[1])});
+  if(!g.nodes.length)L.push("  %% empty diagram");
+  return L.join("\n");
+}
+function drawCode(){$("codeOut").textContent=codeMode==="json"?toJson():toMermaid()}
+var codeTabs=makeTabs($("codeTabs"),function(t){codeMode=t;drawCode()});
+$("copyCode").addEventListener("click",function(){copyText($("codeOut").textContent,"Copied "+(codeMode==="json"?"JSON":"Mermaid")+" to the clipboard")});
+
+/* problems view */
+var dock;
+function drawProblems(){
+  PR=validate();
+  var n=PR.length,hasErr=PR.some(function(p){return p.sev==="error"});
+  [$("vBadge"),$("pBadge")].forEach(function(b){b.textContent=n;b.className="badge"+(n?(hasErr?" err":""):" zero")});
+  $("validateBtn").setAttribute("aria-label","Validate, "+n+" problem"+(n===1?"":"s"));
+  $("lastVal").textContent=lastValidated?"Last validated "+lastValidated.toLocaleTimeString()+". Rule-based (5 rules), not a real terraform validate.":"Rule-based validation (5 rules), updates live. Not a real terraform validate.";
+  var box=$("plist");
+  if(!g.nodes.length){box.innerHTML='<li class="empty"><strong>Nothing to validate</strong>The canvas is empty.</li>';return}
+  if(!n){box.innerHTML='<li class="empty"><strong>No problems found</strong>All 5 rules pass: '+RULES.map(function(r){return esc(r[1].toLowerCase())}).join(", ")+'.</li>';return}
+  box.innerHTML=PR.map(function(p,i){return '<li><button type="button" class="prob '+p.sev+'" data-i="'+i+'"><span class="sev">'+(p.sev==="error"?"Error":"Warn")+'</span><span>'+esc(p.title)+'<small>'+esc(p.detail)+' ('+p.rule+')</small></span></button></li>'}).join("");
+}
+$("plist").addEventListener("click",function(e){
+  var b=e.target.closest(".prob");if(!b)return;var p=PR[+b.dataset.i];if(!p)return;
+  sel=p.nodes[0];dock.select("diagram");drawAll();toast("Selected "+nlabel(sel));
+});
+function doValidate(){
+  runValidate();drawAll();dock.select("problems");show("canvas");
+  toast(PR.length?PR.length+" problem"+(PR.length===1?"":"s")+" found":"No problems found");
+}
+$("validateBtn").addEventListener("click",doValidate);
+$("revalidate").addEventListener("click",doValidate);
+
+/* export menu */
+menu($("exportBtn"),$("exportMenu"));
+$("exportMenu").addEventListener("click",function(e){
+  var b=e.target.closest("[data-exp]");if(!b)return;
+  if(b.dataset.exp==="json")download("architecture.json",toJson(),"application/json");
+  else if(b.dataset.exp==="mermaid")download("architecture.mmd",toMermaid());
+  else openText(toJson());
+});
+$("pname").addEventListener("input",function(){if(codeMode==="json")drawCode()});
+
+/* inspector */
+function sizeMsg(type,r){
+  return {api:"API tier: "+r.readNodes+" node(s) for read load",db:"Database tier: "+r.total+" node(s) incl. spare, ~"+r.tib.toFixed(1)+" TiB",cache:"Cache: size to hot set, not total data",queue:"Queue: partitions >= consumer count",worker:"Workers: scale with queue depth",lb:"Load balancer: pair for failover",cdn:"CDN: offload static reads",storage:"Object store: ~"+r.tib.toFixed(1)+" TiB before compression tuning",client:"Clients are not sized"}[type];
+}
+var inspTabs=makeTabs($("inspTabs"),function(t){tab=t;drawInspector()});
+function drawInspector(){
+  var n=byId(sel),box=$("insp-body");
+  if(!n){box.innerHTML='<div class="empty"><strong>Nothing selected</strong>Click a node on the canvas or in Layers to edit it.</div>';return}
+  if(tab==="props"){
+    var opts=Object.keys(TYPES).map(function(t){return '<option value="'+t+'"'+(t===n.type?" selected":"")+'>'+esc(TYPES[t].label)+'</option>'}).join("");
+    box.innerHTML='<label for="fLabel" style="margin-top:0">Label</label><input type="text" id="fLabel" value="'+esc(n.label)+'"><label for="fType">Type</label><select id="fType">'+opts+'</select><div class="row"><button class="btn danger" id="delBtn" type="button">Delete node</button></div>';
+    $("fLabel").addEventListener("input",function(e){n.label=e.target.value;drawLive()});
+    $("fLabel").addEventListener("change",function(){commit()});
+    $("fType").addEventListener("change",function(e){n.type=e.target.value;commit();drawAll()});
+    $("delBtn").addEventListener("click",function(){g.nodes=g.nodes.filter(function(x){return x.id!==n.id});g.edges=g.edges.filter(function(e){return e[0]!==n.id&&e[1]!==n.id});sel=null;commit();drawAll()});
+  }else if(tab==="size"){
+    var r=calc(S),msg=sizeMsg(n.type,r);
+    box.innerHTML='<p style="margin-top:0"><span class="tag">from calculator</span></p><p>'+esc(msg)+'</p><p class="muted">Uses the current inputs on the Sizing screen. Attaching stores this number on the node.</p><button class="btn" id="attachBtn" type="button">Attach to node</button>';
+    $("attachBtn").addEventListener("click",function(){n.notes=(n.notes?n.notes+"\n":"")+"Sizing: "+msg;commit();toast("Attached to node notes")});
+  }else{
+    box.innerHTML='<label for="fNotes" style="margin-top:0">Design rationale</label><textarea id="fNotes" placeholder="Why this component?">'+esc(n.notes||"")+'</textarea>';
+    $("fNotes").addEventListener("input",function(e){n.notes=e.target.value});
+    $("fNotes").addEventListener("change",function(){commit()});
+  }
+}
+
+/* ---------- sizing ---------- */
+var S={peakRead:20000,peakWrite:5000,payloadKB:2,months:6,rf:3,compression:3,peakFactor:3,readCap:8000,writeCap:2000,spare:1,measured:false};
+var FIELDS=[
+  ["peakRead","Peak read QPS","number"],["peakWrite","Peak write QPS","number"],["payloadKB","Payload size (KB)","number"],
+  ["months","Retention (months)","number"],["rf","Replication factor","number"],["compression","Compression ratio (x:1)","number"],
+  ["peakFactor","Peak / average factor","number"],["readCap","Read QPS per node","number"],["writeCap","Write QPS per node","number"],["spare","Spare nodes (failure domain)","number"]
+];
+function calc(s){
+  var avgW=s.peakWrite/Math.max(s.peakFactor,1),secs=s.months*30*86400;
+  var bytes=avgW*s.payloadKB*1024*secs*s.rf/Math.max(s.compression,1);
+  var tib=bytes/Math.pow(1024,4);
+  var readNodes=Math.ceil(s.peakRead/Math.max(s.readCap,1));
+  var writeNodes=Math.ceil(s.peakWrite*s.rf/Math.max(s.writeCap,1));
+  var base=Math.max(readNodes,writeNodes),total=base+s.spare;
+  var band=s.measured?0.1:0.3;
+  var naive=Math.ceil((s.peakRead+s.peakWrite)/Math.max(s.readCap,1));
+  return {avgW:avgW,tib:tib,readNodes:readNodes,writeNodes:writeNodes,base:base,total:total,
+    lo:Math.max(1,Math.ceil(base*(1-band)))+s.spare,hi:Math.ceil(base*(1+band))+s.spare,naive:naive,perReplicaW:s.peakWrite*s.rf};
+}
+function fmt(n){return n.toLocaleString(undefined,{maximumFractionDigits:1})}
+function renderSizing(){
+  var f=$("sizeForm");
+  if(!f.dataset.built){
+    f.innerHTML='<h3 style="margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">Workload inputs</h3>'+
+      FIELDS.map(function(x){return '<label for="s_'+x[0]+'">'+x[1]+'</label><input type="number" min="0" step="any" id="s_'+x[0]+'" value="'+S[x[0]]+'">'}).join("")+
+      '<label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="s_measured"> Numbers come from measurements (narrower range)</label>';
+    FIELDS.forEach(function(x){$("s_"+x[0]).addEventListener("input",function(e){var v=parseFloat(e.target.value);S[x[0]]=isNaN(v)?0:v;renderSizing()})});
+    $("s_measured").addEventListener("change",function(e){S.measured=e.target.checked;renderSizing()});
+    f.dataset.built="1";
+  }
+  var r=calc(S),conf=S.measured?"measured (+/-10%)":"estimated (+/-30%)";
+  $("sizeResults").innerHTML=
+   '<div class="card res"><h3>Nodes needed</h3><div class="big">'+r.total+' <span class="muted" style="font-size:14px">(range '+r.lo+'-'+r.hi+')</span></div><span class="tag">'+conf+'</span>'+
+   '<div class="formula">max( ceil(readQPS / readCap), ceil(writeQPS x RF / writeCap) ) + spare<br>= max('+r.readNodes+', '+r.writeNodes+') + '+S.spare+' = '+r.total+'</div>'+
+   '<ul><li>Read and write limits checked separately</li><li>Replication counted on writes, not only storage</li><li>Spare node is policy, kept outside the range</li></ul>'+
+   (r.naive<r.total?'<div class="compare">A single-benchmark shortcut would say '+r.naive+' node(s): about '+Math.round((1-r.naive/r.total)*100)+'% too small for this write load.</div>':'')+'</div>'+
+   '<div class="card res"><h3>Storage</h3><div class="big">'+fmt(r.tib)+' TiB</div><span class="tag">'+conf+'</span>'+
+   '<div class="formula">avgWriteQPS x payload x retention x RF / compression<br>= '+fmt(r.avgW)+' x '+S.payloadKB+'KB x '+fmt(S.months*30*86400)+'s x '+S.rf+' / '+S.compression+'</div>'+
+   '<ul><li>Uses average writes ('+fmt(r.avgW)+'/s), not peak</li><li>Compression '+S.compression+':1 applied</li><li>30-day months</li></ul></div>'+
+   '<div class="card res"><h3>Write load per cluster</h3><div class="big">'+fmt(r.perReplicaW)+' /s</div><span class="tag">derived</span>'+
+   '<div class="formula">peakWriteQPS x RF = '+fmt(S.peakWrite)+' x '+S.rf+'</div><ul><li>Every write lands on '+S.rf+' replicas</li><li>Benchmark source must be cited before launch</li></ul></div>'+
+   '<div class="card res"><h3>Review hints</h3><ul>'+
+   (S.compression<=1?'<li>Compression ratio is 1: storage is likely overstated</li>':'')+
+   (S.peakFactor<=1?'<li>Peak factor is 1: no headroom for traffic spikes</li>':'')+
+   (S.months>24&&S.compression<=1?'<li>Retention over 24 months with no compression</li>':'')+
+   ((S.compression>1&&S.peakFactor>1&&!(S.months>24&&S.compression<=1))?'<li>No rule fired on these inputs</li>':'')+
+   '</ul><p class="muted" style="font-size:12px;margin:8px 0 0">Deterministic rules only. No AI in this version.</p></div>';
+}
+
+/* ---------- hub ---------- */
+var P=[
+ {id:"p1",title:"Cache-aside for read-heavy feeds",cat:"Social",src:"Placeholder Co. engineering blog",status:"published",
+  sum:"Serve most reads from an in-memory cache and fall back to the database on a miss, so read load scales without scaling the database.",
+  trade:"Stale reads are possible until entries expire; cache warm-up needs care after a restart.",
+  n:[["client","Client",20,170],["lb","Load balancer",190,170],["api","Feed API",360,170],["cache","Cache",560,70],["db","Database",560,270]],e:[[0,1],[1,2],[2,3],[2,4]]},
+ {id:"p2",title:"Async order pipeline with a queue",cat:"E-commerce",src:"Sample Retail tech blog",status:"published",
+  sum:"Accept orders quickly, put them on a queue, and let workers process payment and fulfilment at their own pace.",
+  trade:"Users see eventual status, so the UI must show progress and handle retries safely.",
+  n:[["client","Client",20,170],["api","Order API",190,170],["queue","Order queue",360,170],["worker","Workers",530,90],["db","Orders DB",530,270]],e:[[0,1],[1,2],[2,3],[3,4]]},
+ {id:"p3",title:"Media delivery with CDN and object storage",cat:"Storage & CDN",src:"Example Media engineering blog",status:"published",
+  sum:"Store large files in object storage and let a CDN serve them from edge locations, keeping the API out of the data path.",
+  trade:"Cache invalidation and signed-URL expiry need a clear policy.",
+  n:[["client","Client",20,170],["cdn","CDN",190,90],["storage","Object storage",380,90],["lb","Load balancer",190,270],["api","Upload API",380,270]],e:[[0,1],[1,2],[0,3],[3,4],[4,2]]},
+ {id:"p4",title:"Real-time fan-out messaging",cat:"Messaging",src:"Demo Chat engineering blog",status:"published",
+  sum:"Publish each message once, then fan it out to subscriber channels through a queue and cache of recent history.",
+  trade:"Ordering across channels is not guaranteed unless partitioning is designed for it.",
+  n:[["client","Client",20,170],["lb","Load balancer",180,170],["api","Gateway",340,170],["queue","Fan-out queue",510,90],["cache","Recent history",510,260],["worker","Delivery workers",620,170]],e:[[0,1],[1,2],[2,3],[2,4],[3,5]]},
+ {id:"p5",title:"Search indexing pipeline",cat:"Search",src:"Sample Search tech blog",status:"draft",
+  sum:"Stream data changes through a queue to workers that update a search index, separate from the primary database.",
+  trade:"Index lags behind the source of truth; a rebuild path is required.",
+  n:[["api","Write API",20,170],["db","Primary DB",190,170],["queue","Change queue",360,170],["worker","Indexer",530,170],["storage","Index store",530,300]],e:[[0,1],[1,2],[2,3],[3,4]]},
+ {id:"p6",title:"Rate-limited public API gateway",cat:"API Platform",src:"Placeholder API team blog",status:"published",
+  sum:"Put a gateway in front of services that checks keys and enforces per-client rate limits using a shared counter store.",
+  trade:"The limiter becomes a critical dependency and must fail open or closed by explicit choice.",
+  n:[["client","Client",20,170],["lb","Load balancer",190,170],["api","API gateway",360,170],["cache","Limit counters",560,70],["db","Key store",560,270]],e:[[0,1],[1,2],[2,3],[2,4]]}
+];
+var cats=["All"].concat(Array.from(new Set(P.map(function(p){return p.cat}))));
+var curCat="All",q="";
+var catsEl=$("cats");
+cats.forEach(function(c){
+  var l=document.createElement("label");l.className="cat";l.style.margin="0";l.style.color="var(--text)";
+  l.innerHTML='<input type="radio" name="cat" value="'+esc(c)+'"'+(c==="All"?" checked":"")+'> '+esc(c);
+  l.querySelector("input").addEventListener("change",function(){curCat=c;renderGrid()});catsEl.appendChild(l);
+});
+$("q").addEventListener("input",function(e){q=e.target.value.toLowerCase();renderGrid()});
+function miniSvg(p){
+  var w=110,h=38,s='<svg class="mini" viewBox="0 0 800 340" aria-hidden="true">';
+  p.e.forEach(function(x){var a=p.n[x[0]],b=p.n[x[1]];s+='<line x1="'+(a[2]+w/2)+'" y1="'+(a[3]+h/2)+'" x2="'+(b[2]+w/2)+'" y2="'+(b[3]+h/2)+'" stroke="#8a94a6" stroke-width="2"/>'});
+  p.n.forEach(function(n){s+='<rect x="'+n[2]+'" y="'+n[3]+'" width="'+w+'" height="'+h+'" rx="8" fill="'+TYPES[n[0]].color+'" opacity=".9"/><text x="'+(n[2]+8)+'" y="'+(n[3]+24)+'" fill="#fff" font-size="15">'+esc(n[1])+'</text>'});
+  return s+'</svg>';
+}
+function renderGrid(){
+  var list=P.filter(function(p){return p.status==="published"&&(curCat==="All"||p.cat===curCat)&&(!q||(p.title+" "+p.sum+" "+p.cat).toLowerCase().indexOf(q)>=0)});
+  $("grid").innerHTML=list.length?list.map(function(p){
+    return '<div class="card pc" tabindex="0" role="button" data-id="'+p.id+'"><h4>'+esc(p.title)+'</h4><div class="pills"><span class="tag">'+esc(p.cat)+'</span></div><div class="src">Source: '+esc(p.src)+'</div><div class="muted" style="font-size:12.5px">'+esc(p.sum)+'</div></div>';
+  }).join(""):'<p class="muted">No published patterns match. (Draft entries are hidden from the hub.)</p>';
+  document.querySelectorAll(".pc").forEach(function(c){
+    function open(){openDetail(c.dataset.id)}
+    c.addEventListener("click",open);c.addEventListener("keydown",function(e){if(e.key==="Enter")open()});
+  });
+}
+function openDetail(id){
+  var p=P.filter(function(x){return x.id===id})[0],d=$("hubDetail");
+  d.innerHTML='<div class="card detail"><div style="display:flex;justify-content:space-between;gap:10px"><h2 style="margin:0;font-size:16px">'+esc(p.title)+'</h2><button class="btn" id="closeD" type="button">Close</button></div>'+
+   '<div class="attr"><strong>Attribution.</strong> This is an original summary inspired by a post from <em>'+esc(p.src)+'</em>. It is not a copy of that post. Read the original at the cited link (placeholder in this demo).</div>'+
+   miniSvg(p)+'<p><strong>Summary.</strong> '+esc(p.sum)+'</p><p><strong>Trade-off.</strong> '+esc(p.trade)+'</p>'+
+   '<div class="row"><button class="btn primary" id="applyD" type="button">Apply to canvas</button><button class="btn" id="cmpD" type="button">Compare with my design</button></div><div id="cmpOut"></div></div>';
+  $("closeD").addEventListener("click",function(){d.innerHTML=""});
+  $("applyD").addEventListener("click",function(){
+    applyPattern(p);
+    show("canvas");toast("Pattern copied to your canvas (deep copy). Undo is available.");
+  });
+  $("cmpD").addEventListener("click",function(){
+    var mine={},theirs={};g.nodes.forEach(function(n){mine[n.type]=(mine[n.type]||0)+1});p.n.forEach(function(n){theirs[n[0]]=(theirs[n[0]]||0)+1});
+    var miss=[],extra=[];Object.keys(theirs).forEach(function(t){if(!mine[t])miss.push(TYPES[t].label)});Object.keys(mine).forEach(function(t){if(!theirs[t])extra.push(TYPES[t].label)});
+    $("cmpOut").innerHTML='<div class="attr" style="margin-top:12px"><strong>Your design vs this pattern (by component type)</strong><br>Missing from your design: '+(miss.length?esc(miss.join(", ")):"none")+'<br>Extra in your design: '+(extra.length?esc(extra.join(", ")):"none")+'</div>';
+  });
+  window.scrollTo({top:0,behavior:"smooth"});$("view-hub").scrollIntoView&&document.querySelector("main").scrollTo({top:0,behavior:"smooth"});
+}
+
+/* ---------- admin gate ---------- */
+var CHECKS=["Original wording: I wrote this in my own words.","Attribution complete: company, article title and working link are filled in.","Original diagram: my own redraw, not a copy of the source figure.","Side-by-side check done against the source article.","Author of record: I understand this entry may be unpublished if found non-compliant."];
+function hash(s){var h=5381;for(var i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))>>>0;return ("00000000"+h.toString(16)).slice(-8)+"..."}
+var A={};P.forEach(function(p){A[p.id]={hash:hash(p.title+p.sum+p.trade),ticks:p.status==="published"?[1,1,1,1,1]:[0,0,0,0,0],status:p.status}});
+var pick=$("adminPick");
+P.forEach(function(p){var o=document.createElement("option");o.value=p.id;o.textContent=p.title;pick.appendChild(o)});
+pick.value="p5";
+pick.addEventListener("change",renderAdmin);
+function renderAdmin(){
+  var a=A[pick.value];
+  $("adminStatus").textContent=a.status;
+  $("adminHash").textContent="sha256:"+a.hash;
+  var c=$("checks");
+  c.innerHTML=CHECKS.map(function(t,i){return '<label class="chk"><input type="checkbox" data-i="'+i+'"'+(a.ticks[i]?" checked":"")+'> <span style="color:var(--text)">'+esc(t)+'</span></label>'}).join("");
+  c.querySelectorAll("input").forEach(function(x){x.addEventListener("change",function(){a.ticks[+x.dataset.i]=x.checked?1:0;sync()})});
+  sync();
+}
+function sync(){
+  var a=A[pick.value],all=a.ticks.every(Boolean);
+  $("publishBtn").disabled=!all||a.status==="published";
+}
+function pById(id){return P.filter(function(p){return p.id===id})[0]}
+$("publishBtn").addEventListener("click",function(){
+  var a=A[pick.value];a.status="published";pById(pick.value).status="published";renderAdmin();renderGrid();toast("Published: approval is tied to this content hash");
+});
+$("editBtn").addEventListener("click",function(){
+  var a=A[pick.value];a.hash=hash(a.hash+Date.now());a.status="draft";a.ticks=[0,0,0,0,0];pById(pick.value).status="draft";renderAdmin();renderGrid();toast("Content changed: hash differs, entry reset to draft");
+});
+$("unpubBtn").addEventListener("click",function(){
+  var a=A[pick.value];a.status="draft";pById(pick.value).status="draft";renderAdmin();renderGrid();toast("Unpublished immediately (takedown)");
+});
+
+/* ---------- assistant (deterministic, rule-based) ---------- */
+var TDESC={client:"The origin of requests (browser or app).",cdn:"Serves static content from edge locations to offload origin reads.",lb:"Spreads requests across API instances and provides failover.",api:"Stateless service tier that handles business logic.",cache:"In-memory store for hot data, cuts read load on the database.",queue:"Buffers work so producers and consumers run at different speeds.",worker:"Consumes queue items and does background processing.",db:"System of record. Durable, but the slowest and costliest tier to scale.",storage:"Cheap, durable storage for large files."};
+var TW=[["lb",/\b(load ?balancer|balancer|lb)\b/],["cdn",/\bcdn\b/],["cache",/\bcache\b/],["queue",/\bqueue\b/],["worker",/\bworkers?\b/],["db",/\b(database|db|datastore)\b/],["storage",/\b(object ?storage|storage|bucket)\b/],["api",/\b(api|service|gateway)\b/],["client",/\bclient\b/]];
+function typeFromWords(s){for(var i=0;i<TW.length;i++)if(TW[i][1].test(s))return TW[i][0];return null}
+var CMDS=[
+ ["add <component> after @node","e.g. add cache after @Feed API"],
+ ["add <component> before @node","e.g. add a queue before @Workers"],
+ ["add <component> between @A and @B","e.g. add a queue between @Feed API and @Database"],
+ ["connect @A to @B","adds an edge"],
+ ["remove @node","deletes a node and its edges"],
+ ["validate","runs the 5 warning rules"],
+ ["size","shows the sizing result and its formula"],
+ ["suggest pattern for <keywords>","e.g. suggest pattern for read heavy"],
+ ["explain @node","describes a node and its neighbours"]
+];
+var chat=null,sessions=[];
+function convId(){var s="";for(var i=0;i<6;i++)s+="0123456789abcdef".charAt(Math.floor(Math.random()*16));return "conv-"+s}
+function newChat(){
+  chat={id:convId(),started:Date.now(),msgs:[]};
+  chat.msgs.push({role:"bot",ts:Date.now(),text:"Hello. I am a rule-based helper: I follow fixed commands and do not use AI. I can edit the diagram, validate it, size it and match patterns. Type @ to reference a node, or use the buttons below.",items:[{text:"add cache after @Feed API"},{text:"suggest pattern for read heavy"},{text:'validate, size, explain @node, or "help" for every command'}]});
+}
+function now(){return Date.now()}
+sessions=[
+ {id:"conv-9c2e41",started:now()-26*3600e3,msgs:[
+   {role:"user",ts:now()-26*3600e3,text:"validate"},
+   {role:"bot",ts:now()-26*3600e3,text:"Found 2 problems (demo session, sample text only).",items:[{text:"No load balancer in front of the API"},{text:"Single database node"}]}]},
+ {id:"conv-51ab07",started:now()-49*3600e3,msgs:[
+   {role:"user",ts:now()-49*3600e3,text:"suggest pattern for read heavy"},
+   {role:"bot",ts:now()-49*3600e3,text:"Top match: Cache-aside for read-heavy feeds (demo session, sample text only)."}]}
+];
+function sessTitle(s){var u=s.msgs.filter(function(m){return m.role==="user"})[0];return u?(u.text.length>44?u.text.slice(0,44)+"...":u.text):"New chat (empty)"}
+
+var log=$("chatLog");
+function msgHtml(m,i){
+  if(m.role==="user")return '<div class="msg user"><div class="who">You</div><div class="bub">'+esc(m.text)+'</div></div>';
+  var h='<div class="msg bot"><div class="who">Assistant (rule-based)</div><div class="bub">';
+  if(m.text)h+='<p>'+esc(m.text)+'</p>';
+  if(m.items&&m.items.length)h+='<ul>'+m.items.map(function(it){return '<li>'+(it.node?'<button type="button" class="lnk" data-select="'+esc(it.node)+'">'+esc(it.text)+'</button>':esc(it.text))+'</li>'}).join("")+'</ul>';
+  if(m.code)h+='<pre class="fx">'+esc(m.code)+'</pre>';
+  if(m.patterns)h+=m.patterns.map(function(p){return '<div class="pcard"><b>'+esc(p.title)+'</b><span class="tag">'+esc(p.cat)+'</span> <span class="muted" style="font-size:12px">matched: '+esc(p.hits.join(", "))+'</span><div class="muted" style="font-size:12.5px;margin:4px 0 6px">'+esc(p.sum)+'</div><button type="button" class="btn sm primary" data-apply="'+p.id+'">Apply to canvas</button></div>'}).join("");
+  if(m.actions)h+='<div class="row" style="margin-top:6px">'+m.actions.map(function(a){return '<button type="button" class="btn sm" data-act="'+a[1]+'">'+esc(a[0])+'</button>'}).join("")+'</div>';
+  h+='</div>';
+  if(m.steps&&m.steps.length)h+='<details class="how" data-i="'+i+'"'+(m.open?" open":"")+'><summary>How I got this</summary><ol>'+m.steps.map(function(s){return '<li>'+esc(s)+'</li>'}).join("")+'</ol></details>';
+  if(m.undo)h+='<div class="urow"><button type="button" class="btn sm" data-undo="'+i+'"'+(m.undo.done?" disabled":"")+'>'+(m.undo.done?"Undone":"Undo this change")+'</button></div>';
+  return h+'</div>';
+}
+function renderChat(){
+  log.innerHTML=chat.msgs.map(msgHtml).join("");
+  log.scrollTop=log.scrollHeight;
+}
+log.addEventListener("toggle",function(e){var d=e.target;if(d.tagName==="DETAILS"){var m=chat.msgs[+d.dataset.i];if(m)m.open=d.open}},true);
+log.addEventListener("click",function(e){
+  var b;
+  if((b=e.target.closest("[data-undo]")))return undoMsg(+b.dataset.undo);
+  if((b=e.target.closest("[data-apply]")))return applyFromChat(b.dataset.apply);
+  if((b=e.target.closest("[data-select]"))){if(byId(b.dataset.select)){sel=b.dataset.select;drawAll();toast("Selected "+nlabel(sel))}else toast("That node no longer exists");return}
+  if((b=e.target.closest("[data-act]"))){if(b.dataset.act==="sizing")show("sizing");else if(b.dataset.act==="problems"){dock.select("problems")}return}
+});
+function undoMsg(i){
+  var m=chat.msgs[i],u=m&&m.undo;if(!u||u.done)return;
+  if(snap()===u.after&&hi>0&&hist[hi-1]===u.before){undo();toast("Change undone")}
+  else{restore(u.before);commit();drawAll();toast("Restored the diagram from before this change")}
+  u.done=true;renderChat();
+}
+function applyFromChat(id){
+  var p=pById(id);if(!p)return;
+  var before=snap();applyPattern(p);var after=snap();
+  chat.msgs.push({role:"bot",ts:Date.now(),text:'Applied "'+p.title+'" to the canvas: '+p.n.length+" nodes, "+p.e.length+" connections. Your previous diagram was replaced.",
+    steps:["You pressed Apply to canvas on the pattern card.","Deep-copied the published pattern's nodes and edges (no live link to the hub).","Replaced the current diagram and pushed one entry onto the undo history.","Undo below restores the diagram exactly as it was before."],undo:{before:before,after:after}});
+  renderChat();
+}
+
+/* mention resolution */
+function refsIn(t){
+  var res=[],lt=t.toLowerCase(),byLen=g.nodes.slice().sort(function(a,b){return b.label.length-a.label.length});
+  if(t.indexOf("@")>=0){
+    var p=0,i;
+    while((i=t.indexOf("@",p))>=0){
+      var rest=lt.slice(i+1),hit=null;
+      for(var k=0;k<byLen.length;k++){var lab=byLen[k].label.toLowerCase();if(lab&&rest.indexOf(lab)===0&&(rest.length===lab.length||!/[a-z0-9]/.test(rest.charAt(lab.length)))){hit=byLen[k];break}}
+      if(hit){res.push(hit);p=i+1+hit.label.length}else p=i+1;
+    }
+    return res;
+  }
+  var found=[];
+  byLen.forEach(function(n){var m=new RegExp("(^|[^a-z0-9])"+escRe(n.label.toLowerCase())+"($|[^a-z0-9])").exec(lt);if(m&&!found.some(function(f){return f.n===n}))found.push({n:n,idx:m.index})});
+  found.sort(function(a,b){return a.idx-b.idx});
+  return found.map(function(f){return f.n});
+}
+function change(fn){var before=snap();fn();var after=snap();commit();drawAll();return {before:before,after:after}}
+function place(anchor,dx,dy){return freeSpot(anchor.x+dx,anchor.y+dy)}
+
+function respond(text){
+  var raw=text.trim(),l=raw.toLowerCase().replace(/^(please|pls|can you|could you)\s+/,""),m;
+  var hasAt=raw.indexOf("@")>=0;
+  function tailOf(rest){return raw.slice(raw.length-rest.length)}
+  function needNodes(rs,n,what){
+    if(rs.length>=n)return null;
+    return {text:hasAt&&rs.length<n?"I could not match every @mention to a node on the canvas. Type @ and pick from the list.":"Which node? "+what+" Type @ to pick one from the list.",items:g.nodes.slice(0,8).map(function(x){return {text:x.label+" ("+TYPES[x.type].label+")"}})};
+  }
+  // add
+  if((m=l.match(/^(?:add|insert|put|place)\s+(?:a |an |the |one )?(.+?)(?:\s+(after|before|between)\b(.*))?$/))){
+    var type=typeFromWords(m[1]);
+    if(!type)return {text:'I do not know the component "'+m[1]+'". Known components:',items:Object.keys(TYPES).map(function(t){return {text:TYPES[t].label}})};
+    var where=m[2],tail=m[3]?tailOf(m[3]):"",rs=where?refsIn(tail):[],steps=[],N,rec;
+    if(where==="after"||where==="before"){
+      var bad=needNodes(rs,1,"The command needs one node.");if(bad)return bad;
+    }
+    if(where==="between"){var bad2=needNodes(rs,2,"The command needs two nodes.");if(bad2)return bad2}
+    steps.push("Parsed the command: add a "+TYPES[type].label+(where?" "+where+" "+rs.slice(0,where==="between"?2:1).map(function(x){return '"'+x.label+'"'}).join(" and "):"")+".");
+    if(!where){
+      rec=change(function(){N=addNode(type);sel=N.id});
+      steps.push("Placed a new "+TYPES[type].label+' node named "'+N.label+'" on a free spot of the canvas.');
+      steps.push("No anchor node was given, so it has no edges. Rule R1 will flag it as not connected until you connect it.");
+      return {text:'Added "'+N.label+'" without connections.',steps:steps,undo:rec};
+    }
+    if(where==="after"){
+      var X=rs[0],outs=g.edges.filter(function(e){return e[0]===X.id});
+      rec=change(function(){
+        N=addNode(type,place(X,W+50,0));sel=N.id;
+        if(type==="cache"){g.edges.push([X.id,N.id]);steps.push('Rule "cache-aside": a cache is attached beside the node, so I added the edge "'+X.label+'" -> "'+N.label+'" and kept the existing outgoing edges.')}
+        else{
+          g.edges=g.edges.filter(function(e){return e[0]!==X.id});g.edges.push([X.id,N.id]);
+          outs.forEach(function(e){g.edges.push([N.id,e[1]])});
+          steps.push('Rule "splice after": added "'+X.label+'" -> "'+N.label+'"'+(outs.length?", removed "+outs.length+" old outgoing edge(s) of \""+X.label+'" and re-pointed them from "'+N.label+'":'+outs.map(function(e){return ' "'+nlabel(e[1])+'"'}).join(","):", the node had no outgoing edges to reroute")+".");
+        }
+        steps.unshift("Created "+TYPES[type].label+' node "'+N.label+'" to the right of "'+X.label+'".');
+      });
+      return {text:'Added "'+N.label+'" after "'+X.label+'".',steps:steps.concat(["Pushed one entry onto the undo history and re-ran the validation rules (see the Problems tab)."]),undo:rec};
+    }
+    if(where==="before"){
+      var Y=rs[0],ins=g.edges.filter(function(e){return e[1]===Y.id});
+      rec=change(function(){
+        N=addNode(type,place(Y,-(W+50),0));sel=N.id;
+        g.edges=g.edges.filter(function(e){return e[1]!==Y.id});
+        ins.forEach(function(e){g.edges.push([e[0],N.id])});g.edges.push([N.id,Y.id]);
+        steps.unshift("Created "+TYPES[type].label+' node "'+N.label+'" to the left of "'+Y.label+'".');
+        steps.push('Rule "splice before": re-pointed '+ins.length+' incoming edge(s)'+(ins.length?ins.map(function(e){return ' "'+nlabel(e[0])+'"'}).join(","):"")+' to "'+N.label+'" and added "'+N.label+'" -> "'+Y.label+'".');
+      });
+      return {text:'Added "'+N.label+'" before "'+Y.label+'".',steps:steps.concat(["Pushed one entry onto the undo history and re-ran the validation rules."]),undo:rec};
+    }
+    // between
+    var A1=rs[0],B1=rs[1];
+    rec=change(function(){
+      var fwd=g.edges.some(function(e){return e[0]===A1.id&&e[1]===B1.id}),rev=g.edges.some(function(e){return e[0]===B1.id&&e[1]===A1.id});
+      var from=A1,to=B1;if(!fwd&&rev){from=B1;to=A1}
+      N=addNode(type,freeSpot((from.x+to.x)/2,(from.y+to.y)/2));sel=N.id;
+      var had=g.edges.length;
+      g.edges=g.edges.filter(function(e){return !(e[0]===from.id&&e[1]===to.id)});
+      var removed=had-g.edges.length;
+      g.edges.push([from.id,N.id]);g.edges.push([N.id,to.id]);
+      steps.unshift("Created "+TYPES[type].label+' node "'+N.label+'" at the midpoint of "'+from.label+'" and "'+to.label+'".');
+      steps.push(removed?'Rule "splice between": removed the direct edge "'+from.label+'" -> "'+to.label+'" and added "'+from.label+'" -> "'+N.label+'" -> "'+to.label+'".':'No direct edge existed between them, so I only added "'+from.label+'" -> "'+N.label+'" -> "'+to.label+'".');
+    });
+    return {text:'Added "'+N.label+'" between "'+A1.label+'" and "'+B1.label+'".',steps:steps.concat(["Pushed one entry onto the undo history and re-ran the validation rules."]),undo:rec};
+  }
+  // remove
+  if((m=l.match(/^(remove|delete)\b(.*)$/))){
+    var rr=refsIn(tailOf(m[2]));var bad3=needNodes(rr,1,"Which node should I remove?");if(bad3)return bad3;
+    var D=rr[0],ec=g.edges.filter(function(e){return e[0]===D.id||e[1]===D.id}).length;
+    var rec2=change(function(){g.nodes=g.nodes.filter(function(x){return x.id!==D.id});g.edges=g.edges.filter(function(e){return e[0]!==D.id&&e[1]!==D.id});if(sel===D.id)sel=null});
+    return {text:'Removed "'+D.label+'" and '+ec+" connected edge(s).",steps:['Matched "'+D.label+'" from your mention.',"Deleted the node and every edge that touched it.","Pushed one entry onto the undo history."],undo:rec2};
+  }
+  // connect
+  if((m=l.match(/^connect\b(.*)$/))){
+    var cr=refsIn(tailOf(m[1]));var bad4=needNodes(cr,2,"Use: connect @A to @B.");if(bad4)return bad4;
+    var a=cr[0],b=cr[1];
+    if(a===b)return {text:"A node cannot be connected to itself."};
+    if(g.edges.some(function(e){return e[0]===a.id&&e[1]===b.id}))return {text:'"'+a.label+'" is already connected to "'+b.label+'".'};
+    var rec3=change(function(){g.edges.push([a.id,b.id])});
+    var cyc=PR.some(function(p){return p.rule==="R2"});
+    return {text:'Connected "'+a.label+'" to "'+b.label+'".'+(cyc?" Note: this design now contains a cycle, see the Problems tab.":""),steps:["Matched both mentions to nodes.","Added the directed edge "+a.label+" -> "+b.label+".","Re-ran validation rule R2 (cycles): "+(cyc?"cycle found.":"no cycle.")],undo:rec3};
+  }
+  // explain
+  if((m=l.match(/^(explain|describe|what is|what's)\b(.*)$/))){
+    var er=refsIn(tailOf(m[2]));var bad5=needNodes(er,1,"Which node should I explain?");if(bad5)return bad5;
+    var n=er[0],ins2=g.edges.filter(function(e){return e[1]===n.id}).map(function(e){return nlabel(e[0])}),outs2=g.edges.filter(function(e){return e[0]===n.id}).map(function(e){return nlabel(e[1])});
+    var pr=PR.filter(function(p){return p.nodes.indexOf(n.id)>=0}),rz=calc(S);
+    var items=[{text:"Role: "+TDESC[n.type]},{text:"Receives from: "+(ins2.length?ins2.join(", "):"nothing (entry point or unconnected)")},{text:"Sends to: "+(outs2.length?outs2.join(", "):"nothing (leaf or unconnected)")},{text:"Sizing hint: "+sizeMsg(n.type,rz)}];
+    pr.forEach(function(p){items.push({text:"Problem: "+p.title,node:n.id})});
+    return {text:'"'+n.label+'" is '+(/^[aeiou]/i.test(TYPES[n.type].label)?"an ":"a ")+TYPES[n.type].label+".",items:items,steps:["Matched the mention to node "+n.id+" ("+TYPES[n.type].label+").","Looked up the fixed description for that component type.","Read incoming and outgoing edges from the graph.","Looked up the sizing hint from the current Sizing inputs.","Filtered the validation results for this node: "+pr.length+" problem(s)."]};
+  }
+  // size
+  if(/^(size|sizing|estimate|how big)\b/.test(l)){
+    var r=calc(S),conf=S.measured?"measured (+/-10%)":"estimated (+/-30%)",types={};g.nodes.forEach(function(x){types[x.type]=1});
+    return {text:"Estimated "+r.total+" node(s) for the data tier (range "+r.lo+"-"+r.hi+", "+conf+") and "+fmt(r.tib)+" TiB of storage.",
+      code:"nodes   = max( ceil("+fmt(S.peakRead)+" / "+fmt(S.readCap)+"), ceil("+fmt(S.peakWrite)+" x "+S.rf+" / "+fmt(S.writeCap)+") ) + "+S.spare+"\n        = max("+r.readNodes+", "+r.writeNodes+") + "+S.spare+" = "+r.total+"\nstorage = "+fmt(r.avgW)+"/s x "+S.payloadKB+"KB x "+fmt(S.months*30*86400)+"s x "+S.rf+" / "+S.compression+" = "+fmt(r.tib)+" TiB",
+      items:Object.keys(types).map(function(t){return {text:TYPES[t].label+": "+sizeMsg(t,r)}}),
+      steps:["Read the workload inputs from the Sizing screen (demo defaults unless you changed them).","Checked read and write limits separately and took the larger.","Counted replication on writes ("+S.rf+"x) and added "+S.spare+" spare node(s).","Applied the "+(S.measured?"10%":"30%")+" uncertainty band to the base count only.","Listed a sizing hint for each component type on your canvas."],
+      actions:[["Open Sizing screen","sizing"]]};
+  }
+  // validate
+  if(/^(validate|check|lint|verify|review)\b|^problems\b/.test(l)){
+    runValidate();drawAll();
+    var vi=PR.map(function(p){return {text:p.title,node:p.nodes[0]}});
+    return {text:g.nodes.length?(PR.length?"Found "+PR.length+" problem"+(PR.length===1?"":"s")+". Click one to select the node.":"No problems found. All 5 rules pass."):"The canvas is empty, so there is nothing to validate.",items:vi,
+      steps:RULES.map(function(r){var c=PR.filter(function(p){return p.rule===r[0]}).length;return r[0]+" "+r[1]+": "+(c?c+" finding(s)":"pass")}).concat(["This is rule-based checking only, not a real terraform validate or plan."]),actions:[["Open Problems tab","problems"]]};
+  }
+  // suggest
+  if(/^(suggest|recommend|find|which pattern|pattern)\b/.test(l)||/\bpatterns?\b/.test(l)){
+    var STOP={"for":1,a:1,an:1,the:1,pattern:1,patterns:1,suggest:1,recommend:1,me:1,my:1,heavy:1,system:1,design:1,app:1,"with":1,to:1,of:1,and:1,i:1,need:1,want:1,find:1,which:1,"in":1,on:1};
+    var SYN={read:["cache","read"],reads:["cache"],write:["queue","async"],writes:["queue"],async:["queue"],asynchronous:["queue"],background:["queue","worker"],"static":["cdn"],media:["cdn","storage"],video:["cdn"],image:["cdn","storage"],images:["cdn"],files:["storage"],upload:["storage","cdn"],realtime:["messaging","fan-out"],"real-time":["messaging","fan-out"],chat:["messaging"],notification:["messaging","queue"],notifications:["messaging","queue"],rate:["rate","gateway"],limit:["rate","gateway"],throttling:["rate"],search:["search","index"],feed:["feed","cache"],order:["order","queue"],orders:["order","queue"],checkout:["order","queue"],latency:["cache","cdn"],spike:["queue"],burst:["queue"]};
+    var toks=l.split(/[^a-z0-9-]+/).filter(function(t){return t&&!STOP[t]&&t.length>1});
+    if(!toks.length)return {text:'Give me some keywords, for example "suggest pattern for read heavy".',items:[{text:"Keywords I know: read, write, async, queue, cache, cdn, media, static, search, chat, realtime, rate limit, orders"}]};
+    var scored=P.filter(function(p){return p.status==="published"}).map(function(p){
+      var hay=(p.title+" "+p.cat+" "+p.sum+" "+p.trade+" "+p.n.map(function(x){return x[1]}).join(" ")).toLowerCase(),sc=0,hits=[];
+      toks.forEach(function(t){if(hay.indexOf(t)>=0){sc+=2;hits.push(t)}(SYN[t]||[]).forEach(function(s){if(hay.indexOf(s)>=0){sc+=1;if(hits.indexOf(s)<0)hits.push(s)}})});
+      return {p:p,score:sc,hits:hits};
+    }).filter(function(x){return x.score>0}).sort(function(a,b){return b.score-a.score}).slice(0,3);
+    var stepsS=["Split your text into keywords: "+toks.join(", ")+".","Expanded keywords with a fixed synonym table (for example read -> cache, write -> queue).","Scored each published pattern: +2 for a direct keyword hit in its title, category, summary, trade-off or node names, +1 per synonym hit.","Draft patterns are excluded. Kept the top 3 with a score above 0."];
+    if(!scored.length)return {text:"No published pattern matched those keywords.",items:[{text:"Try: read heavy, write heavy, async, media, search, chat, rate limit"}],steps:stepsS};
+    return {text:"Best "+scored.length+" match"+(scored.length===1?"":"es")+" for "+toks.join(" ")+":",patterns:scored.map(function(x){return {id:x.p.id,title:x.p.title,cat:x.p.cat,sum:x.p.sum,hits:x.hits}}),steps:stepsS};
+  }
+  if(/^(help|\?|commands|what can you do)/.test(l))return {text:"Supported commands:",items:CMDS.map(function(c){return {text:c[0]+"  ("+c[1]+")"}})};
+  return {text:"I did not understand that. I am rule-based and only know these commands:",items:CMDS.map(function(c){return {text:c[0]+"  ("+c[1]+")"}}),steps:["Compared your text with each known command pattern (add, remove, connect, explain, size, validate, suggest, help).","None matched, so I did not change anything."]};
+}
+function send(text){
+  text=text.trim();if(!text)return;
+  chat.msgs.push({role:"user",ts:Date.now(),text:text});
+  var r;try{r=respond(text)}catch(err){r={text:"Something went wrong while handling that command. Nothing was changed. ("+err.message+")"}}
+  r.role="bot";r.ts=Date.now();chat.msgs.push(r);renderChat();
+}
+
+/* composer + @mention dropdown */
+var inp=$("chatIn"),mention=$("mention"),mOpts=[],mIdx=0,mStart=-1;
+function closeMention(){mention.hidden=true;inp.setAttribute("aria-expanded","false");inp.removeAttribute("aria-activedescendant");mOpts=[]}
+function updateMention(){
+  var pos=inp.selectionStart,before=inp.value.slice(0,pos),mm=before.match(/(^|\s)@([^@\n]*)$/);
+  if(!mm){closeMention();return}
+  var qy=mm[2].toLowerCase();mStart=pos-mm[2].length-1;
+  mOpts=g.nodes.filter(function(n){return n.label.toLowerCase().indexOf(qy)>=0}).slice(0,8);
+  if(!mOpts.length&&/\s/.test(qy)){closeMention();return}
+  mIdx=Math.min(mIdx,Math.max(0,mOpts.length-1));
+  renderMention();
+}
+function renderMention(){
+  mention.hidden=false;inp.setAttribute("aria-expanded","true");
+  mention.innerHTML=mOpts.length?mOpts.map(function(n,i){return '<li role="option" id="mo-'+i+'" data-i="'+i+'" aria-selected="'+(i===mIdx)+'"><span class="dot" style="background:'+TYPES[n.type].color+'"></span>'+esc(n.label)+'<small>'+esc(TYPES[n.type].label)+'</small></li>'}).join(""):'<li class="none" role="option" aria-disabled="true">'+(g.nodes.length?"No node matches":"No nodes on the canvas yet")+'</li>';
+  if(mOpts.length)inp.setAttribute("aria-activedescendant","mo-"+mIdx);
+  var a=mention.querySelector('[aria-selected="true"]');if(a&&a.scrollIntoView)a.scrollIntoView({block:"nearest"});
+}
+function pickMention(i){
+  var n=mOpts[i];if(!n)return;
+  var pos=inp.selectionStart,ins="@"+n.label+" ";
+  inp.value=inp.value.slice(0,mStart)+ins+inp.value.slice(pos);
+  var c=mStart+ins.length;inp.setSelectionRange(c,c);inp.focus();closeMention();
+}
+inp.addEventListener("input",function(){mIdx=0;updateMention()});
+inp.addEventListener("click",updateMention);
+inp.addEventListener("blur",function(){setTimeout(closeMention,120)});
+inp.addEventListener("keydown",function(e){
+  if(!mention.hidden){
+    if(e.key==="ArrowDown"&&mOpts.length){e.preventDefault();mIdx=(mIdx+1)%mOpts.length;renderMention();return}
+    if(e.key==="ArrowUp"&&mOpts.length){e.preventDefault();mIdx=(mIdx-1+mOpts.length)%mOpts.length;renderMention();return}
+    if((e.key==="Enter"||e.key==="Tab")&&mOpts.length){e.preventDefault();pickMention(mIdx);return}
+    if(e.key==="Escape"){e.preventDefault();closeMention();return}
+  }
+  if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();doSend()}
+});
+mention.addEventListener("mousedown",function(e){var li=e.target.closest("li[data-i]");if(li){e.preventDefault();pickMention(+li.dataset.i)}});
+function doSend(){var t=inp.value;if(!t.trim())return;inp.value="";closeMention();send(t)}
+$("sendBtn").addEventListener("click",doSend);
+$("chips").addEventListener("click",function(e){
+  var b=e.target.closest("[data-q]");if(!b)return;var k=b.dataset.q;
+  rightTabs.select("asst");
+  if(k==="validate"||k==="size")send(k);
+  else if(k==="suggest"){inp.value="suggest pattern for ";inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length)}
+  else{
+    if(sel&&byId(sel))send("explain @"+byId(sel).label);
+    else{inp.value="explain @";inp.focus();inp.setSelectionRange(9,9);updateMention()}
+  }
+});
+
+/* chat menu, transcript, history */
+menu($("chatMenuBtn"),$("chatMenu"));
+function msgText(m){
+  var t="["+new Date(m.ts||chat.started).toLocaleTimeString()+"] ";
+  if(m.role==="user")return t+"You: "+m.text;
+  var s=t+"Assistant (rule-based): "+(m.text||"");
+  (m.items||[]).forEach(function(i){s+="\n    - "+i.text});
+  if(m.code)s+="\n"+m.code.split("\n").map(function(x){return "    "+x}).join("\n");
+  (m.patterns||[]).forEach(function(p){s+="\n    * Pattern: "+p.title+" (matched: "+p.hits.join(", ")+")"});
+  if(m.steps&&m.steps.length){s+="\n    How I got this:";m.steps.forEach(function(x,i){s+="\n      "+(i+1)+". "+x})}
+  if(m.undo)s+="\n    (change is undoable"+(m.undo.done?", was undone":"")+")";
+  return s;
+}
+function transcript(){
+  return ["ArchPilot SystemsArchitect - assistant transcript (demo)","Conversation id: "+chat.id,"Started: "+new Date(chat.started).toLocaleString(),"Assistant: rule-based (v0.1), no AI","Project: "+$("pname").value,""].concat(chat.msgs.map(msgText)).join("\n")+"\n";
+}
+$("chatMenu").addEventListener("click",function(e){
+  var b=e.target.closest("[data-cm]");if(!b)return;
+  if(b.dataset.cm==="export")download("transcript-"+chat.id+".txt",transcript());
+  else if(b.dataset.cm==="copyid")copyText(chat.id,"Copied "+chat.id);
+  else startNew();
+});
+function archiveCurrent(){if(chat.msgs.some(function(m){return m.role==="user"}))sessions.unshift(chat)}
+function startNew(){archiveCurrent();newChat();renderChat();renderHist();$("hist").hidden=true;$("histBtn").setAttribute("aria-expanded","false");toast("Started a new chat")}
+function renderHist(){
+  $("hlist").innerHTML='<li><div class="hitem cur"><b>'+esc(sessTitle(chat))+'</b> <span class="tag">current</span><small>'+esc(chat.id)+' &middot; '+esc(fmtTime(chat.started))+' &middot; '+chat.msgs.length+' messages</small></div></li>'+
+    sessions.map(function(s,i){return '<li><button type="button" class="hitem" data-i="'+i+'"><b>'+esc(sessTitle(s))+'</b><small>'+esc(s.id)+' &middot; '+esc(fmtTime(s.started))+' &middot; '+s.msgs.length+' messages</small></button></li>'}).join("");
+}
+$("hlist").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-i]");if(!b)return;
+  var s=sessions.splice(+b.dataset.i,1)[0];archiveCurrent();chat=s;
+  renderChat();renderHist();$("hist").hidden=true;$("histBtn").setAttribute("aria-expanded","false");toast("Opened "+s.id);
+});
+$("histBtn").addEventListener("click",function(){var h=$("hist");h.hidden=!h.hidden;$("histBtn").setAttribute("aria-expanded",h.hidden?"false":"true");if(!h.hidden)renderHist()});
+$("histClose").addEventListener("click",function(){$("hist").hidden=true;$("histBtn").setAttribute("aria-expanded","false")});
+$("newChat").addEventListener("click",startNew);
+
+/* ---------- init ---------- */
+var leftTabs=makeTabs($("leftTabs"));
+dock=makeTabs($("dockTabs"));
+var rightTabs=makeTabs($("rightTabs"));
+var p1=patGraph(P[0]);
+g={nodes:p1.n.map(function(x){return Object.assign({notes:""},x)}),edges:p1.e};
+newChat();renderChat();
+resetHist();drawAll();
+renderGrid();renderAdmin();renderSizing();
+})();
+</script>
+</body>
+</html>

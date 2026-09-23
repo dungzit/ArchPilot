@@ -16,9 +16,13 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements-dev.txt   # Windows
 # source .venv/bin/activate && pip install -r requirements-dev.txt  # Linux/macOS
 
-# create the database and the first user (password read from env or prompt)
-ARCHPILOT_ADMIN_PASSWORD='choose-a-long-password' \
-  .venv/Scripts/python.exe -m scripts.init_db --create-user admin --role admin
+# create the database and the first user. The password is prompted for (twice,
+# not echoed) or piped on stdin - never a command-line argument.
+.venv/Scripts/python.exe -m scripts.create_user admin --role admin --display-name "Admin"
+# non-interactive / inside the container:
+#   printf '%s\n' "$PW" | python -m scripts.create_user admin --role admin --password-stdin
+#   docker exec -i <container> python -m scripts.create_user alice --password-stdin < pw.txt
+# (scripts.init_db --create-user still works; it also reads ARCHPILOT_ADMIN_PASSWORD.)
 
 .venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
 ```
@@ -65,6 +69,13 @@ of `ruff.toml`.
 | `POST` | `/api/auth/login` | no | local username/password, sets httpOnly session cookie + CSRF cookie |
 | `POST` | `/api/auth/logout` | cookie/bearer | revokes the session (needs `x-csrf-token` when cookie-authenticated) |
 | `GET` | `/api/auth/me` | cookie/bearer | current user |
+| `GET` | `/api/workspaces/current` | cookie/bearer | the caller's workspace (`WorkspaceRecord` shape); 404 until one exists |
+| `PUT` | `/api/workspaces/current` | cookie/bearer | create (`revision: 0`) or update (`revision` = current); stale revision → **409** |
+| `GET` | `/api/designs?limit=&offset=` | cookie/bearer | the caller's designs, newest first, no graphs; `limit` 1–100 (default 50) |
+| `POST` | `/api/designs` | cookie/bearer | `{name, graph}` → 201; `graph` validated against `../contracts/archgraph.schema.json` (422 names the path) |
+| `GET` | `/api/designs/{id}` | cookie/bearer | one design with its graph; **404, not 403, for a non-owner** |
+| `PUT` | `/api/designs/{id}` | cookie/bearer | `{name, graph, revision}` full replace; stale revision → **409**; non-owner → 404 |
+| `DELETE` | `/api/designs/{id}` | cookie/bearer | soft delete → 204; non-owner → 404 |
 
 **CSRF.** Every unsafe method (`POST`/`PUT`/`PATCH`/`DELETE`) on a
 cookie-authenticated request must echo the `archpilot_csrf` cookie in an
@@ -87,10 +98,12 @@ backend/
     logging_config.py    JSON logs to stdout
     csrf.py              double-submit CSRF check for cookie-auth mutations
     migrations/          001_core.sql, 002_patterns_legal.sql, 003_publish_gate.sql
-    repositories/        users.py, patterns.py (SQL, no ORM)
-    routers/             health.py, auth.py
+    contract.py          loads ../contracts/archgraph.schema.json; validates design graphs per request
+    repositories/        users.py, patterns.py, workspaces.py, designs.py, errors.py (SQL, no ORM)
+    routers/             health.py, auth.py, workspaces.py, designs.py
   scripts/
     init_db.py           migrate + create a user
+    create_user.py       create a user; password from a prompt or --password-stdin only
     backup.py            VACUUM INTO snapshot, verify, prune
   tests/                 pytest suite
   Dockerfile             SPA build stage + Python runtime, single container

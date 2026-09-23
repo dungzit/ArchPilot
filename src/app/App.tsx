@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import { ChevronDown, Compass, Search, Settings2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronDown, Compass, LogOut, Search, Settings2 } from 'lucide-react'
+import { currentUser, logout, type User } from '../api/auth'
+import { isApiError, setUnauthorizedHandler } from '../api/client'
+import { LoginScreen, type LoginNotice } from '../features/auth/LoginScreen'
 import { copy, type Copy } from '../ui/copy'
 import { navItems, type ModuleKey } from './navigation'
 import { loadWorkspace, type WorkspaceRecord } from '../domain/store'
@@ -23,14 +26,81 @@ import { Investment } from '../features/investment/InvestmentScreen'
 import { InvestmentModal } from '../features/investment/InvestmentModal'
 import { WorkspaceModal } from '../features/workspace/WorkspaceModal'
 
+type Language = 'vi' | 'en'
+
+type Session =
+  | { status: 'checking' }
+  | { status: 'anonymous'; notice: LoginNotice | null }
+  | { status: 'authenticated'; user: User }
+
+/**
+ * Auth gate (task 1.2). Asks `/api/auth/me` once on load: a 401 shows the
+ * login screen, a user shows the shell. Any later 401 from any API call
+ * (session expired or revoked) routes back to login via client.ts's
+ * unauthorized handler. Owns the VI/EN choice so it survives sign-in.
+ */
+export function App() {
+  const [language, setLanguage] = useState<Language>('vi')
+  const [session, setSession] = useState<Session>({ status: 'checking' })
+  const text = (value: Copy) => value[language]
+  const toggleLanguage = () => setLanguage(language === 'vi' ? 'en' : 'vi')
+
+  useEffect(() => {
+    const controller = new AbortController()
+    currentUser(controller.signal)
+      .then((user) => setSession(user ? { status: 'authenticated', user } : { status: 'anonymous', notice: null }))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        const unreachable = isApiError(error) && error.kind === 'unreachable'
+        setSession({ status: 'anonymous', notice: unreachable ? 'unreachable' : null })
+      })
+    return () => controller.abort()
+  }, [])
+
+  // index.html declares lang="vi"; keep it true after a toggle so screen
+  // readers pronounce the English copy as English.
+  useEffect(() => { document.documentElement.lang = language }, [language])
+
+  useEffect(() => setUnauthorizedHandler(() => setSession({ status: 'anonymous', notice: 'expired' })), [])
+
+  async function handleLogout() {
+    try {
+      await logout()
+    } catch {
+      // The session may already be gone server-side; leaving is still right.
+    }
+    setSession({ status: 'anonymous', notice: 'signed-out' })
+  }
+
+  if (session.status === 'checking') {
+    return <div className="auth-splash" role="status">{text(copy('Đang kiểm tra phiên đăng nhập…', 'Checking your session…'))}</div>
+  }
+  if (session.status === 'anonymous') {
+    return (
+      <LoginScreen
+        text={text}
+        language={language}
+        onToggleLanguage={toggleLanguage}
+        notice={session.notice}
+        onLoggedIn={(user) => setSession({ status: 'authenticated', user })}
+      />
+    )
+  }
+  return <AppShell language={language} onToggleLanguage={toggleLanguage} user={session.user} onLogout={handleLogout} />
+}
+
+function initials(name: string): string {
+  const letters = name.trim().split(/\s+/).map((word) => word[0] ?? '').join('')
+  return (letters.length > 1 ? letters[0] + letters[letters.length - 1] : letters || '?').toUpperCase()
+}
+
 /**
  * The application shell: sidebar, topbar, language toggle, module switch and
  * the two modals. It owns no screen content — every screen lives in its own
  * file under `src/features/<module>/`.
  */
-export function App() {
+function AppShell({ language, onToggleLanguage, user, onLogout }: { language: Language; onToggleLanguage: () => void; user: User; onLogout: () => void }) {
   const [activeModule, setActiveModule] = useState<ModuleKey>('overview')
-  const [language, setLanguage] = useState<'vi' | 'en'>('vi')
   const [showInvestment, setShowInvestment] = useState(false)
   const [showWorkspace, setShowWorkspace] = useState(false)
   const [workspace, setWorkspace] = useState<WorkspaceRecord | null>(() => loadWorkspace())
@@ -70,7 +140,7 @@ export function App() {
           <div className="connection"><span className="status-dot green-dot" /> GitLab <span className="connected-label">connected</span></div>
           <div className="connection"><span className="status-dot green-dot" /> Targets <span className="connected-label">AWS · on-prem</span></div>
           <button className="nav-item muted"><Settings2 size={17} /><span>{text(copy('Cài đặt', 'Settings'))}</span></button>
-          <div className="user-card"><div className="avatar">DV</div><div><strong>Architect</strong><span>Personal account</span></div><ChevronDown size={14} /></div>
+          <div className="user-card"><div className="avatar">{initials(user.displayName)}</div><div><strong>{user.displayName}</strong><span>{user.username} · {user.role}</span></div><ChevronDown size={14} /></div>
         </div>
       </aside>
 
@@ -78,9 +148,10 @@ export function App() {
         <header className="topbar">
           <div className="breadcrumbs"><span>ArchPilot</span><span>/</span><strong>{text(navItems.find((item) => item.key === activeModule)?.label ?? copy('Tổng quan', 'Overview'))}</strong></div>
           <div className="top-actions">
-            <button className="language-toggle" onClick={() => setLanguage(language === 'vi' ? 'en' : 'vi')}><span className={language === 'vi' ? 'selected' : ''}>VI</span><span className={language === 'en' ? 'selected' : ''}>EN</span></button>
+            <button className="language-toggle" onClick={onToggleLanguage}><span className={language === 'vi' ? 'selected' : ''}>VI</span><span className={language === 'en' ? 'selected' : ''}>EN</span></button>
             <button className="icon-button" title="Search"><Search size={18} /></button>
-            <button className="avatar small">DV</button>
+            <button className="avatar small" title={user.displayName}>{initials(user.displayName)}</button>
+            <button className="secondary-button logout-button" onClick={onLogout}><LogOut size={15} aria-hidden="true" />{text(copy('Đăng xuất', 'Log out'))}</button>
           </div>
         </header>
 

@@ -4,3 +4,8 @@
 fastapi==0.115.6
 uvicorn==0.34.0
 pydantic==2.10.4
+# Task 1.6: design bodies are validated at request time against
+# ../contracts/archgraph.schema.json - the same file both contract test suites
+# use - so no second (pydantic) definition of ArchGraph exists to drift.
+# Promoted from test-only; runtime deps go 3 -> 4. See app/contract.py.
+jsonschema==4.23.0

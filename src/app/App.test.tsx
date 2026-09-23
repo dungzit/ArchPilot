@@ -13,9 +13,10 @@
  */
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { App } from './App'
 import { navItems, type ModuleKey } from './navigation'
+import { installFakeFetch, jsonResponse, TEST_USER, waitFor } from '../test/fakeFetch'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -59,15 +60,22 @@ const toEnglish = () => click(container.querySelector('.language-toggle'))
 beforeEach(async () => {
   window.localStorage.clear()
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  // Task 1.2: the shell only renders for a signed-in user. These tests are
+  // about the shell, so the fake backend answers /api/auth/me with a user.
+  // The login flow itself is covered by src/features/auth/LoginScreen.test.tsx.
+  installFakeFetch((request) =>
+    request.url === '/api/auth/me' ? jsonResponse(200, TEST_USER) : jsonResponse(404, { detail: 'not found' }))
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
   await act(async () => { root.render(<App />) })
+  await waitFor(() => container.querySelector('.app-shell') !== null, 'the signed-in shell')
 })
 
 afterEach(async () => {
   await act(async () => { root.unmount() })
   container.remove()
+  vi.unstubAllGlobals()
 })
 
 describe('App shell', () => {

@@ -3,11 +3,11 @@
 | | |
 |---|---|
 | **Author** | Senior Developer #1 (Builder / Proposer) |
-| **Date** | 2026-09-23 (v1.0) · 2026-09-23 (v1.2, post-review) · 2026-09-23 (v1.3, CI + `main.tsx` split) |
-| **Version** | 1.3 |
-| **Status** | Reviewed (`senior-developer-2`, approve-with-changes). Review findings closed; **all four red-team architecture blockers carried in code**; **CI now runs all three suites automatically (0.7)** and **`main.tsx` is split (1.1)**. Phase 1 routers are the next item. |
-| **Language / stack** | Backend: Python 3.10+ (CI tests **3.12 and 3.10**; the image is 3.12), FastAPI, SQLite (stdlib-preferring, 3 runtime deps + 4 test/lint-only). Frontend: existing ArchPilot React 18 + TypeScript + Vite on **Node 24**, with `vitest` + `ajv` + `jsdom` as devDependencies. |
-| **Code delivered with this doc** | `ArchPilot/backend/` · `ArchPilot/contracts/` · `ArchPilot/src/domain/sizing.ts` · `ArchPilot/src/contracts/` · `ArchPilot/src/{app,ui,features}/` · `.github/workflows/ci.yml` |
+| **Date** | 2026-09-23 (v1.0) · 2026-09-23 (v1.2, post-review) · 2026-09-23 (v1.3, CI + `main.tsx` split) · 2026-09-23 (v1.4, persistence spine: 1.2 / 1.3 / 1.6) |
+| **Version** | 1.4 |
+| **Status** | Reviewed (`senior-developer-2`, approve-with-changes) up to v1.3. **v1.4 is not yet reviewed.** All four red-team blockers carried in code. v1.4 adds the first real resources (**workspaces 1.3, designs CRUD 1.6**), the SPA's **API client + login screen (1.2)**, and the backend image **built and run for real** (0.8, local half). Next: **1.4** `store.ts` async rewrite. |
+| **Language / stack** | Backend: Python 3.10+ (CI tests **3.12 and 3.10**; the image is 3.12), FastAPI, SQLite (stdlib-preferring, **4 runtime deps** since 1.6 — `jsonschema` promoted from test-only — + 3 test/lint-only). Frontend: existing ArchPilot React 18 + TypeScript + Vite on **Node 24**, with `vitest` + `ajv` + `jsdom` as devDependencies. |
+| **Code delivered with this doc** | `ArchPilot/backend/` · `ArchPilot/contracts/` · `ArchPilot/src/domain/sizing.ts` · `ArchPilot/src/contracts/` · `ArchPilot/src/{app,ui,features,api,test}/` · `ArchPilot/vite.config.ts` · `.github/workflows/ci.yml` (**outside this repo — see §7.2 item 5c**) |
 | **Related docs** | `docs/requirements/systemsarchitect-requirements.md` v0.1 · `docs/architecture/systemsarchitect-prototype-design.md` v0.1 · `docs/architecture/reviews/review-systemsarchitect-prototype.md` v1.0 · `docs/development/reviews/review-systemsarchitect-backend.md` v1.0 · `docs/development/systemsarchitect-contracts-and-sizing.md` v1.0 · `docs/requirements/systemsarchitect-decisions.md` v0.1 |
 
 ### Change log
@@ -18,6 +18,7 @@
 | 1.1 | 2026-09-23 | `senior-developer-2` review: 14 findings fixed in code, backend suite 36 → 65. Wire format switched to camelCase (M-5). Two items handed back. |
 | 1.2 | 2026-09-23 | The two handed-back items delivered: task **0.5/0.6** (`contracts/` + shared fixtures + envelope rules) and task **3.1/3.2** (corrected sizing engine, red-team B3). Backend 65 → **90 pytest**; frontend 0 → **57 vitest**. |
 | 1.3 | 2026-09-23 | Task **0.7** (CI: `.github/workflows/ci.yml` runs ruff + pytest on Python 3.12 **and** 3.10, and `tsc -b` + vitest + `vite build` on Node 24) and task **1.1** (`main.tsx` 292 lines → 25 files under `src/app`, `src/ui`, `src/features/<module>/`, proved byte-identical by a 36-state DOM diff). Frontend 57 → **63 vitest**. Node images bumped 20 → 24 (Node 20 is EOL; jsdom 30 needs ≥ 22.22.2). |
+| 1.4 | 2026-09-23 | Tasks **1.3** (`GET/PUT /api/workspaces/current`, revision-checked, 409 on stale), **1.6** (designs CRUD, owner-scoped, 404 for non-owners, graph validated at request time against **the same** `contracts/archgraph.schema.json`, 409 on stale revision, paginated list, soft delete) and **1.2** (`src/api/client.ts`, `src/api/auth.ts`, `LoginScreen`, auth gate + Logout in `App.tsx`, Vite `/api` proxy, `scripts/create_user.py`). Backend 90 → **154 pytest**; frontend 63 → **97 vitest**. Backend image **built and run** under Docker 29.8 and exercised with curl (first time; the v1.3 `node:24-alpine` bump is now verified). |
 
 ---
 
@@ -37,11 +38,16 @@ decisions into one plan: the API surface, the SQLite schema, exactly what
 changes in `store.ts`, `architecture.ts`, `sizing.ts` and `knowledge.ts`, and a
 numbered 9-week task breakdown. The Phase-0 scaffold ships with this document
 and already runs: migrations, a deep health check, local login, WAL-safe
-backups, and **90 passing Python tests plus 63 passing TypeScript tests**, all
-of them now run automatically by **GitHub Actions on every push and pull
-request** (task 0.7). ArchPilot's `main.tsx` — one 292-line file holding all
-sixteen screens — has been split into one file per screen (task 1.1), so the
-canvas, sizing and pattern-hub work has somewhere to land.
+backups, and **154 passing Python tests plus 97 passing TypeScript tests**
+(v1.4). ArchPilot's `main.tsx` — one 292-line file holding all sixteen screens
+— has been split into one file per screen (task 1.1). **As of v1.4 the
+persistence spine has started:** the server stores each user's workspace and
+architecture designs, other users get "not found" for them, and a stale edit
+is refused instead of silently overwriting newer work. The SPA now opens on a
+login screen and signs out from the top bar. The single Docker image has been
+built and run for real. The one thing still missing before users see
+server-side data in the screens is task 1.4: switching `store.ts` from
+`localStorage` to the API.
 
 **Honest status of the four red-team blockers (v1.0 of this document did not
 make this clear enough, and the reviewer was right to say so).** At v1.0 only
@@ -68,12 +74,17 @@ bản phản biện, và các quyết định của chủ sản phẩm thành m�
 danh sách API, lược đồ SQLite, thay đổi chính xác trong `store.ts`,
 `architecture.ts`, `sizing.ts`, `knowledge.ts`, và phân rã công việc theo 9 tuần
 có đánh số. Bộ khung Phase-0 đi kèm tài liệu này đã chạy được: migration, health
-check sâu, đăng nhập nội bộ, sao lưu an toàn với WAL, và **90 test Python cùng
-63 test TypeScript đang pass**, tất cả nay được **GitHub Actions chạy tự động
-mỗi lần push và mỗi pull request** (công việc 0.7). Tệp `main.tsx` của ArchPilot
-— một tệp 292 dòng chứa toàn bộ mười sáu màn hình — đã được tách thành mỗi màn
-hình một tệp (công việc 1.1), để phần canvas, sizing và pattern hub có chỗ để
-triển khai.
+check sâu, đăng nhập nội bộ, sao lưu an toàn với WAL, và **154 test Python cùng
+97 test TypeScript đang pass** (v1.4). Tệp `main.tsx` của ArchPilot — một tệp
+292 dòng chứa toàn bộ mười sáu màn hình — đã được tách thành mỗi màn hình một
+tệp (công việc 1.1). **Từ bản v1.4, phần lưu trữ phía máy chủ đã bắt đầu:**
+máy chủ lưu workspace và các thiết kế kiến trúc của từng người dùng, người
+khác nhận "không tìm thấy" khi truy cập chúng, và một lần sửa dựa trên dữ liệu
+cũ sẽ bị từ chối thay vì âm thầm ghi đè lên bản mới hơn. SPA nay mở bằng màn
+hình đăng nhập và có nút đăng xuất trên thanh trên cùng. Image Docker duy nhất
+đã được build và chạy thật. Việc còn thiếu để người dùng thấy dữ liệu phía máy
+chủ trong các màn hình là công việc 1.4: chuyển `store.ts` từ `localStorage`
+sang API.
 
 **Tình trạng thật của bốn lỗi chặn từ đội phản biện.** Ở bản v1.0 chỉ có **B4**
 (sao lưu an toàn với WAL) là thực sự được khắc phục; **B1** mới làm một nửa,
@@ -242,7 +253,7 @@ hash binding is not relaxed.
 
 ### 3.4 API surface
 
-Bold = implemented in the Phase-0 scaffold. Everything else is scoped, not built.
+Bold = implemented (Phase-0 scaffold, plus v1.4 workspaces and designs). Everything else is scoped, not built.
 
 | Method | Path | Auth | Requirement |
 |---|---|---|---|
@@ -251,9 +262,9 @@ Bold = implemented in the Phase-0 scaffold. Everything else is scoped, not built
 | **POST** | **`/api/auth/login`** | none | Decision 4 |
 | **POST** | **`/api/auth/logout`** | session | — |
 | **GET** | **`/api/auth/me`** | session | — |
-| GET / PUT | `/api/workspaces/current` | session | ArchPilot module 1 |
-| GET / POST | `/api/designs` | session | `REQ-DESIGN-001/005`; `POST {seededFromPatternId}` = `REQ-HUB-007` |
-| GET / PUT / DELETE | `/api/designs/{id}` | session (owner) | `REQ-DESIGN-004/005`; non-owner gets **404, not 403** |
+| **GET / PUT** | **`/api/workspaces/current`** | session | ArchPilot module 1. **v1.4:** `WorkspaceRecord` shape; GET 404 until one exists; PUT `revision` = last seen (0 creates), stale → 409 |
+| **GET / POST** | **`/api/designs`** | session | `REQ-DESIGN-001/005`. **v1.4:** list is `?limit=` (1–100, default 50) `&offset=`, newest first, no graphs; POST `{name, graph}` → 201. `POST {seededFromPatternId}` (`REQ-HUB-007`) is **not** accepted yet — it lands with 6.1 so provenance cannot be forged by a client |
+| **GET / PUT / DELETE** | **`/api/designs/{id}`** | session (owner) | `REQ-DESIGN-004/005`; non-owner gets **404, not 403**. **v1.4:** PUT `{name, graph, revision}` full replace, stale → 409; DELETE is soft → 204 |
 | GET | `/api/benchmarks` | session | `REQ-CALC-003`, `M7` — every row carries its citation |
 | GET / POST | `/api/designs/{id}/sizings` | session (owner) | `REQ-CALC-007` |
 | POST | `/api/sizings/review` | session | Deterministic rules only, **no LLM** (Decision 5) |
@@ -277,8 +288,9 @@ else may query `patterns_fts` directly (`M1`).
 
 | File | Responsibility |
 |---|---|
-| `src/api/client.ts` | `fetch` wrapper: base URL, `credentials: 'include'`, `x-request-id`, JSON encode/decode, typed `ApiError`, 401 → redirect to login. No HTTP library |
-| `src/api/designs.ts`, `patterns.ts`, `sizings.ts`, `workspace.ts`, `auth.ts` | One thin module per resource; the only place a URL string appears |
+| `src/api/client.ts` ✅ **v1.4** | `fetch` wrapper: same-origin URLs, `credentials: 'include'`, `x-request-id`, `x-csrf-token` from the `archpilot_csrf` cookie on unsafe methods, JSON encode/decode with **no** case conversion (the wire is camelCase), typed `ApiError` (`status`, `detail`, `requestId`, `kind: 'http' \| 'unreachable'`), 401 → registered handler → login. No HTTP library |
+| `src/api/auth.ts` ✅ **v1.4**; `designs.ts`, `patterns.ts`, `sizings.ts`, `workspace.ts` | One thin module per resource; the only place a URL string appears. `workspace.ts` lands with 1.4, `designs.ts` with 2.5 |
+| `src/features/auth/LoginScreen.tsx` ✅ **v1.4** | Username/password form, VI/EN via `copy()`, error states: wrong password, throttled, server unreachable, empty fields; session-expired and signed-out notices |
 | `src/domain/graph.ts` | `ArchGraph`, `ArchNode`, `ArchEdge`, `NodeType`, `PALETTE`, `validateGraph()`, `diffGraphs()`, `migrateGraph()` |
 | `src/domain/benchmarks.ts` | Benchmark types + client-side defaults used only until `/api/benchmarks` responds |
 | `src/features/canvas/*`, `src/features/sizing/*`, `src/features/patterns/*` | The three screens, extracted out of `main.tsx` |
@@ -393,18 +405,18 @@ this confidence-derived band.
 | 0.5 | ~~Add `vitest` to `ArchPilot/package.json`; first test for `sizing.ts`~~ | E1 | — | ~~0.5~~ **done** | `npm test` → **57 passed** (`vitest run`, 2 files). `npm run typecheck` and `npm run build` clean |
 | 0.6 | ~~`contracts/archgraph.schema.json` + shared fixtures + contract test in **both** suites, **plus the three envelope rules**~~ | E2 | 0.5 | ~~1~~ **1.25 done** | 16 shared fixtures, 9 of them deliberately broken, run by `pytest` (jsonschema) **and** `vitest` (ajv) off one manifest. Negative control performed: weakening the casing rule failed the same fixture in both suites |
 | 0.7 | ~~CI: `pytest`, `npm test`, `tsc -b`, `npm run build`~~ | E2 | 0.5 | ~~0.5~~ **done** | `.github/workflows/ci.yml`: job `backend` = `ruff check` + `pytest` on a **3.12 / 3.10 matrix** (M-9 closed — 3.12 is the image, 3.10 is the documented floor, both must pass); job `frontend` = `npm ci` → `tsc -b` → `vitest` → `tsc -b && vite build` on **Node 24**. `ruff` added and the codebase made clean (15 findings fixed). `mypy --strict` deliberately deferred, see §7.2 |
-| 0.8 | Docker build of the combined image; run on the on-prem host | E2 | 0.1 | 1 | `docker run` → SPA at `/`, API at `/api/health` |
+| 0.8 | Docker build of the combined image; run on the on-prem host | E2 | 0.1 | 1 · **local half done (v1.4)** | **Verified locally 2026-09-23, Docker 29.8.0:** `docker build -f backend/Dockerfile .` succeeds (the `node:24-alpine` bump is no longer unverified); `docker run` → container `healthy`, SPA at `/` (200, `text/html`), `/api/health` 200 schema 003, full CRUD exercised with curl (§5). **Open:** run on the on-prem host, Compose file, TLS in front (the image sets `ARCHPILOT_COOKIE_SECURE=true`) |
 
-### Phase 1 — Persistence spine (9 pd) · depends on Phase 0
+### Phase 1 — Persistence spine (9 pd) · **6 pd delivered (1.1, 1.2, 1.3, 1.6), 3 pd open (1.4, 1.5)** · depends on Phase 0
 
 | # | Task | Owner | Depends on | Effort | Verification |
 |---|---|---|---|---|---|
 | 1.1 | ~~**Split `main.tsx`** into `src/features/*` — pure refactor~~ | E1 | 0.5 | ~~2~~ **done** | 292 lines → 25 files (`src/app/`, `src/ui/`, `src/features/<module>/`). **Proved** by a throwaway before/after jsdom diff of all 36 states (16 modules × VI/EN + 4 modal states): identical, `sha256 c3d5f0bf…c442d62b` on both sides. `tsc -b` clean; `vite build` clean. Six kept shell tests replace the throwaway harness |
-| 1.2 | `src/api/client.ts` + `auth.ts`; login screen; 401 redirect | E1 | 0.3, 1.1 | 1.5 | Login from the SPA sets the cookie; refresh keeps the session |
-| 1.3 | `GET/PUT /api/workspaces/current` | E2 | 0.2 | 1 | `pytest`: user B cannot read user A's workspace |
+| 1.2 | ~~`src/api/client.ts` + `auth.ts`; login screen; 401 redirect~~ | E1 | 0.3, 1.1 | ~~1.5~~ **done** | Through the Vite proxy: `/api/auth/me` → 401, login → 200 with both cookies, `/me` with the cookies → 200 (refresh keeps the session). 21 client tests + 13 login-flow tests (jsdom, real `<App/>`): gate, wrong password, 429, unreachable (network error **and** the proxy's empty 502), logout sends `x-csrf-token`, a later 401 routes back to login. First user: `scripts/create_user.py` (prompt or `--password-stdin`, never argv) |
+| 1.3 | ~~`GET/PUT /api/workspaces/current`~~ | E2 | 0.2 | ~~1~~ **done** | `pytest` (16): user B cannot read **or overwrite** user A's workspace; stale revision → 409 and no overwrite; `revision: 0` cannot clobber; two racing writers → exactly one wins (negative control: without the IMMEDIATE transaction both "win") |
 | 1.4 | Rewrite `store.ts` async + write-through cache + legacy import | E1 | 1.2, 1.3 | 1.5 | Existing `localStorage` workspace appears server-side after first login |
 | 1.5 | `src/domain/graph.ts` — `ArchGraph`, palette, `validateGraph()` | E1 | 0.6 | 1.5 | Unit tests for the 4 validation rules |
-| 1.6 | Designs CRUD API, owner-scoped, **404 for non-owners** | E2 | 1.3 | 1.5 | `pytest`: cross-user read returns 404, not 403 |
+| 1.6 | ~~Designs CRUD API, owner-scoped, **404 for non-owners**~~ | E2 | 1.3 | ~~1.5~~ **done** | `pytest` (38): cross-user read/update/delete → 404 with the same body as a missing id (negative control: dropping the owner filter fails 4 tests); **every `archGraph` fixture in the shared manifest is POSTed to the live endpoint and gets the same verdict** as in the jsonschema/ajv suites; stale revision → 409; list paginated and capped at 100; soft delete. +3 live-response contract tests (casing, timestamps, graph, and the 404/409/422 error envelopes) |
 
 ### Phase 2 — Pillar A: canvas (11 pd) · depends on Phase 1
 
@@ -488,8 +500,8 @@ this confidence-derived band.
 
 | Track | pd | Calendar |
 |---|---|---|
-| Phase 0 foundations (**6 pd of 7 done** — only 0.8 Docker remains) | 7 | Week 1 |
-| Phase 1 persistence spine (**2 pd of 9 done** — 1.1) | 9 | Weeks 1–2 |
+| Phase 0 foundations (**6 pd of 7 done** — 0.8 is built and run locally; on-prem run remains) | 7 | Week 1 |
+| Phase 1 persistence spine (**6 pd of 9 done** — 1.1, 1.2, 1.3, 1.6) | 9 | Weeks 1–2 |
 | Phase 2 canvas (E1) | 11 | Weeks 2–5 |
 | Phase 3 sizing (E2, parallel) | 8 | Weeks 2–4 |
 | Content track (C, parallel) | 10 | Weeks 1–7 |
@@ -497,7 +509,7 @@ this confidence-derived band.
 | Phase 5 editorial + legal gate | 7 | Weeks 5–7 |
 | Phase 6 integration | 5 | Weeks 7–8 |
 | Phase 7 hardening + launch | 8 | Weeks 8–9 |
-| **Engineering total** | **62 pd** (**55.5 remaining** after 0.1–0.7 and 1.1, 3.1, 3.2) | |
+| **Engineering total** | **62 pd** (**51.5 remaining** after 0.1–0.7, 1.1–1.3, 1.6, 3.1, 3.2) | |
 | **Content total** | **10 pd** | |
 
 Two engineers × 9 weeks ≈ 90 pd of raw capacity; 62 pd of planned work is ~69%
@@ -517,22 +529,37 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements-dev.txt
 .venv/Scripts/python.exe -m ruff check .          # same command CI runs
 .venv/Scripts/python.exe -m pytest
-ARCHPILOT_ADMIN_PASSWORD='local-dev-password-1' \
-  .venv/Scripts/python.exe -m scripts.init_db --create-user admin --role admin
+.venv/Scripts/python.exe -m scripts.create_user admin --role admin   # prompts twice (v1.4)
 .venv/Scripts/python.exe -m uvicorn app.main:app --port 8000
 
-# frontend (contract + sizing tests)
+# frontend
 cd ArchPilot
 npm install
 npm test          # vitest run
 npm run typecheck # tsc -b
 npm run build     # tsc -b && vite build
+npm run dev       # :5173, proxies /api -> 127.0.0.1:8000 (v1.4); open it and sign in
+
+# container (v1.4) - Git Bash on Windows needs MSYS_NO_PATHCONV=1
+docker build -f backend/Dockerfile -t archpilot:dev .
+docker run -d --rm --name archpilot -p 18000:8000 archpilot:dev
+printf '%s\n' "$PW" | docker exec -i archpilot python -m scripts.create_user alice --role admin --password-stdin
+docker stop archpilot   # --rm also removes the anonymous /data volume
 ```
 
 Observed on 2026-09-23 (Windows 10, Python 3.10.11, SQLite 3.40.1, Node 24.18.0):
 
 | Command | Result |
 |---|---|
+| `ruff check .` (v1.4) | `All checks passed!` |
+| `pytest` (v1.4) | **154 passed**, 1 warning (the same starlette-internal `anyio` deprecation), 74 s. New: `test_workspaces.py` 16, `test_designs.py` 38, `test_create_user_script.py` 7, `test_contracts.py` +3 |
+| `npm test` (v1.4) | **97 passed**, 5 files (`sizing` 34, `contract` 23, `App` 6, `api/client` 21, `features/auth/LoginScreen` 13) |
+| `npm run typecheck` / `npm run build` (v1.4) | clean · `✓ 1909 modules transformed` · `index-*.js 305.40 kB (gzip 90.56 kB)` |
+| negative controls (v1.4) | owner filter removed from `designs.py` → **4 tests fail**; IMMEDIATE transaction removed from `workspaces.put_current` (with a widened race window) → concurrency test fails with `['ok', 'ok']` (a lost update); restored code passes with the same widened window |
+| `docker build -f backend/Dockerfile .` (v1.4, Docker 29.8.0) | succeeds; container reaches `healthy`; `GET /` → 200 `text/html` (SPA), `/api/health` → `{"status":"ok","env":"production","schemaVersion":"003",…}` |
+| `docker exec -i … scripts.create_user … --password-stdin` | `created user alice (admin)` exit 0 · 5-char password → exit 2 `password must be at least 12 characters` · no TTY and no flag → exit 2, refuses rather than hangs |
+| curl against the container (v1.4) | login → 200 with `archpilot_session` (`HttpOnly; Secure; SameSite=lax`) and `archpilot_csrf` (`Secure`, readable) · `POST /api/designs` **without** `x-csrf-token` → 403 `csrf check failed: missing csrf token`, with a forged one → 403 `csrf token mismatch` · with it → **201** + `location: /api/designs/dsg_…` · GET → 200 · list → 200 · PUT rev 1 → 200 rev 2 · PUT rev 1 again → **409** `you sent revision 1 but the current revision is 2` · snake_case graph → 422 `graph does not match the ArchGraph contract - …` · **as bob:** GET/PUT/DELETE alice's design → **404** `design not found` (identical to a nonexistent id), list → `{"items":[],"total":0}`, workspace → 404 · DELETE as alice → 204, then GET → 404 · no cookie → 401 |
+| dev pair: uvicorn :8000 + vite :5173 (v1.4) | through the proxy: `/` serves `index.html` (`<div id="root">`, `/src/main.tsx`) · `/api/auth/me` → **401** · login → 200, both cookies `secure=FALSE` (dev) · `/me` with the jar → 200. With uvicorn stopped the proxy answers **502, empty body**, which `client.ts` reports as "server unreachable". Both processes stopped afterwards; ports 8000/5173 free |
 | `ruff check .` (v1.3) | `All checks passed!` — 15 findings existed before and were fixed, not suppressed |
 | `pytest` (v1.3) | **90 passed**, 1 warning (a starlette-internal `anyio` deprecation), 11.8 s |
 | `npm test` (v1.3) | **63 passed**, 3 files (`sizing.test.ts` 34, `contract.test.ts` 23, `App.test.tsx` 6), 3.0 s |
@@ -585,8 +612,8 @@ and an uncited `declared` benchmark rejected.
 
 ## 7. Status board — done vs still open
 
-Updated 2026-09-23 after the `senior-developer-2` review and the two
-handed-back tasks. This section supersedes the v1.0 stub list.
+Updated 2026-09-23 at v1.4 (tasks 1.2, 1.3, 1.6). This section supersedes the
+v1.0 stub list.
 
 ### 7.1 Done and tested
 
@@ -602,24 +629,35 @@ handed-back tasks. This section supersedes the v1.0 stub list.
 | **CI (task 0.7)** | `.github/workflows/ci.yml`. Job `backend`: `ruff check` + `pytest` on a **Python 3.12 / 3.10 matrix**, `fail-fast: false`, plus a step that records the interpreter, the SQLite build and that the FTS5 `unicode61 remove_diacritics 2` tokenizer exists on the runner. Job `frontend`: `npm ci` → `tsc -b` → `vitest` → `tsc -b && vite build` → assert `dist/index.html` exists, on **Node 24**. `contents: read` only; `cancel-in-progress` concurrency |
 | **Backend lint (task 0.7)** | `ArchPilot/backend/ruff.toml` — `E W F I B UP C4 SIM BLE RUF`, `target-version = "py310"` (the floor, not the image, so ruff never suggests syntax 3.10 rejects). 15 pre-existing findings fixed in code, including 7 dead `# noqa` directives that were claiming protection they no longer gave |
 | **`main.tsx` split (task 1.1)** | 292 lines → 25 files: `src/main.tsx` (bootstrap), `src/app/` (shell + nav + tests), `src/ui/` (`copy`, `PageHeader`, `ModulePanel`, `DatabaseIcon`), `src/features/<module>/` (16 screens + editor + 2 modals). Byte-identical DOM across all 36 states |
-| Test suites | **90 pytest** (`ArchPilot/backend`) · **63 vitest** (`ArchPilot`: 34 sizing + 23 contract + 6 shell) · `ruff check`, `tsc -b` and `vite build` clean — **and all of it runs in CI** |
+| **Workspaces API (task 1.3)** | `GET/PUT /api/workspaces/current`, owner-scoped by construction (no id in the URL). Wire shape = `WorkspaceRecord` in `store.ts`. Client sends the revision it last saw (`0` creates); server assigns the next one; a stale write is a 409 and never lands. Check-and-write in one `BEGIN IMMEDIATE` transaction (`app/db.py:immediate_transaction`) |
+| **Designs API (task 1.6)** | Full CRUD, owner-scoped, **404 not 403** for a non-owner (same body as a missing id). `graph` validated per request against **`contracts/archgraph.schema.json` itself** (`app/contract.py`, jsonschema); no second definition of `ArchGraph` exists in Python. 1 MiB graph cap. Optimistic concurrency on PUT. List paginated (`limit` ≤ 100) and graph-free. Soft delete (takedown can still count derived designs). The first design auto-creates the owner's workspace (`designs.workspace_id` is NOT NULL) |
+| **SPA auth (task 1.2)** | `src/api/client.ts` (credentials, CSRF from cookie, request id, typed `ApiError` incl. `unreachable`, 401 → login hand-off), `src/api/auth.ts`, `src/features/auth/LoginScreen.tsx` (VI/EN, labelled fields, Enter submits, focus management, `role="alert"` errors), auth gate + Logout + real user name in `src/app/App.tsx`, `/api` dev proxy in `vite.config.ts`. The rest of the app behaves as before once signed in (`store.ts` untouched) |
+| **First user** | `backend/scripts/create_user.py` — prompt (twice) or `--password-stdin`; never argv, never env; refuses without a TTY instead of hanging; migrates a fresh DB first |
+| **Docker (task 0.8, local half)** | Image built and run under Docker 29.8.0; healthy; SPA at `/`; full CRUD exercised with curl. The contract file is copied to `/srv/contracts/`, and the app refuses to start without it |
+| Test suites | **154 pytest** (`ArchPilot/backend`) · **97 vitest** (`ArchPilot`: 34 sizing + 23 contract + 6 shell + 21 client + 13 login flow) · `ruff check`, `tsc -b` and `vite build` clean. **CI caveat:** see §7.2 item 5c |
 
 ### 7.2 Still open — engineering
 
 | # | Item | Task | Note |
 |---|---|---|---|
-| 1 | **No routers for designs, workspaces, sizings, patterns or admin.** Tables, triggers and indexes exist; the HTTP layer does not | 1.3, 1.6, 3.3, 3.6, 4.1, 5.1–5.4 | **This is now the top engineering item.** Unblocked twice over: the casing decision is made and the contract guards it (so these routers will not have to be re-cased), and CI enforces the contract on every push. Order: **1.3** workspaces → **1.6** designs CRUD → **3.3** benchmarks |
+| 0 | **Remaining, in order (v1.4).** (1) **1.4** `store.ts` async rewrite + write-through cache + legacy import — the API it needs exists; (2) **canvas persistence UI** — 1.5 `graph.ts`, then 2.1–2.6 with 2.5 autosave onto `/api/designs`; (3) **3.3** benchmarks seed + `GET /api/benchmarks`; (4) **3.4** sizing UI; (5) **pattern hub API** 4.1/4.2; (6) **admin / legal-gate UI** 5.1–5.4; (7) **Litestream** 7.4 | — | Items 1 and 3 are independent and can run in parallel (E1 / E2) |
+| 1 | ~~No routers for designs, workspaces~~. **Still no routers for sizings, benchmarks, patterns or admin** | 3.3, 3.6, 4.1, 5.1–5.4 | Workspaces and designs **done at v1.4**. Next backend item: **3.3** benchmarks |
 | 2 | **No search endpoint.** `patterns_fts` is populated and tested; `search_published_patterns()` is specified (§3.4), not written | 4.2 | All search must route through this one function (`M1`) |
-| 3 | **No frontend wiring.** `src/api/client.ts`, `auth.ts`, `store.ts` async rewrite, `graph.ts` — all specified in §3.5, none implemented. `sizing.ts` is corrected but still has **no call site**, and `src/features/sizing/SizingScreen.tsx` is still hard-coded HTML | 1.2, 1.4, 1.5, 3.4 | Now fully unblocked: the sizing gate ("no sizing screen before 3.1 + 3.2") is cleared **and** the file to edit is 1 screen, not 1/16th of a 292-line file |
+| 3 | **Frontend wiring, partly done.** ~~`client.ts`, `auth.ts`~~ done at v1.4. **Still open:** `store.ts` async rewrite (1.4) — the workspace modal still saves to `localStorage` and still says so; `graph.ts` (1.5); `src/api/workspace.ts` / `designs.ts`. `sizing.ts` still has **no call site** and `SizingScreen.tsx` is still hard-coded HTML (3.4) | 1.4, 1.5, 3.4 | 1.4 is now unblocked on both sides |
+| 3b | **Referential integrity of stored graphs is not checked server-side.** The API accepts a graph whose edge names a missing node, or two nodes with one id — JSON Schema cannot say otherwise (item 11) | 1.5 | When 1.5 decides which `validateGraph()` rules are hard errors (not warnings — `REQ-DESIGN-007` wants an orphan to warn and still save), mirror **only those** in the designs router. ~20 lines |
+| 3c | **No HTTP body-size limit.** The 1 MiB graph cap runs after the body is parsed; uvicorn itself has no limit | 7.x | Put `client_max_body_size` on the TLS proxy in front of the container (devops), or a small ASGI guard |
 | 4 | ~~**`main.tsx` is still one 292-line file**~~ | 1.1 | **Done at v1.3.** See §3.5.3 |
 | 5 | ~~**No CI.**~~ **`mypy --strict` and `ruff format --check` are still not in CI** | 0.7 (partial) | **CI done at v1.3** (`ruff check` + `pytest` × {3.12, 3.10}, `tsc -b` + vitest + `vite build` on Node 24). Two deliberate gaps: (i) `ruff format --check` would rewrite **16 of 26** Python files, and a whole-tree reformat landing with a refactor makes both unreviewable — run `ruff format .` once on its own, then add the check; (ii) `mypy --strict` (m12) was not attempted and its cost is unmeasured. Both are ~0.25 pd each |
-| 5b | **Nothing in CI builds the Docker image or runs a container** | 0.8 | The image was bumped `node:20-alpine` → `node:24-alpine` in both Dockerfiles (Node 20 is EOL 2026-04-30; jsdom 30 needs ≥ 22.22.2) and **that change is unverified** — no Docker daemon was available. `devops-master` should `docker build -f backend/Dockerfile .` before trusting it. Undo is one line per Dockerfile |
+| 5b | **Nothing in CI builds the Docker image or runs a container** | 0.8 | The `node:24-alpine` bump **is now verified locally** (v1.4: the backend image builds and runs). CI still does not build it; a `docker build` job is ~10 lines |
+| 5c | **The CI workflow is not in this repository.** `ArchPilot/` is now its own git repo, but `ci.yml` lives at `D:\ClaudCode\Sub-agents\.github\workflows\ci.yml`, one level up, and uses `working-directory: ArchPilot/backend`. On `github.com/dungzit/ArchPilot` **no CI runs today**, so the "runs on every push" claims in §6 R3/R4 are currently untrue for this repo | 0.7 | Move it to `ArchPilot/.github/workflows/ci.yml` and change the two `working-directory` values (`ArchPilot/backend` → `backend`, `ArchPilot` → `.`) plus any cache paths. PO decision because it touches the repo layout; not done here |
 | 6 | **Litestream is not configured.** `VACUUM INTO` alone leaves RPO at the backup interval | 7.4 | Devops. Also M-8: `ARCHPILOT_BACKUP_DIR` currently defaults to the same volume as the database |
 | 7 | **No seed script.** B2's acceptance criteria are written (review §7.3) but unimplemented | C.5 | Gated on the content track |
 | 8 | Login throttling is in-process and keyed on `(ip, username)` | — | Accepted for 2–4 users; revisit with `login_attempts` if the audience grows |
 | 9 | PBKDF2, not argon2id | — | Deliberate (stdlib only); per-user `password_iterations` is the upgrade seam |
 | 10 | `/api/health` is unauthenticated and verbose | — | Deliberate; decide the production redaction with devops-master |
-| 11 | Referential integrity of `ArchGraph` (dangling edges, duplicate node ids) is **not** in the JSON Schema | 1.5 | JSON Schema cannot express it. It belongs in `validateGraph()`; do not let that boundary blur |
+| 11 | Referential integrity of `ArchGraph` (dangling edges, duplicate node ids) is **not** in the JSON Schema | 1.5 | JSON Schema cannot express it. It belongs in `validateGraph()`; do not let that boundary blur. Server-side consequence: item 3b |
+| 12 | **The CSRF cookie name is hard-coded in the SPA** (`archpilot_csrf` in `src/api/client.ts`) while the backend makes it configurable (`ARCHPILOT_CSRF_COOKIE`) | — | Changing the env var alone would make every mutation 403. Either drop the env var or have `/api/auth/me` return the name. Low risk; noted so nobody "tunes" it |
+| 13 | **Logout while the server is unreachable leaves the httpOnly session cookie in place.** The SPA shows the login screen, but a reload signs the user back in | — | Acceptable for an internal tool; the session still expires after 12 h and is revocable server-side |
 
 ### 7.3 Still open — blocking gates
 
@@ -743,10 +781,38 @@ now has teeth, and the negative control proves it.
 | `ArchPilot/package.json`, `package-lock.json` | `jsdom` added as a devDependency (shell test only) |
 | `docs/development/systemsarchitect-build-scope.md` | this document — §3.5.3, §5, §7.1, §7.2 and the task tables carry the v1.3 record; there is no separate build note |
 
+### Files added / changed at v1.4 (tasks 1.2, 1.3, 1.6)
+
+| Path | Responsibility |
+|---|---|
+| `ArchPilot/backend/app/contract.py` | **new.** Loads `contracts/archgraph.schema.json` once (repo or `/srv/contracts`), `validate_archgraph()` with path-naming messages; start-up fails if the file is missing |
+| `ArchPilot/backend/app/repositories/workspaces.py`, `designs.py`, `errors.py` | **new.** Owner-scoped SQL; `RevisionConflictError`, `NotFoundError` |
+| `ArchPilot/backend/app/routers/workspaces.py`, `designs.py` | **new.** The five design routes and the two workspace routes |
+| `ArchPilot/backend/app/schemas.py` | `WorkspaceOut/Put`, `DesignCreate/Put/Summary/Out/List`, `StrictApiModel` (`extra="forbid"`), `ArchGraphDocument` (contract-validated), 1 MiB cap |
+| `ArchPilot/backend/app/db.py` | `immediate_transaction()` |
+| `ArchPilot/backend/app/main.py` | registers the two routers; loads the contract at start-up |
+| `ArchPilot/backend/scripts/create_user.py` | **new.** First-user script (prompt or `--password-stdin`) |
+| `ArchPilot/backend/requirements.txt`, `requirements-dev.txt` | `jsonschema` moved to runtime (3 → 4 runtime deps) |
+| `ArchPilot/backend/Dockerfile` | copies `contracts/archgraph.schema.json` into `/srv/contracts/` |
+| `ArchPilot/backend/tests/test_workspaces.py`, `test_designs.py`, `test_create_user_script.py` | **new.** 16 + 38 + 7 tests |
+| `ArchPilot/backend/tests/conftest.py`, `test_contracts.py` | two-user fixtures (`user_a`, `user_b`); +3 live-response contract tests |
+| `ArchPilot/backend/README.md` | endpoints, layout, `create_user` usage |
+| `ArchPilot/contracts/README.md` | the "no runtime validation" non-goal is **reversed**, with the reason; runtime row in "Who enforces it" |
+| `ArchPilot/src/api/client.ts`, `auth.ts` | **new.** The HTTP client and the auth resource module |
+| `ArchPilot/src/features/auth/LoginScreen.tsx` | **new.** The login screen |
+| `ArchPilot/src/app/App.tsx` | auth gate (`checking` / `anonymous` / `authenticated`), unauthorized handler, Logout button, real user name/initials, `<html lang>` follows the toggle. The old `App` body is now `AppShell`, otherwise unchanged |
+| `ArchPilot/src/styles.css` | login / splash / logout styles, appended |
+| `ArchPilot/vite.config.ts` | `/api` proxy for `dev` and `preview` (`ARCHPILOT_API_URL` overrides the target) |
+| `ArchPilot/src/test/fakeFetch.ts` | **new.** Test-only fetch stub + `waitFor` |
+| `ArchPilot/src/api/client.test.ts`, `src/features/auth/LoginScreen.test.tsx` | **new.** 21 + 13 tests |
+| `ArchPilot/src/app/App.test.tsx` | signs in through the fake backend before the 6 shell tests (assertions unchanged) |
+| `ArchPilot/docs/systemsarchitect-build-scope.md` | this document — header, change log, §1, §3.4, §3.5.1, task tables, §5, §7 |
+
 ### Next handoff
 
 | Agent / role | What they need to do |
 |---|---|
+| **senior-developer-2 (v1.4)** | Review the v1.4 slice. Attack first: (a) the reversal of the contract's "no runtime validation" non-goal — `jsonschema` at runtime vs. a second pydantic definition; (b) GET `/api/workspaces/current` answering 404 before first save instead of auto-creating; (c) the "unreachable" heuristic in `client.ts` (any 5xx without our envelope, plus 502/503/504); (d) soft delete with no purge path |
 | **senior-developer-2** | **Done** — review delivered as `docs/development/reviews/review-systemsarchitect-backend.md` v1.0, approve-with-changes, 14 findings fixed in code. **Next:** re-review the two handed-back deliverables (`ArchPilot/contracts/` and `src/domain/sizing.ts` v2.0). Specific things to attack: the decision to close `archNode`/`archEdge` with `additionalProperties: false` against NFR-EXT-002's "readers ignore unknown fields"; whether `spareNodes` belongs outside the confidence band; and whether storage should use average rather than peak write QPS |
 | **ba-qa-analyst** | `TC-COMPLY-002`/`003` are green; `TC-COMPLY-005` (publish with no approval refused at the storage layer) and `TC-COMPLY-006` (a reviewed pattern cannot be deleted) are now testable. **`TC-FUNC-CALC-010` (replication applied to write throughput) is unblocked and already has an automated equivalent** — `sizing.test.ts` "a 3x replicated write path needs 3x the write capacity"; write the manual/acceptance form of it plus the other three B3 terms. `TC-COMPLY-004` still needs the seed script |
 | **security-architect** | STRIDE pass on local auth (D6), session lifecycle, the share token (6.4), CSRF (7.3), the admin role boundary, and Markdown → HTML rendering on the pattern detail page |
