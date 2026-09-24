@@ -54,11 +54,17 @@ function click(element: Element | null | undefined) {
 }
 
 const navButtons = () => Array.from(container.querySelectorAll('.main-nav .nav-item'))
+// Task 0.5: the existing modules sit in the collapsed ARCHPILOT MODULES group.
+const expandModules = async () => {
+  if (!container.querySelector('#module-nav-list')) await click(container.querySelector('.nav-group-toggle'))
+}
 const mainArea = () => container.querySelector('.main-area') as HTMLElement
 const toEnglish = () => click(container.querySelector('.language-toggle'))
 
 beforeEach(async () => {
   window.localStorage.clear()
+  // App owns a BrowserRouter; every test starts at the home route.
+  window.history.replaceState(null, '', '/')
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   // Task 1.2: the shell only renders for a signed-in user. These tests are
   // about the shell, so the fake backend answers /api/auth/me with a user.
@@ -79,7 +85,8 @@ afterEach(async () => {
 })
 
 describe('App shell', () => {
-  test('renders one nav item per module, in navItems order', () => {
+  test('renders one nav item per module, in navItems order', async () => {
+    await expandModules()
     const labels = navButtons().map((button) => button.textContent)
     expect(labels).toHaveLength(navItems.length)
     expect(labels).toHaveLength(SCREEN_MARKERS.length)
@@ -89,6 +96,7 @@ describe('App shell', () => {
 
   test('every module renders its own screen', async () => {
     await toEnglish()
+    await expandModules()
     for (const [index, marker] of SCREEN_MARKERS.entries()) {
       await click(navButtons()[index])
       const html = mainArea().innerHTML
@@ -98,6 +106,7 @@ describe('App shell', () => {
   })
 
   test('the architecture module renders both the canvas screen and the editor', async () => {
+    await expandModules()
     const index = navItems.findIndex((item) => item.key === 'architecture')
     await click(navButtons()[index])
     expect(mainArea().querySelector('.architecture-layout')).not.toBeNull()

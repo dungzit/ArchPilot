@@ -87,13 +87,78 @@ def test_broken_fixtures_are_rejected_for_the_intended_reason(case):
     )
 
 
+INTEGRITY_CASES = MANIFEST["integrityCases"]
+MIGRATIONS = MANIFEST["migrations"]
+
+
 def test_manifest_covers_every_fixture_on_disk():
     on_disk = {p.name for p in FIXTURES_DIR.glob("*.json")} - {MANIFEST_PATH.name}
-    listed = {c["fixture"] for c in CASES}
+    listed = {c["fixture"] for c in CASES} | {c["fixture"] for c in INTEGRITY_CASES}
+    listed |= {m[key] for m in MIGRATIONS for key in ("input", "expected")}
     assert on_disk == listed, (
         f"unexercised fixtures: {sorted(on_disk - listed)}; "
         f"missing files: {sorted(listed - on_disk)}"
     )
+
+
+# --------------------------------------------------------------------------
+# Contract 1.1.0 (task 0.2): the L1 integrity layer and the migration pair,
+# driven by the same manifest the TypeScript suite reads.
+# --------------------------------------------------------------------------
+
+
+def test_python_integrity_rules_are_exactly_the_manifest_rules():
+    from app.graph_integrity import RULE_CODES
+
+    assert list(RULE_CODES) == [rule["code"] for rule in MANIFEST["integrityRules"]]
+
+
+@pytest.mark.parametrize("case", INTEGRITY_CASES, ids=lambda c: c["fixture"])
+def test_integrity_fixtures_pass_the_contract_and_fail_integrity_on_the_named_rule(case):
+    """Each broken-integrity fixture must be shape-VALID - otherwise it would
+    prove the contract, not the integrity layer - and must then be rejected
+    with exactly the rule the manifest names."""
+    from app.graph_integrity import check_integrity
+
+    document = load_fixture(case["fixture"])
+    errors = list(validator_for(case["schemaRef"]).iter_errors(document))
+    assert not errors, f"{case['fixture']} must be contract-valid: {error_signature(errors)}"
+    codes = [issue.code for issue in check_integrity(document)]
+    assert case["expectRule"] in codes, f"{case['fixture']}: expected {case['expectRule']}, got {codes}"
+
+
+@pytest.mark.parametrize(
+    "case", [c for c in VALID_CASES if c["schemaRef"] == "#/$defs/archGraph"], ids=case_id
+)
+def test_every_valid_graph_fixture_is_integrity_clean(case):
+    from app.graph_integrity import check_integrity
+
+    assert check_integrity(load_fixture(case["fixture"])) == []
+
+
+@pytest.mark.parametrize("pair", MIGRATIONS, ids=lambda m: f"{m['from']}->{m['to']}")
+def test_migration_pair_is_consistent_with_the_catalogue(pair):
+    """TypeScript owns migrate() (the server never rewrites a document), so the
+    Python half checks what it can independently: both sides pass both layers,
+    no node or edge is lost, and every type moved exactly as the catalogue's
+    legacyTypes table says."""
+    from app.catalog import load_catalog
+    from app.graph_integrity import check_integrity
+
+    source, expected = load_fixture(pair["input"]), load_fixture(pair["expected"])
+    assert (source["schemaVersion"], expected["schemaVersion"]) == (pair["from"], pair["to"])
+    for document in (source, expected):
+        validator_for("#/$defs/archGraph").validate(document)
+        assert check_integrity(document) == []
+    assert [n["id"] for n in source["nodes"]] == [n["id"] for n in expected["nodes"]]
+    assert [e["id"] for e in source["edges"]] == [e["id"] for e in expected["edges"]]
+    legacy = load_catalog().legacy_types[pair["from"]]
+    for before, after in zip(source["nodes"], expected["nodes"], strict=True):
+        ref = legacy[before["type"]]
+        assert (after["type"], after.get("variant")) == (ref.role, ref.variant), before["id"]
+        assert after["label"] == before["label"]
+        assert after["position"] == before["position"]
+    assert "deployment" not in expected, "REQ-TGT-003: a migrated design has no target until the user picks one"
 
 
 def test_every_envelope_rule_has_at_least_one_broken_fixture():
@@ -207,6 +272,20 @@ def test_new_error_paths_obey_the_error_shape(user_a, user_b):
         assert response.status_code == expected_status, response.text
         validator_for("#/$defs/errorResponse").validate(response.json())
         assert response.json()["requestId"] == response.headers["x-request-id"]
+
+
+def test_a_v2_design_response_obeys_the_casing_rule_at_every_depth(user_a):
+    """Red-team review B2. Design v0.2 keyed maps by target id (`bare_metal`),
+    profile id (`dc1_vsphere`) and artifact name (`brief.answers`); any of them
+    would fail this assertion. Contract 1.1.0 carries that data as values in
+    arrays, so the WHOLE body - 2.0 graph included - is camelCase."""
+    graph = load_fixture("archgraph.v2-hybrid-orders.valid.json")
+    created = user_a.post("/api/designs", json={"name": "hybrid", "graph": graph})
+    assert created.status_code == 201, created.text
+    body = created.json()
+    validator_for("#/$defs/camelCaseObject").validate(body)
+    validator_for("#/$defs/archGraph").validate(body["graph"])
+    assert body["schemaVersion"] == "2.0"
 
 
 def test_benchmark_response_obeys_the_casing_and_timestamp_rules(user_a):

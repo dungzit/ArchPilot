@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "2.0",
+  "settings": {
+    "codeName": "broken_design",
+    "environment": "dev"
+  },
+  "nodes": [
+    {
+      "id": "n2",
+      "type": "relational_db",
+      "label": "Orders Db",
+      "codeName": "orders_db",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "realisations": {
+        "aws": {
+          "realisation": "aws.rds",
+          "config": {
+            "instanceClass": "db.t4g.medium"
+          }
+        }
+      }
+    }
+  ],
+  "edges": []
+}

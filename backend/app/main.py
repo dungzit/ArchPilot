@@ -15,11 +15,11 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__
-from .config import BACKEND_ROOT, get_settings
+from .catalog import load_catalog
+from .config import get_settings
 from .contract import load_contract
 from .csrf import CSRF_HEADER, enforce_csrf
 from .db import connect, init_database
@@ -27,6 +27,7 @@ from .logging_config import configure_logging
 from .repositories import benchmarks as benchmarks_repo
 from .repositories import users as users_repo
 from .routers import auth, benchmarks, designs, health, workspaces
+from .spa import SpaStaticFiles
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,38 @@ REQUEST_ID_HEADER = "x-request-id"
 
 # Cheap, static hardening headers. The SPA and the API are same-origin in the
 # container, so a restrictive frame/referrer policy costs nothing.
+#
+# Content-Security-Policy (task 0.5, red-team review M9). The built SPA is one
+# module script plus one stylesheet from /assets, so script-src is 'self' only.
+# style-src needs 'unsafe-inline' because React renders style="" attributes.
+# img-src allows data:/blob: for diagram export and zip download (later
+# phases). The Google Fonts pair is there because src/styles.css @imports its
+# fonts from fonts.googleapis.com today; self-hosting them (the on-prem host
+# may have no internet, NFR2-DEP-001) is an open item, and removing the two
+# origins then is a one-line change here.
+CONTENT_SECURITY_POLICY = "; ".join(
+    [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "img-src 'self' data: blob:",
+        "font-src 'self' https://fonts.gstatic.com",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+    ]
+)
 SECURITY_HEADERS = {
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY",
     "referrer-policy": "no-referrer",
+    "content-security-policy": CONTENT_SECURITY_POLICY,
 }
+# Swagger UI (development only; disabled in production) loads its bundle from a
+# CDN with an inline bootstrap script, which the policy above would block.
+CSP_EXEMPT_PREFIXES = ("/api/docs", "/api/openapi.json")
 
 
 @asynccontextmanager
@@ -93,8 +121,11 @@ def _seed_benchmarks(settings) -> int:
         conn.close()
 
 
-def _apply_security_headers(response) -> None:
+def _apply_security_headers(response, path: str = "") -> None:
+    exempt = path.startswith(CSP_EXEMPT_PREFIXES)
     for name, value in SECURITY_HEADERS.items():
+        if exempt and name == "content-security-policy":
+            continue
         response.headers.setdefault(name, value)
 
 
@@ -133,6 +164,9 @@ def create_app() -> FastAPI:
     # time. A container built without that file must fail here, at start-up,
     # not with a 500 on somebody's first save.
     load_contract()
+    # Same rule for the component catalogue (task 0.6): 2.0 node types are
+    # checked against it on every save.
+    load_catalog()
 
     app = FastAPI(
         title="ArchPilot Backend",
@@ -169,7 +203,7 @@ def create_app() -> FastAPI:
         rejected = enforce_csrf(request, settings, request_id)
         if rejected is not None:
             rejected.headers[REQUEST_ID_HEADER] = request_id
-            _apply_security_headers(rejected)
+            _apply_security_headers(rejected, request.url.path)
             logger.warning(
                 "csrf rejected",
                 extra={"request_id": request_id, "method": request.method, "path": request.url.path},
@@ -192,12 +226,12 @@ def create_app() -> FastAPI:
                 content={"detail": "internal server error", "requestId": request_id},
             )
             response.headers[REQUEST_ID_HEADER] = request_id
-            _apply_security_headers(response)
+            _apply_security_headers(response, request.url.path)
             return response
 
         duration_ms = round((time.perf_counter() - started) * 1000, 2)
         response.headers[REQUEST_ID_HEADER] = request_id
-        _apply_security_headers(response)
+        _apply_security_headers(response, request.url.path)
         logger.info(
             "request",
             extra={
@@ -237,10 +271,12 @@ def create_app() -> FastAPI:
     # Single-container deployment: if the built SPA is present, serve it from
     # the same origin. Then no CORS is involved and the session cookie is
     # first-party. During development the Vite dev server serves it instead and
-    # this mount simply does not exist.
-    spa_dir = BACKEND_ROOT / "static"
+    # this mount simply does not exist. Mounted LAST, so every API route is
+    # matched first and can never be shadowed; SpaStaticFiles adds the narrow
+    # history-API fallback for deep links (app/spa.py).
+    spa_dir = settings.static_dir
     if spa_dir.is_dir():
-        app.mount("/", StaticFiles(directory=str(spa_dir), html=True), name="spa")
+        app.mount("/", SpaStaticFiles(directory=str(spa_dir)), name="spa")
         logger.info("serving SPA from %s", spa_dir)
 
     return app

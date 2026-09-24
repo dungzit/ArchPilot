@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "2.0",
+  "settings": {
+    "codeName": "broken_design",
+    "environment": "dev"
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "quantum_router",
+      "label": "Qr",
+      "codeName": "qr",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": []
+}

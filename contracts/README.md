@@ -7,10 +7,38 @@ languages).
 
 | File | What it is |
 |---|---|
-| `archgraph.schema.json` | JSON Schema 2020-12. The `ArchGraph` shape shared by designs and patterns, plus three envelope rules. |
-| `fixtures/index.json` | The shared manifest. Both test suites iterate it. |
+| `archgraph.schema.json` | JSON Schema 2020-12, contract **1.1.0**. The `ArchGraph` design document shared by designs and patterns - schema **1.0** (frozen flat graph) and schema **2.0** (graph + `deployment` + `brief` + `decisions` + `derivations`, design-v2 D-08) - dispatched on `schemaVersion` with `if/then/else` - plus three envelope rules. |
+| `catalog/components.json` | The provider-neutral logical component catalogue (task 0.6): 45 roles in 11 layers (requirements v2.1 §4.1.1 ids), common attributes, edge modes, size classes, NEST containment rules, 1.0 legacy types, aliases. Read by `src/domain/graph/catalog.ts` and `backend/app/catalog.py`. |
+| `catalog/components.schema.json` | Shape of the catalogue. The backend validates the catalogue against it at start-up. |
+| `catalog/neutrality-tokens.json` | NFR2-NEUT-001 token list (provider and vendor words). Both suites scan the catalogue, the contract's names and enums, and every valid 2.0 fixture outside `deployment`. |
+| `fixtures/index.json` | The shared manifest. Both test suites iterate it: `cases` (shape), `integrityRules` + `integrityCases` (L1 integrity), `migrations` (1.0 -> 2.0 pairs). |
 | `fixtures/*.valid.json` | Documents that **must** validate. |
 | `fixtures/*.invalid.json` | Documents that **must not** validate, each with the keyword it must fail on. |
+| `fixtures/*.integrity.json` | Documents that are **shape-valid** but must be rejected by the integrity layer, each with the rule code (`INT-*`) it must fail on - in Python, in TypeScript, and by the designs API (422). |
+
+## Schema 2.0 in one paragraph
+
+A 2.0 node is **provider-neutral**: logical role (`type`, a catalogue id - the
+pattern is in the contract, membership is an integrity check), `variant`,
+`codeName`, neutral `attributes` (v2.1 names: `replicas`, `statefulness`,
+`failureDomainLevel`, `failureDomainLabel`, ...) and neutral role `config`.
+Everything target-specific lives in `deployment`: `profiles[]`,
+`bindings[{nodeId, target, realisation, config}]` and
+`scenarios[{..., placements[{nodeId, profileId}]}]`. **Data is never a key**
+(red-team review B2): target ids, node ids and artifact names travel as values in
+arrays, so rule (a) below holds at every depth of a 2.0 document too, and the
+neutrality scan only has to exclude the `deployment` subtree.
+`fixtures/archgraph.v2-target-keyed-map.invalid.json` is the regression fixture
+for the rejected design-v0.2 shape.
+
+## The integrity layer (L1)
+
+JSON Schema cannot say "every edge names an existing node". The 19 `INT-*`
+rules in `fixtures/index.json` `integrityRules` can, and they are implemented
+twice with the same codes, paths and order: `backend/app/graph_integrity.py`
+(runs on every `POST`/`PUT /api/designs`, a violation is a 422 in the error
+envelope) and `validateGraph()` in `src/domain/graph/validate.ts` (runs in the
+browser; its `warning`/`info` design rules - NEST-*, DES-* - never block a save).
 
 ## The three envelope rules
 
@@ -64,7 +92,9 @@ The Python suite additionally validates **live API responses** against rules (a)
   suites. The envelope rules (casing, error shape, timestamps) are still
   asserted in tests only; they are properties of our own responses, not of
   user input.
-- **No referential integrity.** JSON Schema cannot express "every `edge.source`
-  names an existing `node.id`" or "node ids are unique". Those belong to
-  `validateGraph()` in `src/domain/graph.ts` (task 1.5). This file checks shape;
-  `validateGraph()` checks consistency. Do not let that boundary blur.
+- **No referential integrity in the schema.** JSON Schema cannot express "every
+  `edge.source` names an existing `node.id`" or "node ids are unique". Those are
+  the integrity layer's (see above): `backend/app/graph_integrity.py` and
+  `validateGraph()` in `src/domain/graph/validate.ts`, sharing the `INT-*` codes.
+  This file checks shape; the integrity layer checks consistency. Do not let
+  that boundary blur.

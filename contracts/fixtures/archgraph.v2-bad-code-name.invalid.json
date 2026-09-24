@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "2.0",
+  "settings": {
+    "codeName": "broken_design",
+    "environment": "dev"
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "service",
+      "label": "Orders Api",
+      "codeName": "Orders API",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": []
+}

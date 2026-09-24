@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "service",
+      "label": "Checkout API",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "n1",
+      "target": "n_gone",
+      "label": "writes to",
+      "direction": "forward"
+    }
+  ]
+}

@@ -17,6 +17,10 @@ import { fileURLToPath } from 'node:url'
 import Ajv2020 from 'ajv/dist/2020'
 import type { ErrorObject, ValidateFunction } from 'ajv'
 import { describe, expect, it } from 'vitest'
+import { migrateGraph } from '../domain/graph/migrate'
+import type { ArchGraph } from '../domain/graph/types'
+import { INTEGRITY_RULES, validateGraph } from '../domain/graph/validate'
+import { neutralityHits } from '../test/neutrality'
 
 interface FixtureCase {
   fixture: string
@@ -37,9 +41,28 @@ const contract = readJson(resolve(contractsDir, 'archgraph.schema.json')) as {
   $id: string
   $defs: Record<string, unknown>
 }
+interface IntegrityCase {
+  fixture: string
+  schemaRef: string
+  expect: 'integrity-error'
+  expectRule: string
+  why: string
+}
+
+interface MigrationPair {
+  from: string
+  to: string
+  input: string
+  expected: string
+  options: Record<string, string>
+}
+
 const manifest = readJson(resolve(fixturesDir, 'index.json')) as {
   contract: string
   cases: FixtureCase[]
+  integrityRules: { code: string; appliesTo: string[]; statement: string }[]
+  integrityCases: IntegrityCase[]
+  migrations: MigrationPair[]
 }
 
 // ajv v8 is published as CommonJS; under ESM the class arrives on `.default`
@@ -97,8 +120,12 @@ describe('shared contract: fixtures', () => {
     const onDisk = readdirSync(fixturesDir)
       .filter((name) => name.endsWith('.json') && name !== 'index.json')
       .sort()
-    const listed = manifest.cases.map((c) => c.fixture).sort()
-    expect(listed).toEqual(onDisk)
+    const listed = [
+      ...manifest.cases.map((c) => c.fixture),
+      ...manifest.integrityCases.map((c) => c.fixture),
+      ...manifest.migrations.flatMap((m) => [m.input, m.expected]),
+    ]
+    expect([...new Set(listed)].sort()).toEqual(onDisk)
   })
 
   it('keeps at least one broken fixture per rule', () => {
@@ -111,6 +138,71 @@ describe('shared contract: fixtures', () => {
   it('points at the same contract file the Python suite loads', () => {
     expect(manifest.contract).toBe('../archgraph.schema.json')
     expect(contract.$id).toBe('https://archpilot.internal/contracts/archgraph.schema.json')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Contract 1.1.0 (task 0.2): the L1 integrity layer and the migration pair,
+// from the same manifest backend/tests/test_contracts.py reads.
+// ---------------------------------------------------------------------------
+
+describe('shared contract: integrity layer (validateGraph vs graph_integrity.py)', () => {
+  it('TypeScript implements exactly the manifest rules, in order', () => {
+    expect([...INTEGRITY_RULES]).toEqual(manifest.integrityRules.map((rule) => rule.code))
+  })
+
+  it.each(manifest.integrityCases.map((c) => [c.fixture, c] as const))(
+    '%s is contract-valid and fails integrity on its named rule',
+    (_name, testCase) => {
+      const document = loadFixture(testCase.fixture)
+      const validate = validatorFor(testCase.schemaRef)
+      expect(validate(document), errorSignature(validate.errors)).toBe(true)
+      const errors = validateGraph(document as ArchGraph).filter((problem) => problem.severity === 'error')
+      expect(errors.map((problem) => problem.ruleId)).toContain(testCase.expectRule)
+    },
+  )
+
+  it.each(validCases.filter((c) => c.schemaRef === '#/$defs/archGraph').map((c) => [c.fixture, c] as const))(
+    '%s is integrity-clean',
+    (_name, testCase) => {
+      const errors = validateGraph(loadFixture(testCase.fixture) as ArchGraph).filter((problem) => problem.severity === 'error')
+      expect(errors).toEqual([])
+    },
+  )
+})
+
+describe('shared contract: migration pairs', () => {
+  it.each(manifest.migrations.map((m) => [`${m.from} -> ${m.to}`, m] as const))('%s: migrateGraph(input) is exactly expected', (_name, pair) => {
+    const input = loadFixture(pair.input) as ArchGraph
+    const expected = loadFixture(pair.expected)
+    expect(input.schemaVersion).toBe(pair.from)
+    const migrated = migrateGraph(input, pair.options)
+    expect(migrated).toEqual(expected)
+    expect(JSON.stringify(migrated)).toBe(JSON.stringify(expected))
+    expect(validatorFor('#/$defs/archGraph')(migrated)).toBe(true)
+  })
+})
+
+describe('shared contract: 2.0 documents keep the envelope rules (review B2)', () => {
+  const v2Valid = validCases.filter((c) => c.schemaRef === '#/$defs/archGraph' && (loadFixture(c.fixture) as ArchGraph).schemaVersion === '2.0')
+
+  it('there are 2.0 documents to check', () => {
+    expect(v2Valid.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it.each(v2Valid.map((c) => [c.fixture] as const))('%s is camelCase at every depth', (fixture) => {
+    const validate = validatorFor('#/$defs/camelCaseObject')
+    expect(validate(loadFixture(fixture)), errorSignature(validate.errors)).toBe(true)
+  })
+
+  it.each(v2Valid.map((c) => [c.fixture] as const))('%s is provider-neutral outside deployment (NFR2-NEUT-001)', (fixture) => {
+    expect(neutralityHits(loadFixture(fixture), '$', new Set(['$.deployment']))).toEqual([])
+  })
+
+  it('the rich fixture really does carry provider data - inside deployment only', () => {
+    const rich = loadFixture('archgraph.v2-hybrid-orders.valid.json')
+    expect(neutralityHits(rich).length).toBeGreaterThan(0)
+    expect(neutralityHits(rich).every(([path]) => path.startsWith('$.deployment'))).toBe(true)
   })
 })
 

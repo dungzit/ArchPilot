@@ -1,6 +1,6 @@
 {
   "contract": "../archgraph.schema.json",
-  "description": "The shared fixture manifest. Both test suites read THIS file and iterate - ArchPilot/backend/tests/test_contracts.py (Python, jsonschema) and ArchPilot/src/contracts/contract.test.ts (TypeScript, ajv). If a fixture ever has to be copied into one of the suites, the contract is already broken. Cases marked expect=invalid must FAIL validation in both suites, and must fail on the keyword named in expectKeyword - a fixture that fails for an accidental reason proves nothing.",
+  "description": "The shared fixture manifest. Both test suites read THIS file and iterate - ArchPilot/backend/tests/test_contracts.py (Python, jsonschema) and ArchPilot/src/contracts/contract.test.ts (TypeScript, ajv). If a fixture ever has to be copied into one of the suites, the contract is already broken. `cases`: shape. Cases marked expect=invalid must FAIL validation in both suites, and must fail on the keyword named in expectKeyword - a fixture that fails for an accidental reason proves nothing. `integrityRules` + `integrityCases`: the L1 integrity layer (backend/app/graph_integrity.py and src/domain/graph/validate.ts). Every integrity fixture is contract-VALID and must be rejected by BOTH implementations with the rule code named in expectRule; the designs API must answer 422 for it. `migrations`: input/expected pairs; src/domain/graph/migrate.ts must turn input into expected exactly, and both documents must pass both layers.",
   "cases": [
     {
       "fixture": "archgraph.minimal.valid.json",
@@ -51,7 +51,34 @@
       "rule": "timestamp",
       "why": "Z is the other legal UTC spelling, and sub-second precision is allowed. Both are unambiguous."
     },
-
+    {
+      "fixture": "archgraph.v2-minimal.valid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "valid",
+      "rule": "graph-shape",
+      "why": "An empty 2.0 design: settings are required, content is not."
+    },
+    {
+      "fixture": "archgraph.v2-hybrid-orders.valid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "valid",
+      "rule": "graph-shape",
+      "why": "Exercises every 2.0 section at once: on-prem containers (site, zone, network segments, hypervisor cluster), physical gear (SAN, switch, bare-metal host), neutral attributes and config, flow and access edges with mode/protocol/port, a deployment layer with two target profiles, bindings for two targets on one node (lossless re-targeting), three scenarios incl. hybrid placements, the wizard brief, two ADRs and derivations. Also integrity-clean, NEST-clean and neutral outside `deployment`."
+    },
+    {
+      "fixture": "archgraph.migration-v1.input.valid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "valid",
+      "rule": "graph-shape",
+      "why": "The legacy half of the migration pair. Still a valid 1.0 document."
+    },
+    {
+      "fixture": "archgraph.migration-v1.expected.valid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "valid",
+      "rule": "graph-shape",
+      "why": "The migrated half of the migration pair. A valid 2.0 document."
+    },
     {
       "fixture": "archgraph.snake-case-key.invalid.json",
       "schemaRef": "#/$defs/archGraph",
@@ -82,7 +109,7 @@
       "expect": "invalid",
       "rule": "graph-shape",
       "expectKeyword": "enum",
-      "why": "NFR-EXT-002: a version bump must be a deliberate edit to this contract plus a migration function, not something a writer can assert unilaterally."
+      "why": "NFR-EXT-002: a version bump must be a deliberate edit to this contract plus a migration function, not something a writer can assert unilaterally. '1.1' is not a version the contract knows (it knows 1.0 and 2.0)."
     },
     {
       "fixture": "archgraph.edge-missing-direction.invalid.json",
@@ -123,6 +150,339 @@
       "rule": "timestamp",
       "expectKeyword": "pattern",
       "why": "Unambiguous but not UTC. The rule is UTC on the wire; local-time conversion is a rendering concern, and mixing the two makes stored timestamps non-comparable as strings (sessions.expires_at is compared as TEXT in SQL)."
+    },
+    {
+      "fixture": "archgraph.v2-missing-settings.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "required",
+      "why": "settings.codeName names every generated resource; a 2.0 document without it cannot be generated or migrated back."
+    },
+    {
+      "fixture": "archgraph.v2-edge-missing-kind.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "required",
+      "why": "REQ-DES-005 / D-09: flow vs access decides whether an edge produces code. Absent is not 'flow by default'."
+    },
+    {
+      "fixture": "archgraph.v2-bad-code-name.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "pattern",
+      "why": "codeName becomes a Terraform label and resource name suffix (REQ-DES-008); spaces and capitals are not legal there."
+    },
+    {
+      "fixture": "archgraph.v2-provider-resource-type.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "pattern",
+      "why": "NFR2-NEUT-001 at the shape level: a node type is a logical role id, so a provider resource type cannot even be spelled."
+    },
+    {
+      "fixture": "archgraph.v2-bad-failure-domain.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "enum",
+      "why": "REQ-DES-025: the failure-domain level list is closed and neutral (host, rack, zone, site, region)."
+    },
+    {
+      "fixture": "archgraph.v2-too-many-profiles.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "maxItems",
+      "why": "Contract limit: at most 10 target profiles per design."
+    },
+    {
+      "fixture": "archgraph.v2-target-keyed-map.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "additionalProperties",
+      "why": "Red-team review B2 regression fixture. Design v0.2 stored realisations on the node keyed by target id. That puts provider tokens in the neutral node and data in keys. Target data lives in deployment.bindings[] instead."
+    },
+    {
+      "fixture": "archgraph.v2-bad-binding-realisation.invalid.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "invalid",
+      "rule": "graph-shape",
+      "expectKeyword": "pattern",
+      "why": "A realisation id is `<target>.<name>` so it can be resolved in that target's catalogue."
+    }
+  ],
+  "integrityRules": [
+    {
+      "code": "INT-DUPLICATE-NODE-ID",
+      "appliesTo": [
+        "1.0",
+        "2.0"
+      ],
+      "statement": "Node ids are unique."
+    },
+    {
+      "code": "INT-DUPLICATE-EDGE-ID",
+      "appliesTo": [
+        "1.0",
+        "2.0"
+      ],
+      "statement": "Edge ids are unique."
+    },
+    {
+      "code": "INT-DANGLING-EDGE",
+      "appliesTo": [
+        "1.0",
+        "2.0"
+      ],
+      "statement": "Every edge source and target names an existing node id."
+    },
+    {
+      "code": "INT-DUPLICATE-CODENAME",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Node codeNames are unique (they become resource addresses)."
+    },
+    {
+      "code": "INT-DANGLING-PARENT",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Every parentId names an existing node id."
+    },
+    {
+      "code": "INT-PARENT-CYCLE",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Containment has no cycles (a node is never its own ancestor)."
+    },
+    {
+      "code": "INT-DEPTH",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Nesting depth is at most the catalogue's limits.maxNestingDepth."
+    },
+    {
+      "code": "INT-UNKNOWN-ROLE",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Every node type is a role id in contracts/catalog/components.json (aliases are resolved only by migration, never accepted on save)."
+    },
+    {
+      "code": "INT-UNKNOWN-VARIANT",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "A node variant is one of its role's catalogue variants."
+    },
+    {
+      "code": "INT-DUPLICATE-PROFILE-ID",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Target profile ids are unique."
+    },
+    {
+      "code": "INT-DUPLICATE-SCENARIO-ID",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Scenario ids are unique."
+    },
+    {
+      "code": "INT-UNKNOWN-PROFILE",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "A scenario's defaultProfileId and every placement profileId name an existing profile."
+    },
+    {
+      "code": "INT-UNKNOWN-SCENARIO",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "deployment.activeScenarioId names an existing scenario."
+    },
+    {
+      "code": "INT-DANGLING-BINDING",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Every binding nodeId names an existing node."
+    },
+    {
+      "code": "INT-DUPLICATE-BINDING",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "At most one binding per (nodeId, target)."
+    },
+    {
+      "code": "INT-DANGLING-PLACEMENT",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Every placement nodeId names an existing node."
+    },
+    {
+      "code": "INT-DUPLICATE-PLACEMENT",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "At most one placement per node within a scenario."
+    },
+    {
+      "code": "INT-DUPLICATE-DECISION-ID",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Decision ids are unique."
+    },
+    {
+      "code": "INT-DANGLING-DECISION-REF",
+      "appliesTo": [
+        "2.0"
+      ],
+      "statement": "Decision linkedNodeIds name existing nodes; supersedes names an existing decision."
+    }
+  ],
+  "integrityCases": [
+    {
+      "fixture": "archgraph.v2-dangling-edge.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DANGLING-EDGE",
+      "why": "Edge e1 points at n9, which does not exist. The build-scope's item 3b gap, closed."
+    },
+    {
+      "fixture": "archgraph.v2-duplicate-node-id.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DUPLICATE-NODE-ID",
+      "why": "Two nodes share id n1; every edge and binding that names n1 is ambiguous."
+    },
+    {
+      "fixture": "archgraph.v2-duplicate-edge-id.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DUPLICATE-EDGE-ID",
+      "why": "Two edges share id e1."
+    },
+    {
+      "fixture": "archgraph.v2-duplicate-code-name.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DUPLICATE-CODENAME",
+      "why": "Two nodes would generate the same resource address."
+    },
+    {
+      "fixture": "archgraph.v2-dangling-parent.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DANGLING-PARENT",
+      "why": "parentId names a container that does not exist."
+    },
+    {
+      "fixture": "archgraph.v2-parent-cycle.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-PARENT-CYCLE",
+      "why": "n1 -> n3 -> n2 -> n1: a containment loop no canvas can render."
+    },
+    {
+      "fixture": "archgraph.v2-too-deep.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DEPTH",
+      "why": "Seven levels of nesting; the catalogue allows six."
+    },
+    {
+      "fixture": "archgraph.v2-unknown-role.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-UNKNOWN-ROLE",
+      "why": "Pattern-valid but not in the catalogue. Must be rejected, never silently rendered."
+    },
+    {
+      "fixture": "archgraph.v2-legacy-role-id.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-UNKNOWN-ROLE",
+      "why": "`database` is the 1.0 / design-v0.2 id; 2.0 uses the v2.1 id relational_db. Aliases are for migration, not for save; the message names the canonical id."
+    },
+    {
+      "fixture": "archgraph.v2-unknown-variant.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-UNKNOWN-VARIANT",
+      "why": "service has variants web/api/worker/scheduler only."
+    },
+    {
+      "fixture": "archgraph.v2-dangling-binding.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DANGLING-BINDING",
+      "why": "A binding for a deleted node would silently resurrect on re-target."
+    },
+    {
+      "fixture": "archgraph.v2-duplicate-binding.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DUPLICATE-BINDING",
+      "why": "Two realisations for one node on one target: which one generates?"
+    },
+    {
+      "fixture": "archgraph.v2-unknown-profile.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-UNKNOWN-PROFILE",
+      "why": "The scenario's default profile dc2 does not exist."
+    },
+    {
+      "fixture": "archgraph.v2-dangling-placement.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DANGLING-PLACEMENT",
+      "why": "A hybrid placement for a node that does not exist."
+    },
+    {
+      "fixture": "archgraph.v2-dangling-decision-ref.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DANGLING-DECISION-REF",
+      "why": "An ADR linked to a node that does not exist."
+    },
+    {
+      "fixture": "archgraph.v1-dangling-edge.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DANGLING-EDGE",
+      "why": "The 1.0 shape gets the id and edge checks too: before contract 1.1.0 the API stored this."
+    },
+    {
+      "fixture": "archgraph.v1-duplicate-node-id.integrity.json",
+      "schemaRef": "#/$defs/archGraph",
+      "expect": "integrity-error",
+      "expectRule": "INT-DUPLICATE-NODE-ID",
+      "why": "Same, for duplicate ids in a 1.0 document."
+    }
+  ],
+  "migrations": [
+    {
+      "from": "1.0",
+      "to": "2.0",
+      "input": "archgraph.migration-v1.input.valid.json",
+      "expected": "archgraph.migration-v1.expected.valid.json",
+      "options": {},
+      "why": "NFR2-EXT-004 / AC-15. Covers: catalogue legacyTypes (database -> relational_db, object_store -> object_storage, external_api -> external_service); codeName from label with Vietnamese folding incl. the đ/Đ case (review m4), uniqueness suffix, digit-leading and symbol-only labels; props -> config; sizingScenarioId -> stale sizing; edges -> kind flow; NO deployment added (REQ-TGT-003 default unset, review B1g)."
     }
   ]
 }

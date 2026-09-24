@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "2.0",
+  "settings": {
+    "codeName": "broken_design",
+    "environment": "dev"
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "service",
+      "label": "Orders Api",
+      "codeName": "orders_api",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "n2",
+      "type": "relational_db",
+      "label": "Orders Db",
+      "codeName": "orders_db",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [],
+  "deployment": {
+    "profiles": [
+      {
+        "id": "p0",
+        "target": "bare_metal",
+        "label": "Profile 0"
+      },
+      {
+        "id": "p1",
+        "target": "bare_metal",
+        "label": "Profile 1"
+      },
+      {
+        "id": "p2",
+        "target": "bare_metal",
+        "label": "Profile 2"
+      },
+      {
+        "id": "p3",
+        "target": "bare_metal",
+        "label": "Profile 3"
+      },
+      {
+        "id": "p4",
+        "target": "bare_metal",
+        "label": "Profile 4"
+      },
+      {
+        "id": "p5",
+        "target": "bare_metal",
+        "label": "Profile 5"
+      },
+      {
+        "id": "p6",
+        "target": "bare_metal",
+        "label": "Profile 6"
+      },
+      {
+        "id": "p7",
+        "target": "bare_metal",
+        "label": "Profile 7"
+      },
+      {
+        "id": "p8",
+        "target": "bare_metal",
+        "label": "Profile 8"
+      },
+      {
+        "id": "p9",
+        "target": "bare_metal",
+        "label": "Profile 9"
+      },
+      {
+        "id": "p10",
+        "target": "bare_metal",
+        "label": "Profile 10"
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "s1",
+        "label": "Default",
+        "defaultProfileId": "p0"
+      }
+    ]
+  }
+}

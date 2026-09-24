@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "2.0",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "service",
+      "label": "Orders Api",
+      "codeName": "orders_api",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "n2",
+      "type": "relational_db",
+      "label": "Orders Db",
+      "codeName": "orders_db",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "n1",
+      "target": "n2",
+      "label": "",
+      "direction": "forward",
+      "kind": "access",
+      "mode": "read_write"
+    }
+  ]
+}

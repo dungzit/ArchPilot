@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "2.0",
+  "settings": {
+    "codeName": "broken_design",
+    "environment": "dev"
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "network_segment",
+      "label": "Segment A",
+      "codeName": "segment_a",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "parentId": "n3"
+    },
+    {
+      "id": "n2",
+      "type": "network_segment",
+      "label": "Segment B",
+      "codeName": "segment_b",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "parentId": "n1"
+    },
+    {
+      "id": "n3",
+      "type": "zone",
+      "label": "Zone C",
+      "codeName": "zone_c",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "parentId": "n2"
+    }
+  ],
+  "edges": []
+}

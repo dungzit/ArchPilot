@@ -79,6 +79,11 @@ class Settings:
         default_factory=lambda: float(os.environ.get("ARCHPILOT_HEALTH_TIMEOUT", "2.0"))
     )
     log_level: str = field(default_factory=lambda: os.environ.get("ARCHPILOT_LOG_LEVEL", "INFO"))
+    # The built SPA (task 0.5). The container copies `dist/` here; when the
+    # directory is absent (development, most tests) the app serves the API only.
+    static_dir: Path = field(
+        default_factory=lambda: Path(os.environ.get("ARCHPILOT_STATIC_DIR", str(BACKEND_ROOT / "static"))).resolve()
+    )
     # Take a VACUUM INTO snapshot before applying any pending migration.
     # Forward-only migrations mean rollback == restore-from-backup (red-team B4,
     # risk R8), so the backup has to exist before the migration runs.

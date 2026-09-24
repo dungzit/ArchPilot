@@ -1,0 +1,10 @@
+{
+  "description": "NFR2-NEUT-001 token list. The neutral model - contracts/catalog/components.json and the property names and enum values of contracts/archgraph.schema.json - must contain none of these as a whole word (case-insensitive). Provider and vendor terms belong only in target data: realisation catalogues, adapters, deployment profiles. Both test suites read THIS file. Add a token here when a new provider or vendor becomes relevant; never delete one to make a test pass.",
+  "tokens": [
+    "aws", "amazon", "azure", "microsoft", "gcp", "google", "alibaba", "oracle", "ibm", "huawei", "tencent", "digitalocean", "cloudflare", "akamai",
+    "vmware", "vsphere", "vcenter", "esxi", "vsan", "nsx", "hyper-v", "hyperv", "nutanix", "proxmox", "openstack", "citrix",
+    "ec2", "s3", "rds", "ebs", "efs", "fsx", "elasticache", "dynamodb", "sqs", "sns", "kinesis", "cloudfront", "route53", "route 53", "fargate", "ecs", "eks", "aks", "gke", "lambda", "cloudwatch", "vpc", "vnet", "cosmos", "bigquery", "redshift", "aurora",
+    "f5", "big-ip", "cisco", "juniper", "fortinet", "fortigate", "palo alto", "check point", "arista", "netapp", "emc", "dell", "hpe", "hewlett", "lenovo", "pure storage", "veeam",
+    "active directory", "entra", "okta", "auth0", "splunk", "datadog"
+  ]
+}

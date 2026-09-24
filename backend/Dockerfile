@@ -14,6 +14,10 @@ COPY package*.json ./
 RUN npm ci
 COPY index.html vite.config.ts tsconfig*.json ./
 COPY src ./src
+# Task 0.3/0.6: src/domain/graph imports contracts/catalog/components.json, and
+# `tsc -b` also type-checks the tests that read contracts/ - so the SPA build
+# needs the contracts directory, not only src/.
+COPY contracts ./contracts
 RUN npm run build
 
 FROM python:3.12-slim AS runtime
@@ -50,6 +54,10 @@ COPY backend/scripts ./scripts
 # Task 1.6: app/contract.py validates design bodies against this file at request
 # time and refuses to start without it (it looks in /srv/contracts first).
 COPY contracts/archgraph.schema.json ./contracts/archgraph.schema.json
+# Task 0.4/0.6: app/catalog.py checks 2.0 node types against the component
+# catalogue (and validates it against its schema) at start-up; it looks in
+# /srv/contracts/catalog first and refuses to start without it.
+COPY contracts/catalog/components.json contracts/catalog/components.schema.json ./contracts/catalog/
 COPY --from=spa /spa/dist ./static
 
 RUN useradd --system --uid 10001 archpilot && mkdir -p /data && chown -R archpilot /data /srv

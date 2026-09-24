@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "2.0",
+  "settings": { "codeName": "orders_platform", "environment": "prod", "catalogueVersion": "1.0.0", "readmeMd": "# Orders platform\n\nOrders data stays in DC1." },
+  "nodes": [
+    { "id": "n1", "type": "site", "label": "DC1 Hà Nội", "codeName": "dc1_ha_noi", "position": { "x": 0, "y": 0 }, "size": { "width": 1400, "height": 900 },
+      "attributes": { "failureDomainLabel": "dc1" }, "config": { "siteKind": "data_centre", "location": "Hà Nội" } },
+    { "id": "n20", "type": "zone", "label": "Phòng máy A", "codeName": "phong_may_a", "parentId": "n1", "position": { "x": 1100, "y": 40 }, "size": { "width": 260, "height": 300 },
+      "attributes": { "failureDomainLevel": "rack", "failureDomainLabel": "room-a" }, "config": { "zoneKind": "room" } },
+    { "id": "n3", "type": "network_segment", "variant": "network", "label": "Prod network", "codeName": "prod_network", "parentId": "n1", "position": { "x": 40, "y": 40 }, "size": { "width": 1000, "height": 800 },
+      "config": { "cidr": "10.20.0.0/16" } },
+    { "id": "n4", "type": "network_segment", "variant": "subnet", "label": "Web tier", "codeName": "web_tier", "parentId": "n3", "position": { "x": 20, "y": 40 }, "size": { "width": 940, "height": 140 },
+      "attributes": { "tier": "web" }, "config": { "exposure": "public", "cidr": "10.20.1.0/24", "vlanId": 101 } },
+    { "id": "n5", "type": "network_segment", "variant": "subnet", "label": "App tier", "codeName": "app_tier", "parentId": "n3", "position": { "x": 20, "y": 200 }, "size": { "width": 940, "height": 320 },
+      "attributes": { "tier": "app" }, "config": { "exposure": "private", "cidr": "10.20.2.0/24", "vlanId": 102, "ipMode": "static" } },
+    { "id": "n6", "type": "network_segment", "variant": "subnet", "label": "Data tier", "codeName": "data_tier", "parentId": "n3", "position": { "x": 20, "y": 540 }, "size": { "width": 940, "height": 200 },
+      "attributes": { "tier": "data" }, "config": { "exposure": "isolated", "cidr": "10.20.3.0/24", "vlanId": 103 } },
+    { "id": "n7", "type": "load_balancer", "label": "Web LB", "codeName": "web_lb", "parentId": "n4", "position": { "x": 40, "y": 40 },
+      "attributes": { "replicas": 2, "failureDomainLevel": "host" }, "config": { "scheme": "internet_facing", "layer": "l7", "protocol": "https", "healthPath": "/health" } },
+    { "id": "n8", "type": "firewall", "label": "Edge firewall", "codeName": "edge_firewall", "parentId": "n3", "position": { "x": 960, "y": 20 },
+      "config": { "inspection": "stateful", "defaultPolicy": "deny", "allowedPorts": ["443"] } },
+    { "id": "n9", "type": "hypervisor_cluster", "label": "Prod cluster", "codeName": "prod_cluster", "parentId": "n5", "position": { "x": 600, "y": 40 }, "size": { "width": 300, "height": 240 },
+      "config": { "hostCount": 4, "hostFailover": true } },
+    { "id": "n10", "type": "virtual_machine", "label": "Bastion", "codeName": "bastion", "parentId": "n9", "position": { "x": 40, "y": 60 },
+      "config": { "osFamily": "linux" } },
+    { "id": "n11", "type": "service", "variant": "api", "label": "Orders API", "codeName": "orders_api", "parentId": "n5", "position": { "x": 40, "y": 40 },
+      "attributes": { "replicas": 3, "failureDomainLevel": "host", "criticality": "high", "sizeClass": "S", "owner": "team-orders" },
+      "config": { "runtime": "java21", "port": 8080, "healthPath": "/actuator/health" },
+      "rationale": "Split out of the monolith so checkout scales independently.",
+      "sizing": { "scenarioId": "siz_orders_api", "formulaVersion": "2.0", "confidence": "estimated", "summary": { "nodeCount": 3 } } },
+    { "id": "n12", "type": "service", "variant": "worker", "label": "Mailer", "codeName": "mailer", "parentId": "n5", "position": { "x": 300, "y": 40 },
+      "attributes": { "replicas": 2, "failureDomainLevel": "host" } },
+    { "id": "n13", "type": "relational_db", "label": "Orders DB", "codeName": "orders_db", "parentId": "n6", "position": { "x": 40, "y": 40 },
+      "attributes": { "statefulness": "stateful", "replicas": 2, "failureDomainLevel": "rack", "criticality": "high", "dataClassification": "confidential", "sizeClass": "M" },
+      "config": { "engine": "postgresql", "engineMajor": "16", "storageGiB": 120, "backupRetentionDays": 7, "deletionProtection": true },
+      "sizing": { "scenarioId": "siz_orders_db", "formulaVersion": "2.0", "confidence": "estimated", "summary": { "nodeCount": 2, "storageGiB": 118 } } },
+    { "id": "n14", "type": "queue", "label": "Mail queue", "codeName": "mail_queue", "parentId": "n5", "position": { "x": 300, "y": 200 },
+      "config": { "deadLetter": true, "retentionHours": 96 } },
+    { "id": "n15", "type": "san", "label": "SAN A", "codeName": "san_a", "parentId": "n20", "position": { "x": 40, "y": 60 },
+      "config": { "protocol": "iscsi", "usableCapacityTiB": 40, "redundancy": "raid_6" } },
+    { "id": "n16", "type": "switch", "label": "Core switch", "codeName": "core_switch", "parentId": "n1", "position": { "x": 1100, "y": 400 },
+      "config": { "ports": 48, "speedGbps": 25, "redundantPair": true } },
+    { "id": "n17", "type": "bare_metal_host", "label": "Analytics host", "codeName": "analytics_host", "parentId": "n3", "position": { "x": 700, "y": 760 },
+      "config": { "formFactor": "rack_2u", "sockets": 2, "memoryGiB": 512 } },
+    { "id": "n21", "type": "backup_target", "label": "Offsite backup", "codeName": "offsite_backup", "position": { "x": 1500, "y": 600 },
+      "config": { "retentionDays": 35, "frequency": "daily", "offsite": true } },
+    { "id": "n18", "type": "client", "label": "Người dùng", "codeName": "nguoi_dung", "position": { "x": -300, "y": 100 } },
+    { "id": "n19", "type": "note", "label": "PII note", "codeName": "pii_note", "position": { "x": -300, "y": 400 },
+      "annotation": { "text": "PII stays in the data tier.", "shape": "rect" } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n18", "target": "n7", "label": "HTTPS", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "https", "port": 443 },
+    { "id": "e2", "source": "n7", "target": "n11", "label": "routes to", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "http", "port": 8080 },
+    { "id": "e3", "source": "n11", "target": "n13", "label": "reads and writes orders", "direction": "forward", "kind": "access", "mode": "read_write", "protocol": "sql", "port": 5432 },
+    { "id": "e4", "source": "n11", "target": "n14", "label": "enqueues mail", "direction": "forward", "kind": "access", "mode": "send" },
+    { "id": "e5", "source": "n12", "target": "n14", "label": "consumes mail", "direction": "forward", "kind": "access", "mode": "consume" },
+    { "id": "e6", "source": "n13", "target": "n15", "label": "volumes on", "direction": "forward", "kind": "flow" },
+    { "id": "e7", "source": "n18", "target": "n8", "label": "passes through", "direction": "forward", "kind": "flow" },
+    { "id": "e8", "source": "n13", "target": "n21", "label": "nightly backup", "direction": "forward", "kind": "access", "mode": "write", "rationale": "RPO 24 h is accepted for the archive copy." }
+  ],
+  "deployment": {
+    "profiles": [
+      { "id": "aws_sg", "target": "aws", "label": "AWS Singapore", "options": { "region": "ap-southeast-1" }, "iacAdapter": "terraform-aws" },
+      { "id": "dc1_vsphere", "target": "vsphere", "label": "DC1 vSphere", "options": { "datacenter": "DC1", "cluster": "prod", "datastore": "ds-prod-01" }, "iacAdapter": "terraform-vsphere" }
+    ],
+    "bindings": [
+      { "nodeId": "n13", "target": "aws", "realisation": "aws.rds", "config": { "instanceClass": "db.t4g.medium" } },
+      { "nodeId": "n13", "target": "vsphere", "realisation": "vsphere.vm_pair_postgres", "config": { "vcpu": 4, "memoryGiB": 16, "template": "ubuntu-24.04-ci" } },
+      { "nodeId": "n11", "target": "vsphere", "realisation": "vsphere.vm_group" }
+    ],
+    "scenarios": [
+      { "id": "all_aws", "label": "All on AWS", "defaultProfileId": "aws_sg" },
+      { "id": "all_dc1", "label": "All on DC1", "defaultProfileId": "dc1_vsphere" },
+      { "id": "hybrid", "label": "Hybrid", "defaultProfileId": "aws_sg",
+        "placements": [ { "nodeId": "n13", "profileId": "dc1_vsphere" }, { "nodeId": "n15", "profileId": "dc1_vsphere" } ] }
+    ],
+    "activeScenarioId": "all_dc1"
+  },
+  "brief": {
+    "context": { "purpose": "Take and fulfil customer orders.", "hostingIntent": "hybrid", "dataResidency": "in_country", "airGapped": false, "existingPlatforms": ["hypervisor_cluster"], "budgetClass": "medium" },
+    "answers": { "peakRps": 1500, "readWriteRatio": 9, "availabilityTarget": 99.95, "rpoMinutes": 15, "rtoMinutes": 60, "asyncWork": true },
+    "assumptions": [ { "key": "peakFactor", "value": 3, "reason": "Default: not answered." } ],
+    "capacity": {
+      "formulaVersion": "2.0",
+      "tiers": [ { "tier": "database", "inputs": { "writeQps": 150, "recordBytes": 2048 }, "results": { "nodeCount": 2, "storageGiB": 118 }, "confidence": "estimated" } ]
+    },
+    "suggestions": [
+      { "ruleId": "SUG-QUEUE-ASYNC", "role": "queue", "state": "accepted", "nodeId": "n14",
+        "because": { "en": "You said there is asynchronous work.", "vi": "Bạn cho biết có công việc bất đồng bộ." } },
+      { "ruleId": "SUG-CACHE-READ", "role": "cache", "state": "dismissed" }
+    ],
+    "ruleSetVersion": "1.0.0"
+  },
+  "decisions": [
+    { "id": "adr1", "number": 1, "title": "Keep orders data on-prem", "status": "accepted",
+      "context": "Order data must stay in the country (brief: data residency).",
+      "options": [ { "name": "Managed database in a public cloud", "cons": "Data leaves the country." }, { "name": "Database on two virtual machines in DC1" } ],
+      "decision": "Run the orders database on two virtual machines in DC1.",
+      "consequences": "The operations team owns patching and failover.",
+      "linkedNodeIds": ["n13"], "source": { "kind": "manual" }, "author": "architect", "date": "2026-09-24" },
+    { "id": "adr2", "number": 2, "title": "Queue mail sending", "status": "proposed", "linkedNodeIds": ["n12", "n14"],
+      "source": { "kind": "suggestion", "ref": "SUG-QUEUE-ASYNC" } }
+  ],
+  "derivations": [
+    { "artifact": "brief.capacity", "upstream": "brief.answers", "hash": "3b1f0a6f5e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b", "hashVersion": 1 },
+    { "artifact": "brief.suggestions", "upstream": "brief.capacity", "hash": "0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9", "hashVersion": 1 }
+  ]
+}

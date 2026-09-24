@@ -1,0 +1,739 @@
+{
+  "$schema": "./components.schema.json",
+  "catalog": "archpilot-components",
+  "version": "1.0.0",
+  "description": "Provider-neutral logical component catalogue (requirements-v2.md v2.1 section 4.1.1; design-v2 4.3.1 / D-03; red-team review B1). Role ids follow requirements v2.1. Included: every v2.1 Must and Should role, plus artifact_registry (v2.1 Could) because the Must wizard rule 'air-gap -> local artifact registry' (REQ-WIZ-006) needs it (review B1). Excluded until v1.1: the other v2.1 Could roles (service_mesh, batch_worker, integration_bus, time_series_db, data_warehouse, ci_cd, rack, power_ups, cooling, out_of_band_mgmt). Read by src/domain/graph/catalog.ts and backend/app/catalog.py. Nothing in this file may contain a provider or vendor term (NFR2-NEUT-001; token list: neutrality-tokens.json); vendor search terms belong in the per-target realisation catalogues (task T.1). Adding a role, variant or field is additive (minor version). Renaming or removing a role needs an alias entry plus a migration step (major version).",
+  "limits": {
+    "maxNestingDepth": 6
+  },
+  "layers": [
+    { "id": "external_annotation", "order": 1, "label": { "en": "External and annotation", "vi": "Bên ngoài và chú thích" } },
+    { "id": "edge", "order": 2, "label": { "en": "Edge and access", "vi": "Biên và truy cập" } },
+    { "id": "network_containers", "order": 3, "label": { "en": "Network containers", "vi": "Vùng chứa mạng" } },
+    { "id": "network", "order": 4, "label": { "en": "Network", "vi": "Mạng" } },
+    { "id": "compute", "order": 5, "label": { "en": "Compute", "vi": "Tính toán" } },
+    { "id": "application", "order": 6, "label": { "en": "Application", "vi": "Ứng dụng" } },
+    { "id": "data", "order": 7, "label": { "en": "Data stores", "vi": "Kho dữ liệu" } },
+    { "id": "storage", "order": 8, "label": { "en": "Storage", "vi": "Lưu trữ" } },
+    { "id": "messaging", "order": 9, "label": { "en": "Messaging", "vi": "Truyền thông điệp" } },
+    { "id": "security", "order": 10, "label": { "en": "Security and identity", "vi": "Bảo mật và định danh" } },
+    { "id": "observability", "order": 11, "label": { "en": "Observability and operations", "vi": "Giám sát và vận hành" } }
+  ],
+  "attributes": [
+    { "key": "replicas", "kind": "int", "label": { "en": "Replicas", "vi": "Số bản sao" }, "min": 1, "max": 1000, "required": true },
+    { "key": "statefulness", "kind": "enum", "label": { "en": "Statefulness", "vi": "Trạng thái" }, "values": ["stateless", "stateful"], "required": true },
+    { "key": "failureDomainLevel", "kind": "enum", "label": { "en": "Failure domain level", "vi": "Mức miền lỗi" }, "values": ["host", "rack", "zone", "site", "region"], "required": true },
+    { "key": "failureDomainLabel", "kind": "text", "label": { "en": "Failure domain label", "vi": "Nhãn miền lỗi" }, "maxLength": 64 },
+    { "key": "tier", "kind": "enum", "label": { "en": "Tier", "vi": "Tầng" }, "values": ["edge", "web", "app", "data", "mgmt"] },
+    { "key": "criticality", "kind": "enum", "label": { "en": "Criticality", "vi": "Mức độ quan trọng" }, "values": ["low", "medium", "high"] },
+    { "key": "dataClassification", "kind": "enum", "label": { "en": "Data classification", "vi": "Phân loại dữ liệu" }, "values": ["public", "internal", "confidential", "restricted"] },
+    { "key": "sizeClass", "kind": "enum", "label": { "en": "Size class", "vi": "Cỡ" }, "values": ["XS", "S", "M", "L", "XL"] },
+    { "key": "owner", "kind": "text", "label": { "en": "Owner", "vi": "Người phụ trách" }, "maxLength": 120 }
+  ],
+  "sizeClasses": {
+    "XS": { "vcpu": 1, "memoryGiB": 2 },
+    "S": { "vcpu": 2, "memoryGiB": 4 },
+    "M": { "vcpu": 4, "memoryGiB": 16 },
+    "L": { "vcpu": 8, "memoryGiB": 32 },
+    "XL": { "vcpu": 16, "memoryGiB": 64 }
+  },
+  "edgeModes": [
+    { "id": "connect", "label": { "en": "connects to", "vi": "kết nối tới" } },
+    { "id": "read", "label": { "en": "reads", "vi": "đọc" } },
+    { "id": "write", "label": { "en": "writes", "vi": "ghi" } },
+    { "id": "read_write", "label": { "en": "reads and writes", "vi": "đọc và ghi" } },
+    { "id": "send", "label": { "en": "sends to", "vi": "gửi tới" } },
+    { "id": "consume", "label": { "en": "consumes from", "vi": "nhận từ" } },
+    { "id": "send_consume", "label": { "en": "sends and consumes", "vi": "gửi và nhận" } },
+    { "id": "publish", "label": { "en": "publishes to", "vi": "phát tới" } },
+    { "id": "deliver", "label": { "en": "delivers to", "vi": "chuyển tới" } },
+    { "id": "replicate", "label": { "en": "replicates to", "vi": "nhân bản tới" } }
+  ],
+  "roles": [
+    {
+      "id": "client", "layer": "external_annotation", "priority": "must",
+      "label": { "en": "Client", "vi": "Máy khách" },
+      "purpose": { "en": "People or devices that use the system: a browser, a mobile app, a partner system.", "vi": "Người hoặc thiết bị sử dụng hệ thống: trình duyệt, ứng dụng di động, hệ thống đối tác." },
+      "synonyms": ["user", "end user", "browser", "mobile app", "device", "người dùng", "trình duyệt", "ứng dụng di động"],
+      "container": false, "codeBearing": false,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "edge" },
+      "accessModes": { "asSource": ["connect", "read", "write", "read_write", "send", "publish"], "asTarget": [] },
+      "fields": [
+        { "key": "channel", "kind": "enum", "label": { "en": "Channel", "vi": "Kênh" }, "values": ["web", "mobile", "partner_system", "device", "operator"], "default": "web" }
+      ]
+    },
+    {
+      "id": "external_service", "layer": "external_annotation", "priority": "must",
+      "label": { "en": "External service", "vi": "Dịch vụ bên ngoài" },
+      "purpose": { "en": "A system you call but do not run: a partner API, a software-as-a-service product, a payment provider.", "vi": "Hệ thống bạn gọi tới nhưng không vận hành: API đối tác, dịch vụ phần mềm thuê ngoài, cổng thanh toán." },
+      "synonyms": ["external api", "third-party api", "partner api", "saas", "payment provider", "dịch vụ bên thứ ba", "api đối tác"],
+      "container": false, "codeBearing": false,
+      "defaultAttributes": { "statefulness": "stateless" },
+      "accessModes": { "asSource": ["connect", "send", "publish", "deliver"], "asTarget": ["connect", "read", "write", "read_write", "send"] },
+      "fields": [
+        { "key": "protocol", "kind": "enum", "label": { "en": "Protocol", "vi": "Giao thức" }, "values": ["https", "grpc", "sftp", "smtp", "other"], "default": "https" }
+      ]
+    },
+    {
+      "id": "note", "layer": "external_annotation", "priority": "must",
+      "label": { "en": "Note", "vi": "Ghi chú" },
+      "purpose": { "en": "A sticky note on the canvas. Never produces code.", "vi": "Ghi chú dán trên canvas. Không bao giờ sinh mã." },
+      "synonyms": ["comment", "sticky note", "ghi chú"],
+      "container": false, "codeBearing": false,
+      "defaultAttributes": {},
+      "accessModes": { "asSource": [], "asTarget": [] },
+      "fields": []
+    },
+    {
+      "id": "shape", "layer": "external_annotation", "priority": "must",
+      "label": { "en": "Shape", "vi": "Hình" },
+      "purpose": { "en": "A rectangle or ellipse to group things visually. Never produces code.", "vi": "Hình chữ nhật hoặc elip để nhóm trực quan. Không bao giờ sinh mã." },
+      "synonyms": ["rectangle", "ellipse", "box", "group", "hình chữ nhật", "khung"],
+      "container": false, "codeBearing": false,
+      "defaultAttributes": {},
+      "accessModes": { "asSource": [], "asTarget": [] },
+      "fields": []
+    },
+    {
+      "id": "text", "layer": "external_annotation", "priority": "must",
+      "label": { "en": "Text", "vi": "Văn bản" },
+      "purpose": { "en": "A free text label on the canvas. Never produces code.", "vi": "Nhãn văn bản tự do trên canvas. Không bao giờ sinh mã." },
+      "synonyms": ["label", "title", "caption", "nhãn", "tiêu đề"],
+      "container": false, "codeBearing": false,
+      "defaultAttributes": {},
+      "accessModes": { "asSource": [], "asTarget": [] },
+      "fields": []
+    },
+    {
+      "id": "dns", "layer": "edge", "priority": "must",
+      "label": { "en": "DNS", "vi": "DNS" },
+      "purpose": { "en": "Name resolution, and traffic steering between sites.", "vi": "Phân giải tên miền và điều hướng lưu lượng giữa các địa điểm." },
+      "synonyms": ["domain name system", "name server", "traffic steering", "global load balancing", "gslb", "phân giải tên miền", "tên miền"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "edge" },
+      "accessModes": { "asSource": [], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "zoneName", "kind": "text", "label": { "en": "DNS zone", "vi": "Vùng DNS" }, "maxLength": 253 },
+        { "key": "steering", "kind": "enum", "label": { "en": "Traffic steering", "vi": "Điều hướng lưu lượng" }, "values": ["none", "failover", "weighted", "latency", "geo"], "default": "none" }
+      ]
+    },
+    {
+      "id": "cdn", "layer": "edge", "priority": "must",
+      "label": { "en": "Content delivery network", "vi": "Mạng phân phối nội dung" },
+      "purpose": { "en": "Caches static and media content close to users.", "vi": "Lưu đệm nội dung tĩnh và đa phương tiện gần người dùng." },
+      "synonyms": ["cdn", "edge cache", "content delivery", "static acceleration", "phân phối nội dung"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "edge" },
+      "accessModes": { "asSource": ["connect", "read"], "asTarget": ["connect", "read"] },
+      "fields": [
+        { "key": "cacheTtlSeconds", "kind": "int", "label": { "en": "Default cache TTL", "vi": "Thời gian lưu đệm mặc định" }, "min": 0, "max": 31536000, "default": 3600, "unit": "s" },
+        { "key": "originProtocol", "kind": "enum", "label": { "en": "Origin protocol", "vi": "Giao thức tới nguồn" }, "values": ["http", "https"], "default": "https" }
+      ]
+    },
+    {
+      "id": "api_gateway", "layer": "edge", "priority": "must",
+      "label": { "en": "API gateway", "vi": "Cổng API" },
+      "purpose": { "en": "One entry point for APIs: authentication, rate limits, routing.", "vi": "Điểm vào chung cho API: xác thực, giới hạn tốc độ, định tuyến." },
+      "synonyms": ["api management", "api proxy", "api facade", "cổng api", "quản lý api"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "edge" },
+      "accessModes": { "asSource": ["connect"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "authMode", "kind": "enum", "label": { "en": "Authentication", "vi": "Xác thực" }, "values": ["none", "api_key", "oauth2", "mtls"], "default": "oauth2" },
+        { "key": "rateLimitRps", "kind": "int", "label": { "en": "Rate limit", "vi": "Giới hạn tốc độ" }, "min": 1, "max": 1000000, "unit": "req/s" }
+      ]
+    },
+    {
+      "id": "waf", "layer": "edge", "priority": "should",
+      "label": { "en": "Web application firewall", "vi": "Tường lửa ứng dụng web" },
+      "purpose": { "en": "Filters malicious web requests before they reach the application.", "vi": "Lọc các yêu cầu web độc hại trước khi tới ứng dụng." },
+      "synonyms": ["waf", "application firewall", "bot protection", "tường lửa web"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "edge" },
+      "accessModes": { "asSource": ["connect"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "mode", "kind": "enum", "label": { "en": "Mode", "vi": "Chế độ" }, "values": ["detect", "block"], "default": "block" }
+      ]
+    },
+    {
+      "id": "reverse_proxy", "layer": "edge", "priority": "should",
+      "label": { "en": "Reverse proxy", "vi": "Proxy ngược" },
+      "purpose": { "en": "Terminates TLS and routes requests to back-end services by host or path.", "vi": "Kết thúc TLS và định tuyến yêu cầu tới dịch vụ phía sau theo tên miền hoặc đường dẫn." },
+      "synonyms": ["ingress controller", "edge proxy", "tls termination", "http router", "proxy ngược"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "web" },
+      "accessModes": { "asSource": ["connect"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "tlsTermination", "kind": "bool", "label": { "en": "Terminates TLS", "vi": "Kết thúc TLS" }, "default": true },
+        { "key": "routing", "kind": "enum", "label": { "en": "Routing", "vi": "Định tuyến" }, "values": ["host", "path", "host_and_path"], "default": "host_and_path" }
+      ]
+    },
+    {
+      "id": "ddos_protection", "layer": "edge", "priority": "should",
+      "label": { "en": "DDoS protection", "vi": "Chống tấn công DDoS" },
+      "purpose": { "en": "Absorbs volumetric denial-of-service traffic upstream of the site.", "vi": "Hấp thụ lưu lượng tấn công từ chối dịch vụ trước khi tới địa điểm." },
+      "synonyms": ["denial of service protection", "scrubbing", "traffic scrubbing", "chống từ chối dịch vụ"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "edge" },
+      "accessModes": { "asSource": ["connect"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "alwaysOn", "kind": "bool", "label": { "en": "Always on", "vi": "Luôn bật" }, "default": true }
+      ]
+    },
+    {
+      "id": "site", "layer": "network_containers", "priority": "must",
+      "label": { "en": "Site", "vi": "Địa điểm" },
+      "purpose": { "en": "A cloud region or a data centre: the outermost failure domain.", "vi": "Một vùng đám mây hoặc một trung tâm dữ liệu: miền lỗi ngoài cùng." },
+      "synonyms": ["region", "data centre", "data center", "datacenter", "dc", "colocation", "campus", "vùng", "trung tâm dữ liệu"],
+      "container": true, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "failureDomainLevel": "site" },
+      "accessModes": { "asSource": [], "asTarget": [] },
+      "fields": [
+        { "key": "siteKind", "kind": "enum", "label": { "en": "Kind", "vi": "Loại" }, "values": ["cloud_region", "data_centre", "colocation", "edge_site", "office"], "default": "data_centre" },
+        { "key": "location", "kind": "text", "label": { "en": "Location", "vi": "Vị trí" }, "maxLength": 120 }
+      ]
+    },
+    {
+      "id": "zone", "layer": "network_containers", "priority": "must",
+      "label": { "en": "Zone", "vi": "Vùng khả dụng" },
+      "purpose": { "en": "A failure domain inside a site: an availability zone, a server room, a rack row or a rack.", "vi": "Một miền lỗi trong địa điểm: vùng khả dụng, phòng máy, dãy tủ rack hoặc một tủ rack." },
+      "synonyms": ["availability zone", "az", "server room", "rack row", "rack", "fault domain", "phòng máy", "dãy tủ rack", "miền lỗi"],
+      "container": true, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "failureDomainLevel": "zone" },
+      "accessModes": { "asSource": [], "asTarget": [] },
+      "fields": [
+        { "key": "zoneKind", "kind": "enum", "label": { "en": "Kind", "vi": "Loại" }, "values": ["availability_zone", "room", "rack_row", "rack"], "default": "availability_zone" }
+      ]
+    },
+    {
+      "id": "network_segment", "layer": "network_containers", "priority": "must",
+      "label": { "en": "Network segment", "vi": "Phân đoạn mạng" },
+      "purpose": { "en": "An isolated network or one tier of it: a private cloud network, a VLAN, a subnet or a security zone.", "vi": "Một mạng cô lập hoặc một tầng của nó: mạng riêng trên đám mây, VLAN, mạng con hoặc vùng bảo mật." },
+      "synonyms": ["vlan", "subnet", "private network", "security zone", "network zone", "tier", "l2 domain", "mạng con", "mạng riêng", "vùng bảo mật"],
+      "variants": [
+        { "id": "network", "label": { "en": "Network (address space)", "vi": "Mạng (dải địa chỉ)" } },
+        { "id": "subnet", "label": { "en": "Subnet or VLAN tier", "vi": "Mạng con hoặc tầng VLAN" } }
+      ],
+      "defaultVariant": "subnet",
+      "container": true, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless" },
+      "accessModes": { "asSource": [], "asTarget": [] },
+      "fields": [
+        { "key": "exposure", "kind": "enum", "label": { "en": "Exposure", "vi": "Mức phơi bày" }, "values": ["public", "private", "isolated"], "default": "private" },
+        { "key": "cidr", "kind": "text", "label": { "en": "Address range (CIDR)", "vi": "Dải địa chỉ (CIDR)" }, "maxLength": 43 },
+        { "key": "vlanId", "kind": "int", "label": { "en": "VLAN id", "vi": "Mã VLAN" }, "min": 1, "max": 4094 },
+        { "key": "ipMode", "kind": "enum", "label": { "en": "Address assignment", "vi": "Cấp địa chỉ" }, "values": ["dhcp", "static"], "default": "dhcp" }
+      ]
+    },
+    {
+      "id": "load_balancer", "layer": "network", "priority": "must",
+      "label": { "en": "Load balancer", "vi": "Bộ cân bằng tải" },
+      "purpose": { "en": "Spreads traffic over healthy instances, at layer 4 or layer 7.", "vi": "Phân phối lưu lượng tới các bản chạy khỏe mạnh, ở tầng 4 hoặc tầng 7." },
+      "synonyms": ["l4 load balancer", "l7 load balancer", "application delivery controller", "adc", "virtual ip", "vip", "cân bằng tải"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "web" },
+      "accessModes": { "asSource": ["connect"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "scheme", "kind": "enum", "label": { "en": "Scheme", "vi": "Phạm vi" }, "values": ["internet_facing", "internal"], "default": "internet_facing" },
+        { "key": "layer", "kind": "enum", "label": { "en": "Layer", "vi": "Tầng" }, "values": ["l4", "l7"], "default": "l7" },
+        { "key": "protocol", "kind": "enum", "label": { "en": "Protocol", "vi": "Giao thức" }, "values": ["http", "https", "tcp", "udp"], "default": "https" },
+        { "key": "healthPath", "kind": "text", "label": { "en": "Health check path", "vi": "Đường dẫn kiểm tra sức khỏe" }, "maxLength": 255, "default": "/health" }
+      ]
+    },
+    {
+      "id": "firewall", "layer": "network", "priority": "must",
+      "label": { "en": "Firewall", "vi": "Tường lửa" },
+      "purpose": { "en": "Allows or denies traffic between networks and tiers.", "vi": "Cho phép hoặc chặn lưu lượng giữa các mạng và tầng." },
+      "synonyms": ["network firewall", "packet filter", "next-generation firewall", "ngfw", "security gateway", "access control list", "acl", "tường lửa"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "edge" },
+      "accessModes": { "asSource": ["connect"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "inspection", "kind": "enum", "label": { "en": "Inspection", "vi": "Kiểm tra" }, "values": ["stateful", "stateless"], "default": "stateful" },
+        { "key": "defaultPolicy", "kind": "enum", "label": { "en": "Default policy", "vi": "Chính sách mặc định" }, "values": ["deny", "allow"], "default": "deny" },
+        { "key": "allowedPorts", "kind": "list", "label": { "en": "Allowed ports", "vi": "Cổng được phép" }, "values": ["22", "53", "80", "443", "1433", "3306", "5432", "5672", "6379", "8080", "9092", "other"] }
+      ]
+    },
+    {
+      "id": "router", "layer": "network", "priority": "should",
+      "label": { "en": "Router", "vi": "Bộ định tuyến" },
+      "purpose": { "en": "Routes traffic between networks; may translate addresses.", "vi": "Định tuyến lưu lượng giữa các mạng; có thể dịch địa chỉ." },
+      "synonyms": ["gateway", "layer 3 switch", "core router", "edge router", "route table", "nat", "định tuyến"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless" },
+      "accessModes": { "asSource": ["connect"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "routing", "kind": "enum", "label": { "en": "Routing", "vi": "Định tuyến" }, "values": ["static", "bgp", "ospf"], "default": "static" },
+        { "key": "nat", "kind": "bool", "label": { "en": "Address translation", "vi": "Dịch địa chỉ" }, "default": false }
+      ]
+    },
+    {
+      "id": "switch", "layer": "network", "priority": "should",
+      "label": { "en": "Switch", "vi": "Bộ chuyển mạch" },
+      "purpose": { "en": "Connects hosts inside a site at layer 2.", "vi": "Kết nối các máy chủ trong một địa điểm ở tầng 2." },
+      "synonyms": ["network switch", "l2 switch", "top-of-rack switch", "tor", "access switch", "core switch", "fabric", "chuyển mạch"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless" },
+      "accessModes": { "asSource": [], "asTarget": [] },
+      "fields": [
+        { "key": "ports", "kind": "int", "label": { "en": "Ports", "vi": "Số cổng" }, "min": 1, "max": 512, "default": 48 },
+        { "key": "speedGbps", "kind": "number", "label": { "en": "Port speed", "vi": "Tốc độ cổng" }, "min": 0.1, "max": 800, "default": 10, "unit": "Gbit/s" },
+        { "key": "redundantPair", "kind": "bool", "label": { "en": "Redundant pair", "vi": "Cặp dự phòng" }, "default": true }
+      ]
+    },
+    {
+      "id": "vpn_link", "layer": "network", "priority": "should",
+      "label": { "en": "VPN link", "vi": "Kết nối VPN" },
+      "purpose": { "en": "Links sites or remote users over an encrypted tunnel or a private interconnect.", "vi": "Kết nối các địa điểm hoặc người dùng từ xa qua đường hầm mã hóa hoặc kết nối riêng." },
+      "synonyms": ["vpn gateway", "site-to-site vpn", "vpn concentrator", "private interconnect", "ipsec", "remote access", "đường hầm", "kết nối riêng"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless" },
+      "accessModes": { "asSource": ["connect"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "linkKind", "kind": "enum", "label": { "en": "Kind", "vi": "Loại" }, "values": ["site_to_site", "remote_access", "private_interconnect"], "default": "site_to_site" },
+        { "key": "bandwidthMbps", "kind": "int", "label": { "en": "Bandwidth", "vi": "Băng thông" }, "min": 1, "max": 400000, "unit": "Mbit/s" }
+      ]
+    },
+    {
+      "id": "bare_metal_host", "layer": "compute", "priority": "must",
+      "label": { "en": "Bare-metal host", "vi": "Máy chủ vật lý" },
+      "purpose": { "en": "A physical server with no virtualisation layer.", "vi": "Một máy chủ vật lý không có lớp ảo hóa." },
+      "synonyms": ["physical server", "dedicated server", "rack server", "blade", "bare metal server", "máy chủ vật lý", "máy chủ riêng"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless" },
+      "accessModes": { "asSource": ["connect", "read", "write", "read_write", "send", "consume", "send_consume", "publish", "replicate"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "formFactor", "kind": "enum", "label": { "en": "Form factor", "vi": "Kiểu dáng" }, "values": ["rack_1u", "rack_2u", "rack_4u", "blade", "tower"], "default": "rack_1u" },
+        { "key": "sockets", "kind": "int", "label": { "en": "CPU sockets", "vi": "Số socket CPU" }, "min": 1, "max": 8, "default": 2 },
+        { "key": "memoryGiB", "kind": "int", "label": { "en": "Memory", "vi": "Bộ nhớ" }, "min": 1, "max": 24576, "unit": "GiB" }
+      ]
+    },
+    {
+      "id": "hypervisor_cluster", "layer": "compute", "priority": "must",
+      "label": { "en": "Hypervisor cluster", "vi": "Cụm ảo hóa" },
+      "purpose": { "en": "A group of virtualisation hosts that runs virtual machines.", "vi": "Nhóm máy chủ ảo hóa chạy các máy ảo." },
+      "synonyms": ["virtualisation cluster", "virtualization cluster", "host cluster", "private cloud", "ảo hóa", "cụm máy chủ ảo hóa"],
+      "container": true, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "failureDomainLevel": "host" },
+      "accessModes": { "asSource": [], "asTarget": [] },
+      "fields": [
+        { "key": "hostCount", "kind": "int", "label": { "en": "Hosts", "vi": "Số máy chủ" }, "min": 1, "max": 128, "default": 3 },
+        { "key": "hostFailover", "kind": "bool", "label": { "en": "Host failover", "vi": "Chuyển đổi khi máy chủ lỗi" }, "default": true },
+        { "key": "workloadBalancing", "kind": "bool", "label": { "en": "Automatic workload balancing", "vi": "Tự cân bằng tải máy ảo" }, "default": true }
+      ]
+    },
+    {
+      "id": "virtual_machine", "layer": "compute", "priority": "must",
+      "label": { "en": "Virtual machine", "vi": "Máy ảo" },
+      "purpose": { "en": "A general-purpose guest operating system on virtualised hardware.", "vi": "Một hệ điều hành khách đa dụng chạy trên phần cứng ảo hóa." },
+      "synonyms": ["vm", "guest", "instance", "virtual server", "máy chủ ảo"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless" },
+      "accessModes": { "asSource": ["connect", "read", "write", "read_write", "send", "consume", "send_consume", "publish"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "osFamily", "kind": "enum", "label": { "en": "OS family", "vi": "Họ hệ điều hành" }, "values": ["linux", "windows", "other"], "default": "linux" },
+        { "key": "dataDiskGiB", "kind": "int", "label": { "en": "Data disk", "vi": "Ổ dữ liệu" }, "min": 0, "max": 65536, "default": 0, "unit": "GiB" }
+      ]
+    },
+    {
+      "id": "container_platform", "layer": "compute", "priority": "must",
+      "label": { "en": "Container platform", "vi": "Nền tảng container" },
+      "purpose": { "en": "A container orchestration cluster, such as Kubernetes, that runs workloads.", "vi": "Cụm điều phối container, ví dụ Kubernetes, chạy các ứng dụng." },
+      "synonyms": ["kubernetes", "k8s", "container orchestration", "container cluster", "điều phối container"],
+      "container": true, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless" },
+      "accessModes": { "asSource": [], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "nodeCount", "kind": "int", "label": { "en": "Worker nodes", "vi": "Số nút worker" }, "min": 1, "max": 1000, "default": 3 },
+        { "key": "version", "kind": "text", "label": { "en": "Version", "vi": "Phiên bản" }, "maxLength": 20 }
+      ]
+    },
+    {
+      "id": "function", "layer": "compute", "priority": "should",
+      "label": { "en": "Function", "vi": "Hàm" },
+      "purpose": { "en": "A short event-driven handler run on demand by a platform.", "vi": "Một hàm xử lý sự kiện ngắn, được nền tảng chạy khi có yêu cầu." },
+      "synonyms": ["serverless function", "faas", "event handler", "hàm serverless"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "app" },
+      "accessModes": { "asSource": ["connect", "read", "write", "read_write", "send", "publish"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "runtime", "kind": "text", "label": { "en": "Runtime", "vi": "Môi trường chạy" }, "maxLength": 60 },
+        { "key": "timeoutSeconds", "kind": "int", "label": { "en": "Timeout", "vi": "Thời gian chờ tối đa" }, "min": 1, "max": 3600, "default": 30, "unit": "s" },
+        { "key": "memoryMiB", "kind": "int", "label": { "en": "Memory", "vi": "Bộ nhớ" }, "min": 64, "max": 32768, "default": 512, "unit": "MiB" }
+      ]
+    },
+    {
+      "id": "service", "layer": "application", "priority": "must",
+      "label": { "en": "Service", "vi": "Dịch vụ" },
+      "purpose": { "en": "Application code you run: a web front end, an API, a background worker or a scheduler.", "vi": "Mã ứng dụng bạn vận hành: giao diện web, API, tiến trình nền hoặc bộ lập lịch." },
+      "synonyms": ["api", "web app", "microservice", "backend", "application server", "worker", "background job", "consumer", "batch job", "scheduler", "cron", "ứng dụng", "tác vụ nền"],
+      "variants": [
+        { "id": "web", "label": { "en": "Web", "vi": "Web" } },
+        { "id": "api", "label": { "en": "API", "vi": "API" } },
+        { "id": "worker", "label": { "en": "Worker", "vi": "Tiến trình nền" } },
+        { "id": "scheduler", "label": { "en": "Scheduler", "vi": "Bộ lập lịch" } }
+      ],
+      "defaultVariant": "api",
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateless", "tier": "app" },
+      "accessModes": { "asSource": ["connect", "read", "write", "read_write", "send", "consume", "send_consume", "publish"], "asTarget": ["connect"] },
+      "fields": [
+        { "key": "runtime", "kind": "text", "label": { "en": "Runtime", "vi": "Môi trường chạy" }, "maxLength": 60 },
+        { "key": "port", "kind": "int", "label": { "en": "Port", "vi": "Cổng" }, "min": 1, "max": 65535, "default": 8080 },
+        { "key": "healthPath", "kind": "text", "label": { "en": "Health check path", "vi": "Đường dẫn kiểm tra sức khỏe" }, "maxLength": 255, "default": "/health" },
+        { "key": "schedule", "kind": "text", "label": { "en": "Schedule (cron)", "vi": "Lịch chạy (cron)" }, "maxLength": 100 }
+      ]
+    },
+    {
+      "id": "relational_db", "layer": "data", "priority": "must",
+      "label": { "en": "Relational database", "vi": "Cơ sở dữ liệu quan hệ" },
+      "purpose": { "en": "Tables with transactions and SQL queries.", "vi": "Bảng dữ liệu có giao dịch và truy vấn SQL." },
+      "synonyms": ["database", "db", "rdbms", "sql database", "cơ sở dữ liệu", "csdl"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "data" },
+      "accessModes": { "asSource": ["replicate"], "asTarget": ["read", "write", "read_write", "replicate"] },
+      "fields": [
+        { "key": "engine", "kind": "text", "label": { "en": "Engine family", "vi": "Họ hệ quản trị" }, "maxLength": 40 },
+        { "key": "engineMajor", "kind": "text", "label": { "en": "Engine major version", "vi": "Phiên bản chính" }, "maxLength": 20 },
+        { "key": "storageGiB", "kind": "int", "label": { "en": "Storage", "vi": "Dung lượng" }, "min": 1, "max": 65536, "default": 20, "unit": "GiB" },
+        { "key": "backupRetentionDays", "kind": "int", "label": { "en": "Backup retention", "vi": "Thời gian giữ bản sao lưu" }, "min": 0, "max": 3650, "default": 7, "unit": "d" },
+        { "key": "deletionProtection", "kind": "bool", "label": { "en": "Deletion protection", "vi": "Chống xóa nhầm" }, "default": true }
+      ]
+    },
+    {
+      "id": "key_value_store", "layer": "data", "priority": "must",
+      "label": { "en": "Key-value store", "vi": "Kho khóa-giá trị" },
+      "purpose": { "en": "Durable lookups by key at high throughput.", "vi": "Tra cứu bền vững theo khóa với thông lượng cao." },
+      "synonyms": ["key value database", "nosql", "wide column", "kho khóa giá trị"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "data" },
+      "accessModes": { "asSource": ["replicate"], "asTarget": ["read", "write", "read_write", "replicate"] },
+      "fields": [
+        { "key": "engine", "kind": "text", "label": { "en": "Engine family", "vi": "Họ hệ quản trị" }, "maxLength": 40 },
+        { "key": "storageGiB", "kind": "int", "label": { "en": "Storage", "vi": "Dung lượng" }, "min": 1, "max": 1048576, "default": 20, "unit": "GiB" },
+        { "key": "consistency", "kind": "enum", "label": { "en": "Consistency", "vi": "Tính nhất quán" }, "values": ["strong", "eventual"], "default": "eventual" }
+      ]
+    },
+    {
+      "id": "document_db", "layer": "data", "priority": "should",
+      "label": { "en": "Document database", "vi": "Cơ sở dữ liệu tài liệu" },
+      "purpose": { "en": "Stores flexible JSON-like documents.", "vi": "Lưu các tài liệu dạng JSON linh hoạt." },
+      "synonyms": ["document store", "json database", "nosql", "cơ sở dữ liệu tài liệu"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "data" },
+      "accessModes": { "asSource": ["replicate"], "asTarget": ["read", "write", "read_write", "replicate"] },
+      "fields": [
+        { "key": "engine", "kind": "text", "label": { "en": "Engine family", "vi": "Họ hệ quản trị" }, "maxLength": 40 },
+        { "key": "storageGiB", "kind": "int", "label": { "en": "Storage", "vi": "Dung lượng" }, "min": 1, "max": 1048576, "default": 20, "unit": "GiB" }
+      ]
+    },
+    {
+      "id": "search_index", "layer": "data", "priority": "should",
+      "label": { "en": "Search index", "vi": "Chỉ mục tìm kiếm" },
+      "purpose": { "en": "Full-text and faceted search over indexed documents.", "vi": "Tìm kiếm toàn văn và theo nhóm trên tài liệu đã lập chỉ mục." },
+      "synonyms": ["search engine", "full-text search", "search cluster", "tìm kiếm toàn văn"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "data" },
+      "accessModes": { "asSource": [], "asTarget": ["read", "write", "read_write"] },
+      "fields": [
+        { "key": "engine", "kind": "text", "label": { "en": "Engine family", "vi": "Họ hệ quản trị" }, "maxLength": 40 },
+        { "key": "storageGiB", "kind": "int", "label": { "en": "Storage", "vi": "Dung lượng" }, "min": 1, "max": 1048576, "default": 50, "unit": "GiB" },
+        { "key": "shards", "kind": "int", "label": { "en": "Shards", "vi": "Số phân mảnh" }, "min": 1, "max": 1024, "default": 3 }
+      ]
+    },
+    {
+      "id": "cache", "layer": "data", "priority": "must",
+      "label": { "en": "Cache", "vi": "Bộ nhớ đệm" },
+      "purpose": { "en": "Fast in-memory copies of hot data to cut read latency and load.", "vi": "Bản sao dữ liệu nóng trong bộ nhớ để giảm độ trễ và tải đọc." },
+      "synonyms": ["in-memory cache", "key-value cache", "session store", "bộ đệm"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "data" },
+      "accessModes": { "asSource": ["replicate"], "asTarget": ["read", "write", "read_write", "replicate"] },
+      "fields": [
+        { "key": "engine", "kind": "text", "label": { "en": "Engine family", "vi": "Họ hệ quản trị" }, "maxLength": 40 },
+        { "key": "memoryGiB", "kind": "number", "label": { "en": "Memory", "vi": "Bộ nhớ" }, "min": 0.5, "max": 4096, "unit": "GiB" },
+        { "key": "eviction", "kind": "enum", "label": { "en": "Eviction", "vi": "Chính sách loại bỏ" }, "values": ["lru", "lfu", "none"], "default": "lru" },
+        { "key": "persistence", "kind": "bool", "label": { "en": "Persistence", "vi": "Lưu xuống đĩa" }, "default": false }
+      ]
+    },
+    {
+      "id": "object_storage", "layer": "storage", "priority": "must",
+      "label": { "en": "Object storage", "vi": "Lưu trữ đối tượng" },
+      "purpose": { "en": "Files and media stored as objects in buckets.", "vi": "Tệp và nội dung đa phương tiện lưu dưới dạng đối tượng trong bucket." },
+      "synonyms": ["object store", "blob storage", "bucket", "media store", "lưu trữ đối tượng"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "data" },
+      "accessModes": { "asSource": ["replicate", "deliver"], "asTarget": ["read", "write", "read_write", "replicate"] },
+      "fields": [
+        { "key": "versioning", "kind": "bool", "label": { "en": "Versioning", "vi": "Lưu phiên bản" }, "default": true },
+        { "key": "retentionDays", "kind": "int", "label": { "en": "Retention", "vi": "Thời gian lưu giữ" }, "min": 0, "max": 36500, "unit": "d" },
+        { "key": "publicRead", "kind": "bool", "label": { "en": "Public read", "vi": "Cho phép đọc công khai" }, "default": false }
+      ]
+    },
+    {
+      "id": "block_storage", "layer": "storage", "priority": "must",
+      "label": { "en": "Block storage", "vi": "Lưu trữ khối" },
+      "purpose": { "en": "Disks attached to servers or virtual machines.", "vi": "Ổ đĩa gắn vào máy chủ hoặc máy ảo." },
+      "synonyms": ["volume", "disk", "lun", "persistent volume", "ổ đĩa"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "data" },
+      "accessModes": { "asSource": ["replicate"], "asTarget": ["read", "write", "read_write", "replicate"] },
+      "fields": [
+        { "key": "sizeGiB", "kind": "int", "label": { "en": "Size", "vi": "Dung lượng" }, "min": 1, "max": 65536, "default": 100, "unit": "GiB" },
+        { "key": "performanceTier", "kind": "enum", "label": { "en": "Performance tier", "vi": "Mức hiệu năng" }, "values": ["standard", "high", "extreme"], "default": "standard" },
+        { "key": "encrypted", "kind": "bool", "label": { "en": "Encrypted", "vi": "Mã hóa" }, "default": true }
+      ]
+    },
+    {
+      "id": "file_storage", "layer": "storage", "priority": "must",
+      "label": { "en": "File storage (NAS)", "vi": "Lưu trữ tệp (NAS)" },
+      "purpose": { "en": "A shared file system mounted over the network.", "vi": "Hệ thống tệp dùng chung, gắn qua mạng." },
+      "synonyms": ["nas", "network attached storage", "file share", "nfs", "smb", "shared file system", "thư mục dùng chung"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "data" },
+      "accessModes": { "asSource": ["replicate"], "asTarget": ["read", "write", "read_write", "replicate"] },
+      "fields": [
+        { "key": "protocol", "kind": "enum", "label": { "en": "Protocol", "vi": "Giao thức" }, "values": ["nfs", "smb", "both"], "default": "nfs" },
+        { "key": "capacityGiB", "kind": "int", "label": { "en": "Capacity", "vi": "Dung lượng" }, "min": 1, "max": 10485760, "unit": "GiB" }
+      ]
+    },
+    {
+      "id": "san", "layer": "storage", "priority": "must",
+      "label": { "en": "Storage area network (SAN)", "vi": "Mạng lưu trữ (SAN)" },
+      "purpose": { "en": "A shared block-storage array reached over a dedicated storage network.", "vi": "Mảng lưu trữ khối dùng chung, truy cập qua mạng lưu trữ riêng." },
+      "synonyms": ["storage array", "disk array", "fibre channel", "iscsi", "nvme over fabrics", "mảng lưu trữ", "mạng lưu trữ"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "data" },
+      "accessModes": { "asSource": ["replicate"], "asTarget": ["read", "write", "read_write", "replicate"] },
+      "fields": [
+        { "key": "protocol", "kind": "enum", "label": { "en": "Protocol", "vi": "Giao thức" }, "values": ["fibre_channel", "iscsi", "nvme_of"], "default": "iscsi" },
+        { "key": "usableCapacityTiB", "kind": "number", "label": { "en": "Usable capacity", "vi": "Dung lượng khả dụng" }, "min": 0.1, "max": 100000, "unit": "TiB" },
+        { "key": "redundancy", "kind": "enum", "label": { "en": "Redundancy", "vi": "Dự phòng" }, "values": ["raid_5", "raid_6", "raid_10", "erasure_coding"], "default": "raid_6" }
+      ]
+    },
+    {
+      "id": "backup_target", "layer": "storage", "priority": "must",
+      "label": { "en": "Backup target", "vi": "Nơi sao lưu" },
+      "purpose": { "en": "Where copies are kept for restore and archive, ideally in another failure domain.", "vi": "Nơi giữ bản sao để khôi phục và lưu trữ dài hạn, tốt nhất ở miền lỗi khác." },
+      "synonyms": ["backup", "archive", "snapshot store", "tape library", "sao lưu", "lưu trữ dài hạn"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "mgmt" },
+      "accessModes": { "asSource": ["read"], "asTarget": ["write", "read_write", "replicate"] },
+      "fields": [
+        { "key": "retentionDays", "kind": "int", "label": { "en": "Retention", "vi": "Thời gian lưu giữ" }, "min": 1, "max": 36500, "default": 35, "unit": "d" },
+        { "key": "frequency", "kind": "enum", "label": { "en": "Frequency", "vi": "Tần suất" }, "values": ["hourly", "daily", "weekly"], "default": "daily" },
+        { "key": "immutable", "kind": "bool", "label": { "en": "Immutable copies", "vi": "Bản sao bất biến" }, "default": false },
+        { "key": "offsite", "kind": "bool", "label": { "en": "Off-site copy", "vi": "Bản sao ngoài địa điểm" }, "default": true }
+      ]
+    },
+    {
+      "id": "queue", "layer": "messaging", "priority": "must",
+      "label": { "en": "Queue", "vi": "Hàng đợi" },
+      "purpose": { "en": "Buffers work so producers and consumers run at their own pace.", "vi": "Đệm công việc để bên gửi và bên xử lý chạy theo nhịp riêng." },
+      "synonyms": ["message queue", "work queue", "message broker", "mq", "hàng đợi thông điệp"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "app" },
+      "accessModes": { "asSource": ["deliver"], "asTarget": ["send", "consume", "send_consume"] },
+      "fields": [
+        { "key": "fifo", "kind": "bool", "label": { "en": "Strict ordering (FIFO)", "vi": "Thứ tự nghiêm ngặt (FIFO)" }, "default": false },
+        { "key": "visibilityTimeoutSeconds", "kind": "int", "label": { "en": "Visibility timeout", "vi": "Thời gian ẩn thông điệp" }, "min": 0, "max": 43200, "default": 30, "unit": "s" },
+        { "key": "retentionHours", "kind": "int", "label": { "en": "Retention", "vi": "Thời gian lưu giữ" }, "min": 1, "max": 336, "default": 96, "unit": "h" },
+        { "key": "deadLetter", "kind": "bool", "label": { "en": "Dead-letter queue", "vi": "Hàng đợi thư lỗi" }, "default": true }
+      ]
+    },
+    {
+      "id": "pubsub_topic", "layer": "messaging", "priority": "should",
+      "label": { "en": "Publish-subscribe topic", "vi": "Chủ đề xuất bản - đăng ký" },
+      "purpose": { "en": "Fans one event out to many subscribers.", "vi": "Phát một sự kiện tới nhiều bên đăng ký." },
+      "synonyms": ["topic", "pub/sub", "event bus", "notification", "fan-out", "bus sự kiện"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "app" },
+      "accessModes": { "asSource": ["deliver"], "asTarget": ["publish"] },
+      "fields": [
+        { "key": "ordered", "kind": "bool", "label": { "en": "Ordered delivery", "vi": "Giữ thứ tự" }, "default": false },
+        { "key": "retentionHours", "kind": "int", "label": { "en": "Retention", "vi": "Thời gian lưu giữ" }, "min": 0, "max": 8760, "default": 24, "unit": "h" }
+      ]
+    },
+    {
+      "id": "event_stream", "layer": "messaging", "priority": "should",
+      "label": { "en": "Event stream", "vi": "Luồng sự kiện" },
+      "purpose": { "en": "An ordered, replayable log of events split into partitions.", "vi": "Nhật ký sự kiện có thứ tự, phát lại được, chia thành các phân vùng." },
+      "synonyms": ["stream", "log stream", "event log", "streaming platform", "commit log", "luồng dữ liệu"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "data" },
+      "accessModes": { "asSource": ["deliver"], "asTarget": ["publish", "consume", "send_consume"] },
+      "fields": [
+        { "key": "partitions", "kind": "int", "label": { "en": "Partitions", "vi": "Số phân vùng" }, "min": 1, "max": 4096, "default": 6 },
+        { "key": "retentionHours", "kind": "int", "label": { "en": "Retention", "vi": "Thời gian lưu giữ" }, "min": 1, "max": 87600, "default": 168, "unit": "h" },
+        { "key": "replicationFactor", "kind": "int", "label": { "en": "Replication factor", "vi": "Hệ số nhân bản" }, "min": 1, "max": 7, "default": 3 }
+      ]
+    },
+    {
+      "id": "identity_provider", "layer": "security", "priority": "must",
+      "label": { "en": "Identity provider", "vi": "Nhà cung cấp định danh" },
+      "purpose": { "en": "Signs users and services in: directory, single sign-on, multi-factor authentication.", "vi": "Xác thực người dùng và dịch vụ: thư mục, đăng nhập một lần, xác thực đa yếu tố." },
+      "synonyms": ["identity", "idp", "sso", "single sign-on", "directory", "ldap", "oidc", "saml", "đăng nhập một lần", "thư mục người dùng"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "mgmt" },
+      "accessModes": { "asSource": [], "asTarget": ["connect", "read"] },
+      "fields": [
+        { "key": "protocol", "kind": "enum", "label": { "en": "Protocol", "vi": "Giao thức" }, "values": ["oidc", "saml", "ldap", "kerberos"], "default": "oidc" },
+        { "key": "mfa", "kind": "bool", "label": { "en": "Multi-factor authentication", "vi": "Xác thực đa yếu tố" }, "default": true }
+      ]
+    },
+    {
+      "id": "secrets_vault", "layer": "security", "priority": "must",
+      "label": { "en": "Secrets vault", "vi": "Kho bí mật" },
+      "purpose": { "en": "Stores and rotates passwords, tokens and keys for applications.", "vi": "Lưu và xoay vòng mật khẩu, token và khóa cho ứng dụng." },
+      "synonyms": ["secret store", "credential store", "password vault", "kho mật khẩu"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "mgmt" },
+      "accessModes": { "asSource": [], "asTarget": ["read", "read_write"] },
+      "fields": [
+        { "key": "rotationDays", "kind": "int", "label": { "en": "Rotation interval", "vi": "Chu kỳ xoay vòng" }, "min": 1, "max": 3650, "default": 90, "unit": "d" }
+      ]
+    },
+    {
+      "id": "key_management", "layer": "security", "priority": "should",
+      "label": { "en": "Key management", "vi": "Quản lý khóa" },
+      "purpose": { "en": "Creates, stores and controls encryption keys, optionally in hardware.", "vi": "Tạo, lưu và kiểm soát khóa mã hóa, có thể trên phần cứng chuyên dụng." },
+      "synonyms": ["key management system", "hsm", "hardware security module", "encryption keys", "khóa mã hóa"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "mgmt" },
+      "accessModes": { "asSource": [], "asTarget": ["connect", "read"] },
+      "fields": [
+        { "key": "hardwareBacked", "kind": "bool", "label": { "en": "Hardware-backed", "vi": "Dùng phần cứng bảo mật" }, "default": false },
+        { "key": "rotationDays", "kind": "int", "label": { "en": "Rotation interval", "vi": "Chu kỳ xoay vòng" }, "min": 1, "max": 3650, "default": 365, "unit": "d" }
+      ]
+    },
+    {
+      "id": "siem_log_store", "layer": "security", "priority": "should",
+      "label": { "en": "Security log store (SIEM)", "vi": "Kho nhật ký bảo mật (SIEM)" },
+      "purpose": { "en": "Keeps audit and security logs for investigation and compliance.", "vi": "Lưu nhật ký kiểm toán và bảo mật để điều tra và tuân thủ." },
+      "synonyms": ["siem", "audit log", "security log", "log archive", "nhật ký kiểm toán", "nhật ký bảo mật"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "mgmt" },
+      "accessModes": { "asSource": [], "asTarget": ["write"] },
+      "fields": [
+        { "key": "retentionDays", "kind": "int", "label": { "en": "Retention", "vi": "Thời gian lưu giữ" }, "min": 1, "max": 3650, "default": 365, "unit": "d" },
+        { "key": "immutable", "kind": "bool", "label": { "en": "Tamper-evident", "vi": "Chống sửa đổi" }, "default": true }
+      ]
+    },
+    {
+      "id": "certificate_authority", "layer": "security", "priority": "should",
+      "label": { "en": "Certificate authority", "vi": "Tổ chức cấp chứng chỉ" },
+      "purpose": { "en": "Issues and revokes TLS certificates.", "vi": "Cấp và thu hồi chứng chỉ TLS." },
+      "synonyms": ["ca", "pki", "tls certificates", "certificate manager", "chứng chỉ số"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "mgmt" },
+      "accessModes": { "asSource": [], "asTarget": ["connect", "read"] },
+      "fields": [
+        { "key": "scope", "kind": "enum", "label": { "en": "Scope", "vi": "Phạm vi" }, "values": ["internal", "public"], "default": "internal" }
+      ]
+    },
+    {
+      "id": "monitoring", "layer": "observability", "priority": "should",
+      "label": { "en": "Monitoring", "vi": "Giám sát" },
+      "purpose": { "en": "Metrics, logs, alerts, dashboards and traces.", "vi": "Chỉ số, nhật ký, cảnh báo, bảng điều khiển và truy vết." },
+      "synonyms": ["metrics", "logging", "log aggregation", "alerting", "tracing", "apm", "observability", "dashboard", "giám sát", "cảnh báo", "nhật ký"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "mgmt" },
+      "accessModes": { "asSource": ["read", "connect"], "asTarget": ["write", "connect"] },
+      "fields": [
+        { "key": "alerting", "kind": "bool", "label": { "en": "Alerting", "vi": "Cảnh báo" }, "default": true },
+        { "key": "logs", "kind": "bool", "label": { "en": "Collects logs", "vi": "Thu thập nhật ký" }, "default": true },
+        { "key": "tracing", "kind": "bool", "label": { "en": "Tracing", "vi": "Truy vết" }, "default": false },
+        { "key": "retentionDays", "kind": "int", "label": { "en": "Retention", "vi": "Thời gian lưu giữ" }, "min": 1, "max": 3650, "default": 30, "unit": "d" }
+      ]
+    },
+    {
+      "id": "artifact_registry", "layer": "observability", "priority": "could",
+      "label": { "en": "Artifact registry", "vi": "Kho artifact" },
+      "purpose": { "en": "Stores container images and packages; can mirror upstream sources for air-gapped sites.", "vi": "Lưu image container và gói phần mềm; có thể sao chép nguồn bên ngoài cho môi trường cách ly mạng." },
+      "synonyms": ["container registry", "image registry", "package repository", "mirror", "kho gói phần mềm", "kho image"],
+      "container": false, "codeBearing": true,
+      "defaultAttributes": { "statefulness": "stateful", "tier": "mgmt" },
+      "accessModes": { "asSource": [], "asTarget": ["read", "read_write"] },
+      "fields": [
+        { "key": "formats", "kind": "list", "label": { "en": "Formats", "vi": "Định dạng" }, "values": ["container_images", "os_packages", "language_packages", "vm_images"] },
+        { "key": "mirrorsUpstream", "kind": "bool", "label": { "en": "Mirrors upstream sources", "vi": "Sao chép nguồn bên ngoài" }, "default": false }
+      ]
+    }
+  ],
+  "nestRules": [
+    {
+      "id": "NEST-01", "kind": "child", "roles": ["site"], "parents": ["root"],
+      "message": { "en": "A site is the outermost container.", "vi": "Địa điểm là vùng chứa ngoài cùng." }
+    },
+    {
+      "id": "NEST-02", "kind": "child", "roles": ["zone"], "parents": ["root", "site", "network_segment"],
+      "message": { "en": "A zone sits at the top level, or inside a site or a network segment.", "vi": "Vùng khả dụng nằm ở cấp cao nhất, hoặc trong một địa điểm hay một phân đoạn mạng." }
+    },
+    {
+      "id": "NEST-03", "kind": "child", "roles": ["network_segment"], "parents": ["root", "site", "zone", "network_segment"],
+      "message": { "en": "A network segment sits at the top level, or inside a site, a zone or a wider network segment.", "vi": "Phân đoạn mạng nằm ở cấp cao nhất, hoặc trong địa điểm, vùng khả dụng hay một phân đoạn mạng rộng hơn." }
+    },
+    {
+      "id": "NEST-04", "kind": "child", "roles": ["container_platform", "hypervisor_cluster"], "parents": ["root", "site", "zone", "network_segment"],
+      "message": { "en": "A cluster sits at the top level, or inside a site, a zone or a network segment.", "vi": "Cụm nằm ở cấp cao nhất, hoặc trong địa điểm, vùng khả dụng hay phân đoạn mạng." }
+    },
+    {
+      "id": "NEST-05", "kind": "child",
+      "roles": ["service", "virtual_machine", "relational_db", "key_value_store", "document_db", "search_index", "cache", "load_balancer", "reverse_proxy", "firewall", "waf", "api_gateway", "vpn_link", "queue", "pubsub_topic", "event_stream", "object_storage", "file_storage", "block_storage", "backup_target", "identity_provider", "secrets_vault", "key_management", "siem_log_store", "certificate_authority", "monitoring", "artifact_registry"],
+      "parents": ["root", "site", "zone", "network_segment", "container_platform", "hypervisor_cluster"],
+      "message": { "en": "{child} cannot be placed inside {parent}.", "vi": "Không thể đặt {child} bên trong {parent}." }
+    },
+    {
+      "id": "NEST-06", "kind": "child", "roles": ["bare_metal_host", "san", "switch", "router"], "parents": ["root", "site", "zone", "network_segment"],
+      "message": { "en": "Physical equipment sits in a site, a zone or a network segment, not inside a cluster.", "vi": "Thiết bị vật lý nằm trong địa điểm, vùng khả dụng hoặc phân đoạn mạng, không nằm trong cụm." }
+    },
+    {
+      "id": "NEST-07", "kind": "child", "roles": ["client", "external_service", "dns", "cdn", "ddos_protection", "function"], "parents": ["root", "site"],
+      "message": { "en": "{child} is outside your networks: place it at the top level or directly in a site.", "vi": "{child} nằm ngoài các mạng của bạn: đặt ở cấp cao nhất hoặc trực tiếp trong một địa điểm." }
+    },
+    {
+      "id": "NEST-08", "kind": "child", "roles": ["note", "shape", "text"], "parents": ["*"],
+      "message": { "en": "Annotations can go at the top level or in any container.", "vi": "Chú thích có thể đặt ở cấp cao nhất hoặc trong bất kỳ vùng chứa nào." }
+    },
+    {
+      "id": "NEST-09", "kind": "container", "roles": ["hypervisor_cluster"], "accepts": ["virtual_machine", "note", "shape", "text"],
+      "message": { "en": "A hypervisor cluster holds virtual machines only.", "vi": "Cụm ảo hóa chỉ chứa máy ảo." }
+    },
+    {
+      "id": "NEST-10", "kind": "container", "roles": ["container_platform"],
+      "accepts": ["service", "relational_db", "key_value_store", "document_db", "search_index", "cache", "queue", "pubsub_topic", "event_stream", "object_storage", "load_balancer", "reverse_proxy", "note", "shape", "text"],
+      "message": { "en": "A container platform holds workloads, data stores, messaging and its ingress only.", "vi": "Nền tảng container chỉ chứa ứng dụng, kho dữ liệu, truyền thông điệp và lối vào của nó." }
+    }
+  ],
+  "legacyTypes": {
+    "1.0": {
+      "client": { "role": "client" },
+      "cdn": { "role": "cdn" },
+      "load_balancer": { "role": "load_balancer" },
+      "service": { "role": "service" },
+      "database": { "role": "relational_db" },
+      "cache": { "role": "cache" },
+      "queue": { "role": "queue" },
+      "object_store": { "role": "object_storage" },
+      "external_api": { "role": "external_service" },
+      "note": { "role": "note" }
+    }
+  },
+  "aliases": {
+    "database": { "role": "relational_db" },
+    "object_store": { "role": "object_storage" },
+    "external_api": { "role": "external_service" },
+    "network": { "role": "network_segment", "variant": "network" },
+    "subnet": { "role": "network_segment", "variant": "subnet" },
+    "bare_metal_server": { "role": "bare_metal_host" },
+    "kubernetes_cluster": { "role": "container_platform" },
+    "identity": { "role": "identity_provider" },
+    "backup": { "role": "backup_target" },
+    "vpn_gateway": { "role": "vpn_link" },
+    "topic": { "role": "pubsub_topic" },
+    "stream": { "role": "event_stream" },
+    "worker": { "role": "service", "variant": "worker" },
+    "batch_worker": { "role": "service", "variant": "worker" },
+    "logging": { "role": "monitoring" }
+  }
+}

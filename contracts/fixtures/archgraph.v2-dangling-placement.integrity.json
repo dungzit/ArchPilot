@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "2.0",
+  "settings": {
+    "codeName": "broken_design",
+    "environment": "dev"
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "service",
+      "label": "Orders Api",
+      "codeName": "orders_api",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "n2",
+      "type": "relational_db",
+      "label": "Orders Db",
+      "codeName": "orders_db",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [],
+  "deployment": {
+    "profiles": [
+      {
+        "id": "dc1",
+        "target": "vsphere",
+        "label": "DC1"
+      },
+      {
+        "id": "aws_sg",
+        "target": "aws",
+        "label": "AWS"
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "s1",
+        "label": "Hybrid",
+        "defaultProfileId": "aws_sg",
+        "placements": [
+          {
+            "nodeId": "n9",
+            "profileId": "dc1"
+          }
+        ]
+      }
+    ]
+  }
+}

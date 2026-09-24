@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Author** | Senior Developer #1 (Builder / Proposer) |
-| **Date** | 2026-09-23 (v1.0) · 2026-09-23 (v1.2, post-review) · 2026-09-23 (v1.3, CI + `main.tsx` split) · 2026-09-23 (v1.4, persistence spine: 1.2 / 1.3 / 1.6) · 2026-09-24 (v1.5, 1.4 store + 3.3 benchmarks + 3.4 sizing UI) |
-| **Version** | 1.5 |
+| **Date** | 2026-09-23 (v1.0) · 2026-09-23 (v1.2, post-review) · 2026-09-23 (v1.3, CI + `main.tsx` split) · 2026-09-23 (v1.4, persistence spine: 1.2 / 1.3 / 1.6) · 2026-09-24 (v1.5, 1.4 store + 3.3 benchmarks + 3.4 sizing UI) · 2026-09-24 (v1.6, **v2 Phase 0**: design-v2 §5.2 tasks 0.2-0.6 - see §7.0) |
+| **Version** | 1.6 |
 | **Status** | Reviewed (`senior-developer-2`, approve-with-changes) up to v1.3. **v1.4 and v1.5 are not yet reviewed.** All four red-team blockers carried in code. v1.5: the SPA's workspace now lives on the server (**1.4**), benchmarks have a cited, idempotent seed and a read endpoint (**3.3**), and the Sizing screen is a real calculator on the v2.0 engine (**3.4**). Next: the interactive canvas (1.5 → 2.1–2.6). |
 | **Language / stack** | Backend: Python 3.10+ (CI tests **3.12 and 3.10**; the image is 3.12), FastAPI, SQLite (stdlib-preferring, **4 runtime deps** since 1.6 — `jsonschema` promoted from test-only — + 3 test/lint-only). Frontend: existing ArchPilot React 18 + TypeScript + Vite on **Node 24**, with `vitest` + `ajv` + `jsdom` as devDependencies. |
 | **Code delivered with this doc** | `ArchPilot/backend/` · `ArchPilot/contracts/` · `ArchPilot/src/domain/sizing.ts` · `ArchPilot/src/contracts/` · `ArchPilot/src/{app,ui,features,api,test}/` · `ArchPilot/vite.config.ts` · `.github/workflows/ci.yml` (**outside this repo — see §7.2 item 5c**) |
@@ -19,6 +19,7 @@
 | 1.2 | 2026-09-23 | The two handed-back items delivered: task **0.5/0.6** (`contracts/` + shared fixtures + envelope rules) and task **3.1/3.2** (corrected sizing engine, red-team B3). Backend 65 → **90 pytest**; frontend 0 → **57 vitest**. |
 | 1.3 | 2026-09-23 | Task **0.7** (CI: `.github/workflows/ci.yml` runs ruff + pytest on Python 3.12 **and** 3.10, and `tsc -b` + vitest + `vite build` on Node 24) and task **1.1** (`main.tsx` 292 lines → 25 files under `src/app`, `src/ui`, `src/features/<module>/`, proved byte-identical by a 36-state DOM diff). Frontend 57 → **63 vitest**. Node images bumped 20 → 24 (Node 20 is EOL; jsdom 30 needs ≥ 22.22.2). |
 | 1.5 | 2026-09-24 | Tasks **1.4** (`store.ts` async on `/api/workspaces/current`, owner-scoped `localStorage` cache, one-time legacy import, 409 → reload + message, offline → pending edit + "not saved" + Retry), **3.3** (migration `004`, idempotent never-overwriting benchmark seed, `GET /api/benchmarks`) and **3.4** (Sizing calculator: inputs left, result cards right, formula + substitution + assumptions + confidence on every number, deterministic review hints, single-benchmark shortcut note, VI/EN). Backend 154 → **174 pytest**; frontend 97 → **150 vitest**. Image built and run as `archpilot:task-3x`, exercised with curl, then removed. |
+| 1.6 | 2026-09-24 | **v2 Phase 0** (design-v2 §5.2 tasks 0.2, 0.3, 0.4, 0.5, 0.6; 0.1 skipped - CI already in this repo), with the red-team review's B1/B2/M6/M9/m2/m3/m4 applied: contract **1.1.0** (ArchGraph 2.0 design document, `if/then/else` on `schemaVersion`), component catalogue v1.0.0 (45 v2.1 roles, 11 layers), `src/domain/graph/` core, `graph_integrity.py` + migration **005**, react-router + SPA fallback + CSP + Studio shell. Backend 174 → **323 pytest**; frontend 150 → **387 vitest**. Image build **blocked** (Docker Desktop crashed at start-up, §7.0.4); the production-configured app was verified with curl instead. |
 | 1.4 | 2026-09-23 | Tasks **1.3** (`GET/PUT /api/workspaces/current`, revision-checked, 409 on stale), **1.6** (designs CRUD, owner-scoped, 404 for non-owners, graph validated at request time against **the same** `contracts/archgraph.schema.json`, 409 on stale revision, paginated list, soft delete) and **1.2** (`src/api/client.ts`, `src/api/auth.ts`, `LoginScreen`, auth gate + Logout in `App.tsx`, Vite `/api` proxy, `scripts/create_user.py`). Backend 90 → **154 pytest**; frontend 63 → **97 vitest**. Backend image **built and run** under Docker 29.8 and exercised with curl (first time; the v1.3 `node:24-alpine` bump is now verified). |
 
 ---
@@ -630,8 +631,76 @@ and an uncited `declared` benchmark rejected.
 
 ## 7. Status board — done vs still open
 
-Updated 2026-09-24 at v1.5 (tasks 1.4, 3.3, 3.4; v1.4 added 1.2, 1.3, 1.6). This section supersedes the
-v1.0 stub list.
+Updated 2026-09-24 at v1.6 (v2 Phase 0, §7.0); v1.5 added 1.4, 3.3, 3.4; v1.4 added 1.2, 1.3, 1.6. This
+section supersedes the v1.0 stub list.
+
+### 7.0 v2 Phase 0 - design-v2 §5.2 tasks 0.2-0.6 (v1.6)
+
+Binding inputs: `docs/requirements-v2.md` v2.1, `docs/design-v2.md` v0.2, and the red-team review
+`docs/reviews/review-design-v2.md` v1.0. Where design and requirements disagreed, **requirements v2.1
+won**, and the review's findings that touch these tasks were applied (7.0.2). Not reviewed yet.
+
+#### 7.0.1 Tasks
+
+| # | Task | Status | What is real now |
+|---|---|---|---|
+| 0.1 | CI in repo, pins | **Skipped** (per instruction) | `.github/workflows/ci.yml` already runs in this repo. New deps are pinned exactly: `react-router` **7.18.4** (design D-14 says 7; 8.4.0 exists), `@noble/hashes` **2.4.0**. The older `"latest"` deps are still unpinned (0.1 remainder) |
+| 0.2 | Contract v2 design document | **Done** | `contracts/archgraph.schema.json` **1.1.0**: `archGraph` dispatches on `schemaVersion` (`if/then/else`; 1.0 frozen, 2.0 new). 2.0 = neutral nodes (`type` = catalogue role pattern, `variant`, `codeName`, v2.1 `attributes`, neutral `config`, `sizing`, `annotation`) + edges (`kind` flow/access, `mode`, `protocol`, `port`) + `deployment{profiles[], bindings[], scenarios[{placements[]}], activeScenarioId}` + `brief` (open `context`/`answers` maps, assumptions, capacity, suggestions) + `decisions[]` (ADR, 4000-char fields, max 100) + `derivations[]`. Limits: nodes 500, edges 1000, profiles 10, scenarios 10, bindings 5000. Fixtures 16 → **45** in `fixtures/index.json`: 11 valid, 17 shape-invalid (each fails on a named keyword), **17 integrity-invalid** (contract-valid, each fails on a named `INT-*` rule), 1 migration pair. `archgraph.wrong-schema-version.invalid.json` now says `1.1` (2.0 is legal) |
+| 0.6 | Component catalogue | **Done** | `contracts/catalog/components.json` v1.0.0: **45 roles in 11 layers**, requirements v2.1 §4.1.1 ids and priorities (every Must and Should role, plus `artifact_registry` for the Must air-gap wizard rule). On-prem is first-class: `site`, `zone`, `network_segment` (variants network/subnet), `hypervisor_cluster`, `bare_metal_host`, `san`, `file_storage` (NAS), `switch`, `router`, `firewall`, `load_balancer`, `vpn_link`, `backup_target`. VI/EN label + purpose per role, neutral synonyms, field descriptors, access modes, default attributes, 9 common attributes, 10 edge modes, size classes, **10 NEST rules** (8 child, 2 container), 1.0 legacy types, 15 aliases (design-v0.2 ids -> v2.1 ids). `components.schema.json` (shape) and `neutrality-tokens.json` (NFR2-NEUT-001, 79 tokens). Loaders: `src/domain/graph/catalog.ts`, `backend/app/catalog.py` (validates at start-up; app refuses to start without it) |
+| 0.3 | `src/domain/graph/` core | **Done** | `types.ts`, `catalog.ts` (palette groups, VI-folding synonym search), `codeName.ts` (NFC, `đ`→`d`, uniqueness), `migrate.ts` (1.0 → 2.0, byte-identical to the shared pair), `containment.ts` (`canNest` per NEST rule, ancestry, depth, `validParents`, effective failure domain per REQ-DES-025), `validate.ts` (L1 = the 19 `INT-*` rules, same codes/paths/order as Python; L2 = NEST-*, DES-W01/W03/W04/W05/W06, DES-I01, warnings only), `hash.ts` (RFC 8785 JCS + NFC + pure-JS SHA-256), `commands.ts` (13 pure commands: add/move/resize/rename/setCodeName/reparent/update/remove(delete or lift)/addEdge/updateEdge/removeEdge/setBinding/setPlacement; refusals carry the NEST or INT code + VI/EN text). A purity test forbids clock, randomness, locale, Web Crypto and browser I/O in these files |
+| 0.4 | Backend integrity + migration 005 | **Done** | `backend/app/graph_integrity.py` (19 rules: duplicate ids/codeNames, dangling edges/parents/bindings/placements/decision refs, containment cycles reported once, depth ≤ 6, unknown role (with the canonical id as a hint) / variant, deployment references). Hooked into the designs request model after shape and size: a violation is a **422 `{detail, requestId}`** naming up to 3 issues. Migration `005_design_document_v2.sql`: triggers keep `designs.schema_version` ∈ {1.0, 2.0} and equal to `graph_json.$.schemaVersion` (a script cannot store a lying row). The designs API accepts **1.0 and 2.0** on POST and PUT (a 1.0 design can be upgraded and back) |
+| 0.5 | Router, SPA fallback, Studio shell | **Done** | `App` = `BrowserRouter` + auth gate; sidebar groups **STUDIO** (Overview `/`, Designs, New guided design, Templates, Knowledge hub, Sizing, Learn - unbuilt ones render a planned screen that already answers its deep links, params shown as text), **ARCHPILOT MODULES** (the 16 screens unchanged at `/m/<key>`, collapsed by default, auto-open on `/m/*`; `/m/sizing` → `/sizing`), **EDITORIAL** (editor/admin only; 404 for members). Routes are generated from each Studio item's patterns, so the breadcrumb and the router cannot disagree. Backend `app/spa.py`: history-API fallback **only** for GET/HEAD, not `/api*`, not `/assets/*`, and only when `Accept` has `text/html`; `index.html` `no-store`, hashed assets `immutable`; CSP on every response (dev-only Swagger exempt). `ARCHPILOT_STATIC_DIR` setting. Not done: focus mode (needs the workspace, Phase 2) |
+
+#### 7.0.2 Red-team review findings applied (docs/reviews/review-design-v2.md)
+
+| Finding | What changed in code |
+|---|---|
+| **B1** reconcile with v2.1 | Catalogue uses the v2.1 role ids and priorities; `zone` container; `failureDomainLevel` + `failureDomainLabel`, `statefulness`, criticality low/medium/high; migration adds **no** deployment (REQ-TGT-003 "unset"); design-v0.2 ids kept only as aliases, and refused on save with the canonical id in the message |
+| **B2** no target data on nodes, no data as keys | Node `realisations.<target>` removed; `deployment.bindings[]`, `placements[]`, `derivations[]` are arrays of values. A 2.0 design response passes the existing camelCase-at-every-depth test; neutrality scan excludes only `$.deployment`. Regression fixture `archgraph.v2-target-keyed-map.invalid.json` |
+| **M6** + coordinator (3) hashing | `hash.ts`: JCS + NFC, `@noble/hashes` (no Web Crypto, works on plain-HTTP pages); golden hash cross-checked with Python `hashlib` |
+| **M9** fallback + CSP | Implemented as specified, with pytest cases for `/api/nope` (JSON 404 whatever the Accept), `/assets/missing.js` (404) and CSP presence |
+| **m2** | `if/then/else` instead of `oneOf`; `brief.context`/`answers` are open camelCase maps |
+| **m3** | ADR text fields ≤ 4000, decisions ≤ 100 |
+| **m4** | `đ`/`Đ` mapped before stripping marks; NFD input folds like NFC |
+
+#### 7.0.3 Deviations from design-v2 v0.2 (for SA#1's v0.3)
+
+1. Role ids and attribute names follow v2.1, not §4.3.1/§4.3.2 (B1).
+2. Target data in `deployment.bindings[]`, not `node.realisations` (B2).
+3. Legacy 1.0 documents migrate with **no** default AWS profile (§4.3.4 said add one; B1g, REQ-TGT-003).
+4. `maxNestingDepth` = **6**, not 4: v2.1 adds `zone`, and design NEST-04/05 already allowed site > network > subnet > cluster > workload (5 levels).
+5. Aliases are resolved by migration only; a 2.0 save with an alias type is refused (INT-UNKNOWN-ROLE + hint) so TS consumers never see two spellings.
+6. NEST rules renumbered for the v2.1 container set (NEST-01..10); `network_segment` may nest in `network_segment` (network > subnet tier).
+7. Home keeps the "Tổng quan / Overview" label: `/` renders the Overview screen until a real Home exists.
+8. Migration 005 carries the schema-version guard; `lesson_id` / `seeded_from_template_id` wait for the migrations that create their target tables.
+
+#### 7.0.4 Evidence (what I actually ran)
+
+| Check | Result |
+|---|---|
+| `ruff check .` | All checks passed |
+| `pytest` | **323 passed** (was 174): new `test_catalog.py` 27, `test_graph_integrity.py` 21, `test_spa.py` 27; `test_contracts.py` 29 → 67, `test_designs.py` 38 → 74 (every integrity fixture POSTed → 422 with its rule code) |
+| `npm test` (vitest) | **387 passed** in 18 files (was 150 in 9): `graph/{catalog 24, codeName 25, migrate 11, containment 23, validate 19, commands 42, hash 18, purity 10}`, `contract` 23 → 68, new `app/routing` 20; `App` 6 unchanged in count (now expands the module group first) |
+| `npm run typecheck` / `npm run build` | clean · `index-*.js 384.27 kB (gzip 118.20 kB)` (was 335 kB; +react-router) |
+| Negative controls | integrity hook removed from `schemas.py` → **20** designs tests fail; `/api` exclusion removed from `spa.py` → **4** fail; dangling-edge rule disabled in `validate.ts` → **5** fail; NEST container rule disabled in `containment.ts` → **6** fail. All restored |
+| Docker image `archpilot:p0` | **Not built.** Docker Desktop 4.91.0 was not running; on start it crashed: `initializing Secrets Engine: listening on unix://C:/Users/DATVT/AppData/Local/docker-secrets-engine/engine.sock: rename ... engine.sock.stale: The file cannot be accessed by the system`. The fix (delete that stale socket file, restart Docker Desktop) touches the user's Docker install, so it was not done. **Do NOT press "Reset to factory defaults"** in its dialog - that wipes `archpilot-data`. `archpilot-v1` was not touched (the engine never came up) |
+| Substitute: the same app with the image's production settings | `ARCHPILOT_ENV=production`, `COOKIE_SECURE=true`, empty CORS, `ARCHPILOT_STATIC_DIR=dist`, throwaway DB, uvicorn on `127.0.0.1:18082`. `create_user tester --role member --password-stdin` → exit 0. `/api/health` → `ok production schema 005`. Login → both cookies `Secure`, passed back as an explicit `Cookie` header. **v2 document** (hybrid fixture) POST → **201**, `schemaVersion 2.0`, 20 nodes, 3 bindings; GET → 200; a 1.0 document → 201. **Invalid** → **422** `{detail, requestId}`: dangling edge (`INT-DANGLING-EDGE edges[0].target: 'n9' is not a node id`), unknown role, legacy id `database` (`use 'relational_db'`), parent cycle (`containment loop n1 -> n3 -> n2 -> n1`), target-keyed map (contract: `'realisations' was unexpected`); nothing stored. **`/hub/anything`** (Accept text/html) → **200 `text/html`**, `no-store`, CSP header, `<div id="root">`. **`/api/nothing`** → **404 `application/json`** `{"detail":"Not Found","requestId":…}` for Accept text/html and application/json. Also: `/hub/anything` as a fetch (`*/*`) → JSON 404; `/assets/index-OLD.js` → 404; the real bundle → `immutable`; POST `/hub/anything` → 405 JSON. Server stopped and data deleted afterwards |
+
+#### 7.0.5 Weakest points (attack these first)
+
+1. **The image was not built or run.** The Dockerfile now copies `contracts/` into the SPA stage and `contracts/catalog/` into the runtime; both are untested in Docker. First thing to run once Docker Desktop is fixed.
+2. **CSP allows Google Fonts** because `src/styles.css` `@import`s them. On an air-gapped host (NFR2-DEP-001) fonts silently fall back. Self-host the fonts, then drop the two origins.
+3. **Two hand-written integrity implementations.** They are held together by 17 shared fixtures, identical paths/messages/order tests and negative controls - not by construction. A rule added to one side only is caught solely if someone adds a shared fixture.
+4. **REQ-DES-026 / US-D2 "two replicas in the same rack label"** cannot be decided from one node's single `failureDomainLabel`; DES-W04 covers "replicas = 1" only. Needs a BA decision (per-replica labels, or spread = child nodes in distinct zones).
+5. **Catalogue breadth vs review M8.** 45 roles ship as data (Must + Should); every role will need a realisation or an explicit "unsupported" per target in T.1.
+6. Design rules are noisy on purpose-built on-prem gear: DES-W04 fires on a single SAN or backup target (stateful, 1 replica). Tune per role in the catalogue if users object.
+
+#### 7.0.6 Next tasks
+
+- **Human:** fix Docker Desktop (delete `%LOCALAPPDATA%\docker-secrets-engine\engine.sock`, restart), then run `docker build -f backend/Dockerfile -t archpilot:p0 .` and the curl script's checks against a throwaway container, then remove it.
+- **senior-developer-2:** review v1.6 (contract 1.1.0 shape, integrity parity, fallback/CSP, command semantics - especially `lift`, and binding/placement normalisation).
+- **SA#1:** fold §7.0.3 into design-v2 v0.3; **BA:** US-D2 label semantics, v2.1 wording for aliases and depth 6.
+- **Engineering, next in plan:** 1.1 HCL IR/printer (E2); 2.1 workspace shell on `@xyflow/react` using `commands.ts` + `validateGraph` (E1); T.1 realisation catalogues as `deployment.bindings` targets; 0.1 remainder (pin the `"latest"` deps); self-host fonts; `design_revisions` (review M5).
 
 ### 7.1 Done and tested
 
@@ -655,7 +724,7 @@ v1.0 stub list.
 | **Workspace store (task 1.4)** | `src/domain/store.ts` async on `src/api/workspace.ts`. Server is the source of truth; `localStorage` key `archpilot.workspace.cache.v2` is an owner-scoped cache, read only when the server is unreachable, cleared on logout. One-time import of the legacy `archpilot.workspace.v1` record on first login (normalised to what the server accepts; never deleted; a marker records the decision). 409 → newer record reloaded, the modal stays open with the typed values and says what happened. Unreachable → edit kept as `pending`, sidebar shows "Not saved to the server" with **Retry**, pushed automatically on the next load (as a conflict if it went stale). `src/features/workspace/useWorkspace.ts` replaces the old `useState(() => loadWorkspace())` |
 | **Benchmarks (task 3.3)** | Migration `004_benchmark_seed.sql` (`origin` column, `benchmark_seed_log`, non-blank `source_title` on every row, edit → `origin=user` trigger). `app/repositories/benchmarks.py` seed: 5 component types × read/write, all `estimated`, URL-less, cited as a generic planning heuristic; runs at every start-up and via `scripts/seed_benchmarks.py`; never updates, never resurrects. `GET /api/benchmarks` for any signed-in user |
 | **Sizing calculator (task 3.4)** | `src/features/sizing/SizingScreen.tsx` replaces the hard-coded HTML: inputs left (peak read/write QPS, payload, peak factor, retention, RF, compression, per-node read/write with "load from benchmark", spare nodes, measured toggle), cards right (nodes, storage, cluster write load, payload bandwidth, review hints). Each card: number + range + confidence tag + formula + substituted formula + assumptions. Shortcut note when a single-benchmark sizing would under-size. `src/domain/sizingCalculator.ts` + `src/domain/benchmarks.ts` hold the logic; the engine is untouched |
-| Test suites | **174 pytest** (`ArchPilot/backend`) · **150 vitest** (`ArchPilot`: 34 sizing + 23 contract + 6 shell + 21 client + 13 login + 14 store + 5 workspace shell + 22 calculator + 12 sizing screen) · `ruff check`, `tsc -b` and `vite build` clean. **CI caveat:** see §7.2 item 5c |
+| Test suites | **v1.6: 323 pytest · 387 vitest** (breakdown in §7.0.4). At v1.5: **174 pytest** (`ArchPilot/backend`) · **150 vitest** (`ArchPilot`: 34 sizing + 23 contract + 6 shell + 21 client + 13 login + 14 store + 5 workspace shell + 22 calculator + 12 sizing screen) · `ruff check`, `tsc -b` and `vite build` clean. **CI caveat:** see §7.2 item 5c |
 
 ### 7.2 Still open — engineering
 
@@ -665,7 +734,7 @@ v1.0 stub list.
 | 1 | ~~No routers for designs, workspaces, benchmarks~~. **Still no routers for sizings, patterns or admin** | 3.6, 4.1, 5.1–5.4 | Workspaces and designs done at v1.4, benchmarks (read-only) at v1.5 |
 | 2 | **No search endpoint.** `patterns_fts` is populated and tested; `search_published_patterns()` is specified (§3.4), not written | 4.2 | All search must route through this one function (`M1`) |
 | 3 | **Frontend wiring, mostly done.** ~~`client.ts`, `auth.ts`~~ (v1.4), ~~`store.ts` async (1.4), `workspace.ts`, `benchmarks.ts`, Sizing calculator (3.4)~~ (v1.5). **Still open:** `graph.ts` (1.5), `designs.ts` + the canvas (2.x). **Known gaps in 3.4:** the engine's `assumptions` strings are English-only (the VI screen labels them as engine output); `headroom` (30%) and `indexOverhead` (30%) are engine defaults shown in the assumptions but not editable; scenarios are not saved yet (3.6) | 1.5, 2.x, 3.6 | — |
-| 3b | **Referential integrity of stored graphs is not checked server-side.** The API accepts a graph whose edge names a missing node, or two nodes with one id — JSON Schema cannot say otherwise (item 11) | 1.5 | When 1.5 decides which `validateGraph()` rules are hard errors (not warnings — `REQ-DESIGN-007` wants an orphan to warn and still save), mirror **only those** in the designs router. ~20 lines |
+| 3b | ~~**Referential integrity of stored graphs is not checked server-side.**~~ **Done at v1.6** (v2 task 0.4, §7.0): `app/graph_integrity.py`, 19 shared `INT-*` rules, 422 on violation, for 1.0 and 2.0 documents. Original note: the API accepted a graph whose edge names a missing node, or two nodes with one id — JSON Schema cannot say otherwise (item 11) | 1.5 | When 1.5 decides which `validateGraph()` rules are hard errors (not warnings — `REQ-DESIGN-007` wants an orphan to warn and still save), mirror **only those** in the designs router. ~20 lines |
 | 3c | **No HTTP body-size limit.** The 1 MiB graph cap runs after the body is parsed; uvicorn itself has no limit | 7.x | Put `client_max_body_size` on the TLS proxy in front of the container (devops), or a small ASGI guard |
 | 4 | ~~**`main.tsx` is still one 292-line file**~~ | 1.1 | **Done at v1.3.** See §3.5.3 |
 | 5 | ~~**No CI.**~~ **`mypy --strict` and `ruff format --check` are still not in CI** | 0.7 (partial) | **CI done at v1.3** (`ruff check` + `pytest` × {3.12, 3.10}, `tsc -b` + vitest + `vite build` on Node 24). Two deliberate gaps: (i) `ruff format --check` would rewrite **16 of 26** Python files, and a whole-tree reformat landing with a refactor makes both unreviewable — run `ruff format .` once on its own, then add the check; (ii) `mypy --strict` (m12) was not attempted and its cost is unmeasured. Both are ~0.25 pd each |

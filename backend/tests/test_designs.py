@@ -195,6 +195,107 @@ def test_every_archgraph_fixture_in_the_shared_manifest_gets_the_same_verdict_fr
         assert "ArchGraph contract" in detail
 
 
+INTEGRITY_CASES = MANIFEST["integrityCases"]
+HYBRID = json.loads((FIXTURES_DIR / "archgraph.v2-hybrid-orders.valid.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("case", INTEGRITY_CASES, ids=lambda c: c["fixture"])
+def test_every_integrity_fixture_is_rejected_by_the_api_with_its_rule_code(user_a, case):
+    """Task 0.4: corrupt documents are refused, in the contract error shape,
+    and the detail names the shared rule code, so a user (or the SPA) can match
+    it to the same rule validateGraph() reports in the browser."""
+    graph = json.loads((FIXTURES_DIR / case["fixture"]).read_text(encoding="utf-8"))
+    response = user_a.post(URL, json={"name": case["fixture"], "graph": graph})
+    assert response.status_code == 422, response.text
+    body = response.json()
+    assert set(body) == {"detail", "requestId"}
+    assert "graph failed integrity checks" in body["detail"]
+    assert case["expectRule"] in body["detail"]
+    assert user_a.get(URL).json()["total"] == 0, "nothing was stored"
+
+
+def test_a_v2_document_round_trips_unchanged_and_lists_as_schema_2(user_a):
+    design = create(user_a, "Hybrid orders", HYBRID)
+    assert design["schemaVersion"] == "2.0"
+    assert design["graph"] == HYBRID
+    assert user_a.get(f"{URL}/{design['id']}").json()["graph"] == HYBRID
+    assert user_a.get(URL).json()["items"][0]["schemaVersion"] == "2.0"
+
+
+def test_a_v1_design_can_be_upgraded_to_v2_by_put_and_downgraded_back(user_a):
+    """The SPA migrates on load and saves 2.0; an older tab may still save 1.0.
+    The API accepts both on every write (the revision check still applies)."""
+    design = create(user_a, graph=CHECKOUT)
+    path = f"{URL}/{design['id']}"
+    upgraded = user_a.put(path, json={"name": "x", "graph": HYBRID, "revision": 1})
+    assert upgraded.status_code == 200, upgraded.text
+    assert (upgraded.json()["schemaVersion"], upgraded.json()["revision"]) == ("2.0", 2)
+    back = user_a.put(path, json={"name": "x", "graph": CHECKOUT, "revision": 2})
+    assert back.status_code == 200, back.text
+    assert back.json()["schemaVersion"] == "1.0"
+
+
+def test_an_unknown_role_is_rejected_and_the_detail_names_the_canonical_id(user_a):
+    graph = copy.deepcopy(HYBRID)
+    graph["nodes"][12]["type"] = "database"  # the design-v0.2 / 1.0 id of relational_db
+    detail = user_a.post(URL, json={"name": "x", "graph": graph}).json()["detail"]
+    assert "INT-UNKNOWN-ROLE nodes[12].type" in detail
+    assert "'relational_db'" in detail
+
+
+def test_an_integrity_error_on_update_leaves_the_stored_design_untouched(user_a):
+    design = create(user_a, graph=HYBRID)
+    broken = copy.deepcopy(HYBRID)
+    broken["edges"][0]["target"] = "n_deleted"
+    response = user_a.put(f"{URL}/{design['id']}", json={"name": "x", "graph": broken, "revision": 1})
+    assert response.status_code == 422
+    stored = user_a.get(f"{URL}/{design['id']}").json()
+    assert (stored["revision"], stored["graph"]) == (1, HYBRID)
+
+
+def test_many_integrity_issues_are_summarised_not_echoed(user_a):
+    graph = copy.deepcopy(HYBRID)
+    for edge in graph["edges"]:
+        edge["target"] = "n_gone"
+    detail = user_a.post(URL, json={"name": "x", "graph": graph}).json()["detail"]
+    assert detail.count("INT-DANGLING-EDGE") == 3
+    assert "(+5 more)" in detail
+
+
+def test_the_storage_layer_refuses_a_schema_version_that_disagrees_with_the_document(user_a, migrated_db):
+    """Migration 005: a script that bypasses the API still cannot store a
+    document whose schema_version column lies about graph_json."""
+    import sqlite3
+
+    design = create(user_a, graph=CHECKOUT)
+    with pytest.raises(sqlite3.IntegrityError, match=r"schema_version must be 1\.0 or 2\.0"):
+        migrated_db.execute("UPDATE designs SET schema_version = '2.0' WHERE id = ?", (design["id"],))
+    with pytest.raises(sqlite3.IntegrityError, match=r"schema_version must be 1\.0 or 2\.0"):
+        migrated_db.execute(
+            "UPDATE designs SET graph_json = ?, schema_version = '3.0' WHERE id = ?",
+            ('{"schemaVersion":"3.0","nodes":[],"edges":[]}', design["id"]),
+        )
+    migrated_db.execute(
+        "UPDATE designs SET graph_json = ?, schema_version = '2.0' WHERE id = ?",
+        (json.dumps(HYBRID), design["id"]),
+    )
+    assert user_a.get(f"{URL}/{design['id']}").json()["schemaVersion"] == "2.0"
+
+
+def test_a_missing_catalogue_fails_at_startup_not_on_first_save(temp_settings, monkeypatch, tmp_path):
+    from app import catalog
+    from app.main import create_app
+
+    monkeypatch.setenv("ARCHPILOT_CATALOG_DIR", str(tmp_path))
+    catalog.load_catalog.cache_clear()
+    try:
+        with pytest.raises(FileNotFoundError, match="component catalogue"):
+            create_app()
+    finally:
+        monkeypatch.delenv("ARCHPILOT_CATALOG_DIR")
+        catalog.load_catalog.cache_clear()
+
+
 def test_contract_errors_name_the_offending_path(user_a):
     graph = copy.deepcopy(CHECKOUT)
     graph["nodes"][1]["type"] = "mainframe"

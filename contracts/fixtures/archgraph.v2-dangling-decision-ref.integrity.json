@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "2.0",
+  "settings": {
+    "codeName": "broken_design",
+    "environment": "dev"
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "service",
+      "label": "Orders Api",
+      "codeName": "orders_api",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "n2",
+      "type": "relational_db",
+      "label": "Orders Db",
+      "codeName": "orders_db",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [],
+  "decisions": [
+    {
+      "id": "adr1",
+      "number": 1,
+      "title": "Use a relational store",
+      "status": "accepted",
+      "linkedNodeIds": [
+        "n2",
+        "n404"
+      ]
+    }
+  ]
+}

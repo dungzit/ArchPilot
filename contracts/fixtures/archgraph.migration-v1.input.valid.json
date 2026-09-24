@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0",
+  "nodes": [
+    { "id": "n_client", "type": "client", "label": "Người dùng", "position": { "x": 0, "y": 0 } },
+    { "id": "n_lb", "type": "load_balancer", "label": "Cổng vào", "position": { "x": 220, "y": 0 } },
+    {
+      "id": "n_orders",
+      "type": "service",
+      "label": "Đơn hàng API",
+      "position": { "x": 440, "y": 0 },
+      "rationale": "Split out of the monolith so checkout scales independently.",
+      "sizingScenarioId": "siz_7c1f2a",
+      "props": { "runtime": "java21", "replicas": 4 }
+    },
+    { "id": "n_orders_2", "type": "service", "label": "Đơn hàng API", "position": { "x": 440, "y": 160 } },
+    { "id": "n_db", "type": "database", "label": "ĐƠN HÀNG (Postgres)", "position": { "x": 660, "y": -90 } },
+    { "id": "n_pay", "type": "external_api", "label": "Cổng thanh toán", "position": { "x": 880, "y": 0 } },
+    { "id": "n_fraud", "type": "external_api", "label": "3rd-party fraud check", "position": { "x": 880, "y": 160 } },
+    { "id": "n_media", "type": "object_store", "label": "Ảnh sản phẩm", "position": { "x": 660, "y": 90 } },
+    { "id": "n_note", "type": "note", "label": "Peak = 3x", "position": { "x": 440, "y": 300 } },
+    { "id": "n_sym", "type": "cache", "label": "***", "position": { "x": 660, "y": 300 } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n_client", "target": "n_lb", "label": "HTTPS", "direction": "forward" },
+    { "id": "e2", "source": "n_lb", "target": "n_orders", "label": "routes to", "direction": "forward" },
+    { "id": "e3", "source": "n_orders", "target": "n_db", "label": "writes to", "direction": "forward", "rationale": "Synchronous write." },
+    { "id": "e4", "source": "n_orders", "target": "n_pay", "label": "", "direction": "bidirectional" }
+  ]
+}

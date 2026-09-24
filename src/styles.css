@@ -114,3 +114,17 @@ button { cursor: pointer; }
 .calc-hints .calc-help { margin-top: 10px; }
 .calc-paused { font-size: 12px; color: #9a4b1c; background: #fff7f5; }
 @media (max-width: 980px) { .calc-two { grid-template-columns: 1fr; } }
+
+/* Task 0.5 - Studio navigation shell: three sidebar groups, planned and 404 screens. */
+.sidebar-scroll { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; min-height: 0; flex: 1 1 auto; margin-bottom: 12px; }
+.studio-nav, .module-nav, .editorial-nav { display: flex; flex-direction: column; gap: 4px; }
+.nav-soon { margin-left: auto; font-size: 8px; font-family: 'DM Mono', monospace; letter-spacing: .05em; color: #7d9aa5; border: 1px solid #2c4e63; border-radius: 6px; padding: 1px 5px; }
+.nav-group-toggle { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; color: #6d909b; font-family: 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; font-size: 9px; font-weight: 500; padding: 4px 12px 9px; cursor: pointer; text-align: left; }
+.nav-group-toggle:hover, .nav-group-toggle:focus-visible { color: #dce9ed; }
+.nav-item:focus-visible, .nav-group-toggle:focus-visible { outline: 2px solid #79d7bd; outline-offset: 1px; }
+a.nav-item { text-decoration: none; }
+.planned-panel { display: flex; gap: 14px; align-items: flex-start; padding: 20px 22px; }
+.planned-panel p { margin: 6px 0 0; }
+.planned-params code, .not-found-screen code { font-family: 'DM Mono', monospace; font-size: 12px; overflow-wrap: anywhere; }
+a.secondary-button, a.primary-button { text-decoration: none; display: inline-flex; align-items: center; }
+@media (max-width: 800px) { .nav-soon, .nav-group-toggle span { display: none; } }

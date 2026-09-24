@@ -12,12 +12,14 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@noble/hashes": "2.4.0",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "react-router": "7.18.4",
     "typescript": "latest",
     "vite": "latest"
   },

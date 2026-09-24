@@ -23,6 +23,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstra
 from pydantic.alias_generators import to_camel
 
 from .contract import validate_archgraph
+from .graph_integrity import assert_integrity
 
 Role = Literal["member", "editor", "admin"]
 
@@ -41,12 +42,20 @@ OptionalText = Annotated[str, StringConstraints(strip_whitespace=True, max_lengt
 
 
 def _check_archgraph(value: dict[str, Any]) -> dict[str, Any]:
-    """Validate against contracts/archgraph.schema.json - the same file both
-    test suites use. No second definition of the graph shape exists in Python."""
+    """Three gates, cheapest first, each a 422 in the {detail, requestId} envelope:
+
+    1. shape - contracts/archgraph.schema.json, the same file both test suites
+       use (schema 1.0 or 2.0). No second definition exists in Python;
+    2. size - the 1 MiB resource cap;
+    3. L1 integrity - app/graph_integrity.py: unique ids and codeNames, no
+       dangling edges/parents/bindings/placements/decision links, no
+       containment cycles, depth, and catalogue membership of 2.0 node types.
+    """
     validate_archgraph(value)
     size = len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     if size > MAX_GRAPH_BYTES:
         raise ValueError(f"graph is {size} bytes; the limit is {MAX_GRAPH_BYTES}")
+    assert_integrity(value)
     return value
 
 

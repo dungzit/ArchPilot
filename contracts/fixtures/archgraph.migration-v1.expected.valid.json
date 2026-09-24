@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "2.0",
+  "settings": { "codeName": "design", "environment": "dev", "catalogueVersion": "1.0.0" },
+  "nodes": [
+    { "id": "n_client", "type": "client", "label": "Người dùng", "codeName": "nguoi_dung", "position": { "x": 0, "y": 0 } },
+    { "id": "n_lb", "type": "load_balancer", "label": "Cổng vào", "codeName": "cong_vao", "position": { "x": 220, "y": 0 } },
+    {
+      "id": "n_orders",
+      "type": "service",
+      "label": "Đơn hàng API",
+      "codeName": "don_hang_api",
+      "position": { "x": 440, "y": 0 },
+      "config": { "runtime": "java21", "replicas": 4 },
+      "rationale": "Split out of the monolith so checkout scales independently.",
+      "sizing": { "scenarioId": "siz_7c1f2a", "stale": true }
+    },
+    { "id": "n_orders_2", "type": "service", "label": "Đơn hàng API", "codeName": "don_hang_api_2", "position": { "x": 440, "y": 160 } },
+    { "id": "n_db", "type": "relational_db", "label": "ĐƠN HÀNG (Postgres)", "codeName": "don_hang_postgres", "position": { "x": 660, "y": -90 } },
+    { "id": "n_pay", "type": "external_service", "label": "Cổng thanh toán", "codeName": "cong_thanh_toan", "position": { "x": 880, "y": 0 } },
+    { "id": "n_fraud", "type": "external_service", "label": "3rd-party fraud check", "codeName": "external_service_3rd_party_fraud_check", "position": { "x": 880, "y": 160 } },
+    { "id": "n_media", "type": "object_storage", "label": "Ảnh sản phẩm", "codeName": "anh_san_pham", "position": { "x": 660, "y": 90 } },
+    { "id": "n_note", "type": "note", "label": "Peak = 3x", "codeName": "peak_3x", "position": { "x": 440, "y": 300 } },
+    { "id": "n_sym", "type": "cache", "label": "***", "codeName": "cache", "position": { "x": 660, "y": 300 } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n_client", "target": "n_lb", "label": "HTTPS", "direction": "forward", "kind": "flow" },
+    { "id": "e2", "source": "n_lb", "target": "n_orders", "label": "routes to", "direction": "forward", "kind": "flow" },
+    { "id": "e3", "source": "n_orders", "target": "n_db", "label": "writes to", "direction": "forward", "kind": "flow", "rationale": "Synchronous write." },
+    { "id": "e4", "source": "n_orders", "target": "n_pay", "label": "", "direction": "bidirectional", "kind": "flow" }
+  ]
+}

@@ -2,20 +2,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://archpilot.internal/contracts/archgraph.schema.json",
   "title": "ArchPilot wire contract",
-  "version": "1.0.0",
-  "description": "Single source of truth for the shapes that cross the Python/TypeScript boundary. Build-scope decision D2 replaced the architects' shared `packages/core` with a Python backend, so nothing in the toolchain reconciles the two languages any more; this file is the replacement (decision D4). It covers (1) the ArchGraph shape shared by designs and patterns, and (2) three envelope rules, because the review of 2026-09-23 found that envelope drift - not graph drift - caused the first real bug. Validated by ArchPilot/backend/tests/test_contracts.py (jsonschema) and ArchPilot/src/contracts/contract.test.ts (ajv), both driven by fixtures/index.json. Deliberately NOT an OpenAPI document and deliberately not code-generated: at 2-4 users and one graph type a hand-maintained schema plus shared fixtures is right-sized.",
+  "version": "1.1.0",
+  "description": "Single source of truth for the shapes that cross the Python/TypeScript boundary. Build-scope decision D2 replaced the architects' shared `packages/core` with a Python backend, so nothing in the toolchain reconciles the two languages any more; this file is the replacement (decision D4). It covers (1) the ArchGraph design document shared by designs and patterns - schema 1.0 (flat graph) and schema 2.0 (design-v2 D-08: graph + deployment + brief + decisions + derivations), and (2) three envelope rules, because the review of 2026-09-23 found that envelope drift - not graph drift - caused the first real bug. Validated by ArchPilot/backend/tests/test_contracts.py (jsonschema) and ArchPilot/src/contracts/contract.test.ts (ajv), both driven by fixtures/index.json, and at runtime by backend/app/contract.py. Contract 1.1.0 is additive: every 1.0 document that was valid is still valid. Deliberately NOT an OpenAPI document and deliberately not code-generated.",
 
   "$defs": {
 
     "camelCaseKey": {
       "title": "Envelope rule (a) - wire casing",
-      "description": "Every key that crosses the HTTP boundary is camelCase. The SPA's domain types are camelCase throughout (WorkspaceRecord.projectName, EntityEnvelope.schemaVersion, SizingResult.formulaVersion); Python is snake_case. The wire picks camelCase once, here. Backend side: app/schemas.py ApiModel sets alias_generator=to_camel.",
+      "description": "Every key that crosses the HTTP boundary is camelCase, at every depth, including inside an ArchGraph 2.0 document. The SPA's domain types are camelCase throughout (WorkspaceRecord.projectName, EntityEnvelope.schemaVersion, SizingResult.formulaVersion); Python is snake_case. The wire picks camelCase once, here. Backend side: app/schemas.py ApiModel sets alias_generator=to_camel. Consequence for 2.0 (red-team review B2): data never becomes a key. Target ids, node ids and artifact names travel as VALUES inside arrays of objects (deployment.bindings, scenario.placements, derivations), never as map keys.",
       "type": "string",
       "pattern": "^[a-z][A-Za-z0-9]*$"
     },
 
     "camelCaseObject": {
-      "description": "Recursively asserts envelope rule (a) over a whole response body. Point any live API response at this to prove no snake_case key slipped in at any depth.",
+      "description": "Recursively asserts envelope rule (a) over a whole response body. Point any live API response at this to prove no snake_case key slipped in at any depth - including a design response that carries a 2.0 graph.",
       "type": "object",
       "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
       "additionalProperties": { "$ref": "#/$defs/camelCaseValue" }
@@ -48,8 +48,28 @@
       "additionalProperties": false
     },
 
+    "archGraph": {
+      "title": "ArchGraph - the one design document, dispatched on schemaVersion",
+      "description": "A user design and a reference pattern serialise to the identical document (architects' decision D1). `schemaVersion` selects the shape: '2.0' is validated as archGraphV2; anything else (including a missing version) is validated as archGraphV1, which is what every document before contract 1.1.0 was. KNOWN LIMIT: JSON Schema cannot express referential integrity, so 'every edge.source names an existing node.id', 'ids are unique', 'no parent cycles' and 'type is a catalogue role' are NOT checked here - they belong to the L1 integrity layer: backend/app/graph_integrity.py and validateGraph() in src/domain/graph/validate.ts, which share the rule codes listed in fixtures/index.json `integrityCases`. This file checks shape; the integrity layer checks consistency.",
+      "type": "object",
+      "required": ["schemaVersion"],
+      "properties": {
+        "schemaVersion": {
+          "description": "Pinned (NFR-EXT-002 / NFR2-EXT-004). Adding a version here is the deliberate act that says a migration function exists in src/domain/graph/migrate.ts.",
+          "type": "string",
+          "enum": ["1.0", "2.0"]
+        }
+      },
+      "if": {
+        "required": ["schemaVersion"],
+        "properties": { "schemaVersion": { "const": "2.0" } }
+      },
+      "then": { "$ref": "#/$defs/archGraphV2" },
+      "else": { "$ref": "#/$defs/archGraphV1" }
+    },
+
     "nodeType": {
-      "description": "Fixed palette (REQ-DESIGN-002). Adding a member is an additive, one-line edit here plus PALETTE in src/domain/graph.ts; that edit is the point of this file, not an obstacle to it. Renaming or removing one requires an ArchGraph schemaVersion bump.",
+      "description": "Schema 1.0 fixed palette (REQ-DESIGN-002). Frozen: schema 2.0 replaced the enum with catalogue roles (contracts/catalog/components.json); the 1.0 -> 2.0 type map is the catalogue's `legacyTypes['1.0']`.",
       "type": "string",
       "enum": [
         "client",
@@ -76,6 +96,7 @@
     },
 
     "archNode": {
+      "description": "Schema 1.0 node. Frozen.",
       "type": "object",
       "required": ["id", "type", "label", "position"],
       "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
@@ -87,7 +108,7 @@
         "rationale": { "type": "string", "maxLength": 4000 },
         "sizingScenarioId": { "type": "string", "minLength": 1, "maxLength": 64 },
         "props": {
-          "description": "The extension point (NFR-EXT-002). Adding a props key is additive and needs no change to this file; that is why the node object itself can afford to be closed.",
+          "description": "The 1.0 extension point (NFR-EXT-002). Becomes `config` in 2.0.",
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
           "additionalProperties": { "type": ["string", "number"] }
@@ -97,6 +118,7 @@
     },
 
     "archEdge": {
+      "description": "Schema 1.0 edge. Frozen.",
       "type": "object",
       "required": ["id", "source", "target", "label", "direction"],
       "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
@@ -115,20 +137,402 @@
       "additionalProperties": false
     },
 
-    "archGraph": {
-      "title": "ArchGraph - the one graph shape",
-      "description": "A user design and a reference pattern serialise to the identical document (architects' decision D1), which is what makes REQ-HUB-007 'apply to canvas' a deep copy with new IDs and REQ-HUB-008 'compare' a set diff. KNOWN LIMIT: JSON Schema cannot express referential integrity, so 'every edge.source names an existing node.id' and 'node ids are unique' are NOT checked here - they belong to validateGraph() in src/domain/graph.ts (task 1.5). This file checks shape; validateGraph() checks consistency.",
+    "archGraphV1": {
+      "title": "ArchGraph 1.0 - flat graph (frozen)",
       "type": "object",
       "required": ["schemaVersion", "nodes", "edges"],
       "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
       "properties": {
-        "schemaVersion": {
-          "description": "Pinned (NFR-EXT-002). Adding '1.1' here is the deliberate act that says a migration function exists in src/domain/graph.ts.",
-          "type": "string",
-          "enum": ["1.0"]
-        },
+        "schemaVersion": { "type": "string", "enum": ["1.0"] },
         "nodes": { "type": "array", "items": { "$ref": "#/$defs/archNode" } },
         "edges": { "type": "array", "items": { "$ref": "#/$defs/archEdge" } }
+      },
+      "additionalProperties": false
+    },
+
+    "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+
+    "roleId": {
+      "description": "A logical role id from contracts/catalog/components.json (requirements v2.1 section 4.1.1). The pattern is the contract; catalogue membership is the L1 integrity check (design-v2 D-03), so growing the taxonomy never needs a contract change.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,39}$"
+    },
+
+    "codeName": {
+      "description": "Stable identifier used in generated code and resource addresses (REQ-DES-008). Set once from the label; renaming the label does not change it.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,39}$"
+    },
+
+    "targetId": {
+      "description": "A deployment target kind (aws, vsphere, bare_metal, ...) or a target profile id. Target ids are data, so this is a pattern, not an enum. Only ever used as a VALUE (review B2).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,23}$"
+    },
+
+    "configValue": {
+      "anyOf": [
+        { "type": "string", "maxLength": 2000 },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "array", "maxItems": 100, "items": { "type": "string", "maxLength": 200 } }
+      ]
+    },
+
+    "configMap": {
+      "description": "An open map of scalars (or string lists) with camelCase keys. Which keys are meaningful is catalogue or question-catalogue data, checked in TypeScript, so adding a field needs no contract release.",
+      "type": "object",
+      "maxProperties": 100,
+      "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
+      "additionalProperties": { "$ref": "#/$defs/configValue" }
+    },
+
+    "semver": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+
+    "settings": {
+      "type": "object",
+      "required": ["codeName", "environment"],
+      "properties": {
+        "codeName": { "$ref": "#/$defs/codeName" },
+        "environment": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,15}$" },
+        "catalogueVersion": {
+          "description": "The components.json version this document was last edited against (review M6/M7: an upstream input of bindings and suggestions).",
+          "$ref": "#/$defs/semver"
+        },
+        "readmeMd": { "type": "string", "maxLength": 20000 }
+      },
+      "additionalProperties": false
+    },
+
+    "nodeAttributes": {
+      "description": "Neutral attributes common to every role - requirements v2.1 REQ-DES-024 and REQ-DES-025 names (statefulness, failureDomainLevel, failureDomainLabel), plus design-v2's sizeClass. The enums are mirrored by the catalogue's `attributes` list; a test in each suite asserts they agree. Absent = the role default from the catalogue (containers of type site and zone supply failure-domain defaults to their children).",
+      "type": "object",
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "statefulness": { "enum": ["stateless", "stateful"] },
+        "failureDomainLevel": { "enum": ["host", "rack", "zone", "site", "region"] },
+        "failureDomainLabel": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "tier": { "enum": ["edge", "web", "app", "data", "mgmt"] },
+        "criticality": { "enum": ["low", "medium", "high"] },
+        "dataClassification": { "enum": ["public", "internal", "confidential", "restricted"] },
+        "sizeClass": { "enum": ["XS", "S", "M", "L", "XL"] },
+        "owner": { "type": "string", "maxLength": 120 }
+      },
+      "additionalProperties": false
+    },
+
+    "sizingAttachment": {
+      "description": "Summary of a sizing scenario attached to a node (design-v2 D-11). The full scenario lives in sizing_scenarios; staleness is tracked by `derivations`. `stale: true` is what migration writes for a 1.0 `sizingScenarioId`, whose numbers were never copied into the graph.",
+      "type": "object",
+      "required": ["scenarioId"],
+      "properties": {
+        "scenarioId": { "$ref": "#/$defs/id" },
+        "formulaVersion": { "type": "string", "maxLength": 20 },
+        "confidence": { "enum": ["measured", "declared", "estimated", "unverified"] },
+        "summary": {
+          "type": "object",
+          "maxProperties": 20,
+          "propertyNames": { "$ref": "#/$defs/camelCaseKey" },
+          "additionalProperties": { "type": "number" }
+        },
+        "stale": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+
+    "archNodeV2": {
+      "description": "A provider-neutral node (NFR2-NEUT-001): logical role, neutral attributes and neutral role config. Everything target-specific lives in deployment.bindings (review B2).",
+      "type": "object",
+      "required": ["id", "type", "label", "codeName", "position"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "$ref": "#/$defs/roleId" },
+        "variant": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,39}$" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "codeName": { "$ref": "#/$defs/codeName" },
+        "position": {
+          "description": "Relative to the parent container when parentId is set.",
+          "$ref": "#/$defs/position"
+        },
+        "size": {
+          "type": "object",
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "number", "exclusiveMinimum": 0, "maximum": 100000 },
+            "height": { "type": "number", "exclusiveMinimum": 0, "maximum": 100000 }
+          },
+          "additionalProperties": false
+        },
+        "parentId": { "$ref": "#/$defs/id" },
+        "attributes": { "$ref": "#/$defs/nodeAttributes" },
+        "config": {
+          "description": "Neutral, role-specific configuration (catalogue field descriptors). Never provider-specific.",
+          "$ref": "#/$defs/configMap"
+        },
+        "rationale": { "type": "string", "maxLength": 4000 },
+        "sizing": { "$ref": "#/$defs/sizingAttachment" },
+        "annotation": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string", "maxLength": 4000 },
+            "shape": { "enum": ["rect", "ellipse"] }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "edgeMode": {
+      "description": "Mirrored by the catalogue's `edgeModes`; a test in each suite asserts they agree.",
+      "enum": ["connect", "read", "write", "read_write", "send", "consume", "send_consume", "publish", "deliver", "replicate"]
+    },
+
+    "archEdgeV2": {
+      "type": "object",
+      "required": ["id", "source", "target", "label", "direction", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "source": { "$ref": "#/$defs/id" },
+        "target": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "maxLength": 120 },
+        "direction": { "enum": ["forward", "bidirectional"] },
+        "kind": {
+          "description": "REQ-DES-005: flow = visual only, no code; access = the source uses the target, so adapters may derive firewall rules, permissions and references (design-v2 D-09).",
+          "enum": ["flow", "access"]
+        },
+        "mode": { "$ref": "#/$defs/edgeMode" },
+        "protocol": { "enum": ["tcp", "udp", "http", "https", "grpc", "amqp", "mqtt", "sql", "nfs", "smb", "iscsi", "other"] },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "rationale": { "type": "string", "maxLength": 4000 }
+      },
+      "additionalProperties": false
+    },
+
+    "targetProfile": {
+      "type": "object",
+      "required": ["id", "target", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/targetId" },
+        "target": { "$ref": "#/$defs/targetId" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "options": { "$ref": "#/$defs/configMap" },
+        "iacAdapter": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,39}$" }
+      },
+      "additionalProperties": false
+    },
+
+    "binding": {
+      "description": "A node's realisation on one target (review B2 / alternative A2). Bindings for every target a node was ever configured on are kept, so re-targeting away and back is lossless (REQ-TGT-005).",
+      "type": "object",
+      "required": ["nodeId", "target", "realisation"],
+      "properties": {
+        "nodeId": { "$ref": "#/$defs/id" },
+        "target": { "$ref": "#/$defs/targetId" },
+        "realisation": {
+          "description": "A realisation id from that target's catalogue: `<target>.<name>`.",
+          "type": "string",
+          "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$",
+          "maxLength": 80
+        },
+        "config": { "$ref": "#/$defs/configMap" }
+      },
+      "additionalProperties": false
+    },
+
+    "placement": {
+      "type": "object",
+      "required": ["nodeId", "profileId"],
+      "properties": {
+        "nodeId": { "$ref": "#/$defs/id" },
+        "profileId": { "$ref": "#/$defs/targetId" }
+      },
+      "additionalProperties": false
+    },
+
+    "scenario": {
+      "type": "object",
+      "required": ["id", "label", "defaultProfileId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "defaultProfileId": { "$ref": "#/$defs/targetId" },
+        "placements": {
+          "description": "Per-node profile overrides (hybrid; REQ-TGT-003 Should). The v1 UI may show a single implicit scenario (review A6); the shape is here so v1.1 needs no data migration.",
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/$defs/placement" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "deployment": {
+      "title": "Deployment-target layer (design-v2 4.3.5 as corrected by review B2)",
+      "description": "Absent = no target chosen yet (REQ-TGT-003 default: unset). Templates and patterns carry no deployment (REQ-TPL-004). This is the ONLY subtree of a design document that may contain provider terms; the neutrality scan excludes it and nothing else.",
+      "type": "object",
+      "required": ["profiles", "scenarios"],
+      "properties": {
+        "profiles": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/targetProfile" } },
+        "bindings": { "type": "array", "maxItems": 5000, "items": { "$ref": "#/$defs/binding" } },
+        "scenarios": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/scenario" } },
+        "activeScenarioId": { "$ref": "#/$defs/id" }
+      },
+      "additionalProperties": false
+    },
+
+    "assumption": {
+      "type": "object",
+      "required": ["key", "value"],
+      "properties": {
+        "key": { "$ref": "#/$defs/camelCaseKey" },
+        "value": { "$ref": "#/$defs/configValue" },
+        "reason": { "type": "string", "maxLength": 500 }
+      },
+      "additionalProperties": false
+    },
+
+    "bilingualText": {
+      "type": "object",
+      "properties": {
+        "en": { "type": "string", "maxLength": 2000 },
+        "vi": { "type": "string", "maxLength": 2000 }
+      },
+      "additionalProperties": false
+    },
+
+    "suggestion": {
+      "type": "object",
+      "required": ["ruleId", "state"],
+      "properties": {
+        "ruleId": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]{1,39}$" },
+        "role": { "$ref": "#/$defs/roleId" },
+        "variant": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,39}$" },
+        "state": { "enum": ["pending", "accepted", "dismissed"] },
+        "nodeId": { "$ref": "#/$defs/id" },
+        "because": { "$ref": "#/$defs/bilingualText" }
+      },
+      "additionalProperties": false
+    },
+
+    "brief": {
+      "title": "Wizard answers and derived artifacts (REQ-WIZ-*, design-v2 4.2.9 / 4.3.8)",
+      "description": "`context` and `answers` are open maps (review m2): the question catalogue is data, validated in TypeScript, so a new wizard question needs no contract release.",
+      "type": "object",
+      "properties": {
+        "context": { "$ref": "#/$defs/configMap" },
+        "answers": { "$ref": "#/$defs/configMap" },
+        "assumptions": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/assumption" } },
+        "capacity": {
+          "type": "object",
+          "required": ["formulaVersion", "tiers"],
+          "properties": {
+            "formulaVersion": { "type": "string", "maxLength": 20 },
+            "tiers": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "required": ["tier"],
+                "properties": {
+                  "tier": { "$ref": "#/$defs/camelCaseKey" },
+                  "inputs": { "type": "object", "maxProperties": 50, "propertyNames": { "$ref": "#/$defs/camelCaseKey" }, "additionalProperties": { "type": "number" } },
+                  "results": { "type": "object", "maxProperties": 50, "propertyNames": { "$ref": "#/$defs/camelCaseKey" }, "additionalProperties": { "type": "number" } },
+                  "confidence": { "enum": ["measured", "declared", "estimated", "unverified"] }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "suggestions": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/suggestion" } },
+        "ruleSetVersion": { "$ref": "#/$defs/semver" }
+      },
+      "additionalProperties": false
+    },
+
+    "decisionRecord": {
+      "title": "ADR light (REQ-ART-006, design-v2 4.3.9)",
+      "description": "Free text is capped at 4000 characters per field and the log at 100 records (review m3), so ADRs cannot crowd out the graph under the 1 MiB cap.",
+      "type": "object",
+      "required": ["id", "number", "title", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "number": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "status": { "enum": ["proposed", "accepted", "superseded", "rejected"] },
+        "context": { "type": "string", "maxLength": 4000 },
+        "options": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "pros": { "type": "string", "maxLength": 2000 },
+              "cons": { "type": "string", "maxLength": 2000 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "decision": { "type": "string", "maxLength": 4000 },
+        "consequences": { "type": "string", "maxLength": 4000 },
+        "linkedNodeIds": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/id" } },
+        "source": {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["manual", "suggestion", "realisation", "template"] },
+            "ref": { "type": "string", "maxLength": 80 }
+          },
+          "additionalProperties": false
+        },
+        "supersedes": { "$ref": "#/$defs/id" },
+        "author": { "type": "string", "maxLength": 120 },
+        "date": {
+          "description": "A calendar date, not a timestamp: the day the decision was taken.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "artifactName": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z][A-Za-z0-9]*([.][a-z][A-Za-z0-9]*)*$"
+    },
+
+    "derivation": {
+      "description": "`artifact` was derived from `upstream` when upstream's canonical content hashed to `hash` (REQ-ART-002, design-v2 4.3.10). Stored as an array of values (review B2), so artifact names such as brief.answers never become keys.",
+      "type": "object",
+      "required": ["artifact", "upstream", "hash"],
+      "properties": {
+        "artifact": { "$ref": "#/$defs/artifactName" },
+        "upstream": { "$ref": "#/$defs/artifactName" },
+        "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "hashVersion": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+
+    "archGraphV2": {
+      "title": "ArchGraph 2.0 - the design document (design-v2 D-08)",
+      "description": "Logical graph (provider-neutral nodes and edges) plus the deployment-target layer, the wizard brief, the decision log and the outdated-tracking derivations, in one document so the existing designs API, revisions, 409 handling and 1 MiB cap apply unchanged. Limits: nodes 500, edges 1000, decisions 100, derivations 500, profiles 10, scenarios 10.",
+      "type": "object",
+      "required": ["schemaVersion", "settings", "nodes", "edges"],
+      "properties": {
+        "schemaVersion": { "const": "2.0" },
+        "settings": { "$ref": "#/$defs/settings" },
+        "nodes": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/archNodeV2" } },
+        "edges": { "type": "array", "maxItems": 1000, "items": { "$ref": "#/$defs/archEdgeV2" } },
+        "deployment": { "$ref": "#/$defs/deployment" },
+        "brief": { "$ref": "#/$defs/brief" },
+        "decisions": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/decisionRecord" } },
+        "derivations": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/derivation" } }
       },
       "additionalProperties": false
     }

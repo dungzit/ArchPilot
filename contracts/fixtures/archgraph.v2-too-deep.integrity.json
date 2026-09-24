@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "2.0",
+  "settings": {
+    "codeName": "broken_design",
+    "environment": "dev"
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "site",
+      "label": "Level 1",
+      "codeName": "level_1",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "n2",
+      "type": "network_segment",
+      "label": "Level 2",
+      "codeName": "level_2",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "parentId": "n1"
+    },
+    {
+      "id": "n3",
+      "type": "zone",
+      "label": "Level 3",
+      "codeName": "level_3",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "parentId": "n2"
+    },
+    {
+      "id": "n4",
+      "type": "network_segment",
+      "label": "Level 4",
+      "codeName": "level_4",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "parentId": "n3"
+    },
+    {
+      "id": "n5",
+      "type": "network_segment",
+      "label": "Level 5",
+      "codeName": "level_5",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "parentId": "n4"
+    },
+    {
+      "id": "n6",
+      "type": "network_segment",
+      "label": "Level 6",
+      "codeName": "level_6",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "parentId": "n5"
+    },
+    {
+      "id": "n7",
+      "type": "service",
+      "label": "Level 7",
+      "codeName": "level_7",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "parentId": "n6"
+    }
+  ],
+  "edges": []
+}
