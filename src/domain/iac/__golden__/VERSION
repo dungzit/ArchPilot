@@ -1,0 +1,4 @@
+generator 0.1.0
+aws-terraform 0.1.0
+vsphere-terraform 0.1.0
+goldens efa46626c488d135ea29ed00cb23da57da5228860181c9b66692e9dfe262b87f

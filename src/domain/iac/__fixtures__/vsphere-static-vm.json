@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "2.0",
+  "settings": { "codeName": "jump_hosts", "environment": "prod" },
+  "nodes": [
+    { "id": "s1", "type": "site", "label": "DC1 Ha Noi", "codeName": "dc1", "position": { "x": 0, "y": 0 }, "config": { "siteKind": "data_centre", "location": "Ha Noi" } },
+    { "id": "g1", "type": "network_segment", "variant": "subnet", "label": "App VLAN", "codeName": "app_vlan", "parentId": "s1", "position": { "x": 20, "y": 20 },
+      "config": { "exposure": "private", "cidr": "10.20.2.0/24", "vlanId": 102, "ipMode": "static" } },
+    { "id": "h1", "type": "hypervisor_cluster", "label": "Prod cluster", "codeName": "prod_cluster", "parentId": "g1", "position": { "x": 20, "y": 40 }, "config": { "hostCount": 4 } },
+    { "id": "m1", "type": "virtual_machine", "label": "Bastion", "codeName": "bastion", "parentId": "h1", "position": { "x": 20, "y": 40 }, "attributes": { "sizeClass": "XS" }, "config": { "osFamily": "linux" } },
+    { "id": "m2", "type": "virtual_machine", "label": "Tools VM", "codeName": "tools", "parentId": "h1", "position": { "x": 200, "y": 40 }, "attributes": { "replicas": 2, "sizeClass": "S" }, "config": { "osFamily": "linux" } },
+    { "id": "d1", "type": "relational_db", "label": "Tools DB", "codeName": "tools_db", "parentId": "g1", "position": { "x": 600, "y": 40 }, "attributes": { "replicas": 2 }, "config": { "engine": "postgresql" } },
+    { "id": "f1", "type": "firewall", "label": "DC firewall", "codeName": "dc_firewall", "parentId": "s1", "position": { "x": 900, "y": 20 } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "m2", "target": "d1", "label": "stores results", "direction": "forward", "kind": "access", "mode": "read_write", "protocol": "sql", "port": 5432 },
+    { "id": "e2", "source": "m1", "target": "m2", "label": "ssh", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "tcp", "port": 22 }
+  ],
+  "deployment": {
+    "profiles": [ { "id": "dc1_vsphere", "target": "vsphere", "label": "DC1", "iacAdapter": "vsphere-terraform",
+      "options": { "server": "vcenter.dc1.example.internal", "datacenter": "DC1", "cluster": "prod", "datastore": "ds-prod-01", "vmTemplate": "linux-template-2024", "vmFolder": "archpilot", "edition": "standard" } } ],
+    "bindings": [
+      { "nodeId": "g1", "target": "vsphere", "realisation": "vsphere.port_group_existing",
+        "config": { "portGroup": "pg-app-102", "ipv4Addresses": ["10.20.2.10", "10.20.2.11", "10.20.2.12"], "gateway": "10.20.2.1", "dnsServers": ["10.20.0.53", "10.20.0.54"] } }
+    ],
+    "scenarios": [ { "id": "main", "label": "Main", "defaultProfileId": "dc1_vsphere" } ]
+  }
+}

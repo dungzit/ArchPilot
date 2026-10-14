@@ -208,6 +208,34 @@ def test_role_ids_fit_the_contract_role_pattern():
 _TOKEN_RE = re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(t.lower()) for t in TOKENS) + r")(?![a-z0-9])")
 
 
+_SINGLE_WORD_TOKENS = {t.lower() for t in TOKENS if re.fullmatch(r"[a-z0-9]+", t.lower())}
+_CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+
+
+def _camel_case_hits(text):
+    """Single-word tokens hidden in camelCase: every contiguous run of camel parts, joined and lower-cased."""
+    hits = []
+    for run in re.findall(r"[A-Za-z0-9]+", text):
+        parts = _CAMEL_BOUNDARY.split(run)
+        if len(parts) < 2:
+            continue
+        for start in range(len(parts)):
+            word = ""
+            for part in parts[start:]:
+                word += part.lower()
+                if word in _SINGLE_WORD_TOKENS:
+                    hits.append(word)
+    return hits
+
+
+def _token_matches(text):
+    """Whole-word tokens, plus tokens glued into camelCase: lower-casing
+    ``awsRegion`` or ``vSphereCluster`` first glues the token to its neighbour
+    (review-v2-phase0). Same rule as src/test/neutrality.ts."""
+    plain = _TOKEN_RE.findall(text.lower())
+    return plain + [m for m in _camel_case_hits(text) if m not in plain]
+
+
 def neutrality_hits(value, path="$", *, skip=()):
     """Every (path, token) where a token appears as a whole word in a key or string value."""
     hits = []
@@ -216,13 +244,13 @@ def neutrality_hits(value, path="$", *, skip=()):
             child = f"{path}.{key}"
             if child in skip:
                 continue
-            hits += [(child, m) for m in _TOKEN_RE.findall(key.lower())]
+            hits += [(child, m) for m in _token_matches(key)]
             hits += neutrality_hits(item, child, skip=skip)
     elif isinstance(value, list):
         for index, item in enumerate(value):
             hits += neutrality_hits(item, f"{path}[{index}]", skip=skip)
     elif isinstance(value, str):
-        hits += [(path, m) for m in _TOKEN_RE.findall(value.lower())]
+        hits += [(path, m) for m in _token_matches(value)]
     return hits
 
 
@@ -231,6 +259,28 @@ def test_the_neutrality_scanner_actually_finds_tokens():
     assert neutrality_hits({"label": "Amazon RDS for PostgreSQL"}) == [("$.label", "amazon"), ("$.label", "rds")]
     assert neutrality_hits({"vsphere": 1}) == [("$.vsphere", "vsphere")]
     assert neutrality_hits({"label": "cards"}) == [], "whole words only: 'rds' inside 'cards' is fine"
+
+
+def test_the_neutrality_scanner_sees_tokens_glued_into_camel_case():
+    """Config keys are camelCase by contract; `awsRegion` hid from the lower-case-only scan."""
+    assert neutrality_hits({"config": {"awsRegion": 1, "s3Bucket": 2, "ec2Size": 3}}) == [
+        ("$.config.awsRegion", "aws"),
+        ("$.config.s3Bucket", "s3"),
+        ("$.config.ec2Size", "ec2"),
+    ]
+    assert neutrality_hits({"label": "vSphereCluster", "note": "cosmosDb", "kind": "AWSRegion"}) == [
+        ("$.label", "vsphere"),
+        ("$.note", "cosmos"),
+        ("$.kind", "aws"),
+    ]
+    assert neutrality_hits({"label": "awesomeRegion", "key": "cardsDeck", "words": "Esxi-like but esxiHost"}) == [
+        ("$.words", "esxi")
+    ]
+
+
+def test_the_token_list_still_names_the_targets_the_product_ships():
+    """Never delete a token to make a test pass (neutrality-tokens.json). Pin the core ones."""
+    assert {"aws", "azure", "gcp", "vmware", "vsphere", "ec2", "s3", "rds", "vpc"} <= set(TOKENS)
 
 
 def test_the_catalogue_contains_no_provider_or_vendor_term():

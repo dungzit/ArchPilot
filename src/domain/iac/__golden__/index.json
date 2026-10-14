@@ -1,0 +1,172 @@
+{
+  "goldens": [
+    {
+      "adapter": "aws-terraform",
+      "dir": "aws-injection/hostile-aws-dev",
+      "fixture": "aws-injection",
+      "validationCommands": [
+        [
+          "terraform",
+          "fmt",
+          "-check",
+          "-recursive",
+          "-diff"
+        ],
+        [
+          "terraform",
+          "init",
+          "-backend=false",
+          "-input=false",
+          "-no-color"
+        ],
+        [
+          "terraform",
+          "validate",
+          "-json",
+          "-no-color"
+        ]
+      ],
+      "version": "0.1.0"
+    },
+    {
+      "adapter": "aws-terraform",
+      "dir": "aws-internal-platform/catalog-aws-main",
+      "fixture": "aws-internal-platform",
+      "validationCommands": [
+        [
+          "terraform",
+          "fmt",
+          "-check",
+          "-recursive",
+          "-diff"
+        ],
+        [
+          "terraform",
+          "init",
+          "-backend=false",
+          "-input=false",
+          "-no-color"
+        ],
+        [
+          "terraform",
+          "validate",
+          "-json",
+          "-no-color"
+        ]
+      ],
+      "version": "0.1.0"
+    },
+    {
+      "adapter": "aws-terraform",
+      "dir": "aws-network-nat-none/core-network-aws-stage",
+      "fixture": "aws-network-nat-none",
+      "validationCommands": [
+        [
+          "terraform",
+          "fmt",
+          "-check",
+          "-recursive",
+          "-diff"
+        ],
+        [
+          "terraform",
+          "init",
+          "-backend=false",
+          "-input=false",
+          "-no-color"
+        ],
+        [
+          "terraform",
+          "validate",
+          "-json",
+          "-no-color"
+        ]
+      ],
+      "version": "0.1.0"
+    },
+    {
+      "adapter": "aws-terraform",
+      "dir": "aws-network-nat-per-zone/edge-aws-prod",
+      "fixture": "aws-network-nat-per-zone",
+      "validationCommands": [
+        [
+          "terraform",
+          "fmt",
+          "-check",
+          "-recursive",
+          "-diff"
+        ],
+        [
+          "terraform",
+          "init",
+          "-backend=false",
+          "-input=false",
+          "-no-color"
+        ],
+        [
+          "terraform",
+          "validate",
+          "-json",
+          "-no-color"
+        ]
+      ],
+      "version": "0.1.0"
+    },
+    {
+      "adapter": "aws-terraform",
+      "dir": "aws-three-tier/orders-aws-sg",
+      "fixture": "aws-three-tier",
+      "validationCommands": [
+        [
+          "terraform",
+          "fmt",
+          "-check",
+          "-recursive",
+          "-diff"
+        ],
+        [
+          "terraform",
+          "init",
+          "-backend=false",
+          "-input=false",
+          "-no-color"
+        ],
+        [
+          "terraform",
+          "validate",
+          "-json",
+          "-no-color"
+        ]
+      ],
+      "version": "0.1.0"
+    },
+    {
+      "adapter": "vsphere-terraform",
+      "dir": "vsphere-static-vm/jump-hosts-dc1-vsphere",
+      "fixture": "vsphere-static-vm",
+      "validationCommands": [
+        [
+          "terraform",
+          "fmt",
+          "-check",
+          "-recursive",
+          "-diff"
+        ],
+        [
+          "terraform",
+          "init",
+          "-backend=false",
+          "-input=false",
+          "-no-color"
+        ],
+        [
+          "terraform",
+          "validate",
+          "-json",
+          "-no-color"
+        ]
+      ],
+      "version": "0.1.0"
+    }
+  ]
+}

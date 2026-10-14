@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__
+from .body_limit import DEFAULT_MAX_BODY_BYTES, BodySizeLimitMiddleware
 from .catalog import load_catalog
 from .config import get_settings
 from .contract import load_contract
@@ -32,6 +33,8 @@ from .spa import SpaStaticFiles
 logger = logging.getLogger(__name__)
 
 REQUEST_ID_HEADER = "x-request-id"
+# Whole-request cap (app/body_limit.py). The graph's own 1 MiB cap is in app/schemas.py.
+MAX_REQUEST_BODY_BYTES = DEFAULT_MAX_BODY_BYTES
 
 # Cheap, static hardening headers. The SPA and the API are same-origin in the
 # container, so a restrictive frame/referrer policy costs nothing.
@@ -183,6 +186,9 @@ def create_app() -> FastAPI:
         openapi_url=None if settings.is_production else "/api/openapi.json",
     )
 
+    # Innermost (added first): a 413 from here still passes through CORS and
+    # request_context below, so it gets x-request-id and the security headers.
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

@@ -7,7 +7,7 @@ the caller: ``None`` / ``NotFoundError``, which the router turns into 404.
 Deletion is soft (``deleted_at``): the column already existed in 001, and a
 takedown (NFR-LEGAL-002) still needs to count designs derived from a pattern.
 
-Graph validation is NOT done here - the request model runs it against the wire
+Graph validation is NOT done here - the designs router runs it against the wire
 contract before this layer is reached (``app/schemas.py`` -> ``app/contract.py``).
 """
 

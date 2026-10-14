@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "2.0",
+  "settings": { "codeName": "catalog", "environment": "prod" },
+  "nodes": [
+    { "id": "s1", "type": "site", "label": "Region", "codeName": "region", "position": { "x": 0, "y": 0 }, "config": { "siteKind": "cloud_region" } },
+    { "id": "v1", "type": "network_segment", "variant": "network", "label": "Platform network", "codeName": "platform_net", "parentId": "s1", "position": { "x": 20, "y": 20 }, "config": { "cidr": "10.50.0.0/16" } },
+    { "id": "t1", "type": "network_segment", "variant": "subnet", "label": "Ingress", "codeName": "ingress", "parentId": "v1", "position": { "x": 20, "y": 20 }, "config": { "exposure": "public", "cidr": "10.50.0.0/24" } },
+    { "id": "t2", "type": "network_segment", "variant": "subnet", "label": "Apps", "codeName": "apps", "parentId": "v1", "position": { "x": 20, "y": 120 }, "config": { "exposure": "private", "cidr": "10.50.8.0/22" } },
+    { "id": "t3", "type": "network_segment", "variant": "subnet", "label": "Databases", "codeName": "db", "parentId": "v1", "position": { "x": 20, "y": 420 }, "config": { "exposure": "isolated", "cidr": "10.50.16.0/22" } },
+    { "id": "p1", "type": "container_platform", "label": "App cluster", "codeName": "apps_cluster", "parentId": "t2", "position": { "x": 20, "y": 40 }, "config": { "nodeCount": 3 } },
+    { "id": "a1", "type": "service", "variant": "api", "label": "Catalog API", "codeName": "catalog_api", "parentId": "p1", "position": { "x": 20, "y": 40 },
+      "attributes": { "replicas": 2 }, "config": { "port": 9000, "healthPath": "/ready" },
+      "sizing": { "scenarioId": "siz_catalog_api", "formulaVersion": "2.0", "confidence": "estimated", "summary": { "nodeCount": 3 } } },
+    { "id": "a2", "type": "service", "variant": "worker", "label": "Indexer", "codeName": "indexer", "parentId": "p1", "position": { "x": 300, "y": 40 }, "config": { "port": 8080 } },
+    { "id": "l1", "type": "load_balancer", "label": "Internal LB", "codeName": "internal_lb", "parentId": "t2", "position": { "x": 600, "y": 40 },
+      "config": { "scheme": "internal", "layer": "l7", "protocol": "http", "healthPath": "/health" } },
+    { "id": "d1", "type": "relational_db", "label": "Catalog DB", "codeName": "catalog_db", "parentId": "t3", "position": { "x": 20, "y": 40 },
+      "attributes": { "replicas": 1, "sizeClass": "L" }, "config": { "engine": "mysql", "engineMajor": "8.0", "storageGiB": 20, "deletionProtection": false },
+      "sizing": { "scenarioId": "siz_catalog_db", "formulaVersion": "2.0", "confidence": "estimated", "summary": { "storageGiB": 118.2 } } },
+    { "id": "b1", "type": "bare_metal_host", "label": "Legacy search host", "codeName": "legacy_search", "position": { "x": 900, "y": 300 }, "config": { "memoryGiB": 256 } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "l1", "target": "a1", "label": "", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "http", "port": 9000 },
+    { "id": "e2", "source": "a2", "target": "l1", "label": "calls the API", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "http" },
+    { "id": "e3", "source": "a1", "target": "d1", "label": "reads", "direction": "forward", "kind": "access", "mode": "read", "protocol": "sql" },
+    { "id": "e4", "source": "a2", "target": "d1", "label": "writes", "direction": "forward", "kind": "access", "mode": "write", "protocol": "sql" },
+    { "id": "e5", "source": "a2", "target": "b1", "label": "pulls documents", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "tcp", "port": 9200 }
+  ],
+  "deployment": {
+    "profiles": [ { "id": "aws_main", "target": "aws", "label": "Main account", "options": { "region": "us-east-2", "nat": "single", "projectName": "catalog" } } ],
+    "scenarios": [ { "id": "main", "label": "Main", "defaultProfileId": "aws_main" } ]
+  }
+}

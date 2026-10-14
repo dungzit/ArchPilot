@@ -64,18 +64,33 @@ class SpaStaticFiles(StaticFiles):
         super().__init__(directory=directory, html=True)
 
     async def get_response(self, path: str, scope: Scope) -> Response:
-        request_path = scope.get("path", "")
         try:
             response = await super().get_response(path, scope)
+        except (ValueError, OSError) as exc:
+            # A NUL byte (ValueError from realpath/stat on every OS) or a path
+            # the OS cannot even name (WinError 123 for an over-long path) is
+            # simply "no such file" - not an unauthenticated 500 with a
+            # traceback in the log (review-v2-phase0 m-SPA-1).
+            if not should_fall_back(scope) or "\x00" in scope.get("path", ""):
+                raise StarletteHTTPException(status_code=404) from exc
+            return await self._shell(scope)
         except StarletteHTTPException as exc:
             if exc.status_code != 404 or not should_fall_back(scope):
                 raise
-            response = await super().get_response(SPA_SHELL, scope)
-            response.headers["cache-control"] = NO_STORE
-            return response
+            return await self._shell(scope)
 
-        if request_path in ("/", f"/{SPA_SHELL}"):
+        # Decide caching on the file actually served (`path`, normalised by
+        # StaticFiles), not on the raw URL: `/assets/..%2findex.html` serves
+        # index.html and must not be marked immutable; `/index.html/` must
+        # still be no-store.
+        served = path.replace("\\", "/")
+        if served in (".", "", SPA_SHELL):
             response.headers["cache-control"] = NO_STORE
-        elif is_asset_path(request_path) and response.status_code == 200:
+        elif served.startswith("assets/") and response.status_code == 200:
             response.headers["cache-control"] = IMMUTABLE
+        return response
+
+    async def _shell(self, scope: Scope) -> Response:
+        response = await super().get_response(SPA_SHELL, scope)
+        response.headers["cache-control"] = NO_STORE
         return response

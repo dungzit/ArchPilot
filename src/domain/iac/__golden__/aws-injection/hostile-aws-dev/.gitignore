@@ -1,0 +1,14 @@
+# Terraform working files. The lock file (.terraform.lock.hcl) is committed on purpose.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+backend.hcl

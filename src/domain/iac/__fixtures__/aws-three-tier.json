@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "2.0",
+  "settings": { "codeName": "orders", "environment": "prod", "catalogueVersion": "1.0.0" },
+  "nodes": [
+    { "id": "n1", "type": "site", "label": "Singapore region", "codeName": "sg_region", "position": { "x": 0, "y": 0 }, "config": { "siteKind": "cloud_region" } },
+    { "id": "n2", "type": "zone", "label": "Zone A", "codeName": "zone_a", "parentId": "n1", "position": { "x": 20, "y": 20 } },
+    { "id": "n3", "type": "zone", "label": "Zone B", "codeName": "zone_b", "parentId": "n1", "position": { "x": 320, "y": 20 } },
+    { "id": "n4", "type": "network_segment", "variant": "network", "label": "Main network", "codeName": "main", "parentId": "n1", "position": { "x": 20, "y": 200 }, "config": { "cidr": "10.0.0.0/16" } },
+    { "id": "n5", "type": "network_segment", "variant": "subnet", "label": "Public web tier", "codeName": "public_web", "parentId": "n4", "position": { "x": 20, "y": 40 }, "attributes": { "tier": "web" }, "config": { "exposure": "public", "cidr": "10.0.0.0/22" } },
+    { "id": "n6", "type": "network_segment", "variant": "subnet", "label": "App tier", "codeName": "app", "parentId": "n4", "position": { "x": 20, "y": 200 }, "attributes": { "tier": "app" }, "config": { "exposure": "private", "cidr": "10.0.4.0/22" } },
+    { "id": "n7", "type": "network_segment", "variant": "subnet", "label": "Data tier", "codeName": "data", "parentId": "n4", "position": { "x": 20, "y": 400 }, "attributes": { "tier": "data" }, "config": { "exposure": "isolated", "cidr": "10.0.8.0/22", "vlanId": 30 } },
+    { "id": "n8", "type": "load_balancer", "label": "Web LB", "codeName": "web_lb", "parentId": "n5", "position": { "x": 40, "y": 40 }, "attributes": { "replicas": 2 }, "config": { "scheme": "internet_facing", "layer": "l7", "protocol": "https", "healthPath": "/health" } },
+    { "id": "n9", "type": "service", "variant": "api", "label": "Orders API", "codeName": "orders_api", "parentId": "n6", "position": { "x": 40, "y": 40 },
+      "attributes": { "replicas": 2, "criticality": "high", "sizeClass": "M" }, "config": { "runtime": "java21", "port": 8080, "healthPath": "/actuator/health" } },
+    { "id": "n10", "type": "queue", "label": "Mail queue", "codeName": "mail_queue", "parentId": "n6", "position": { "x": 300, "y": 40 }, "config": { "deadLetter": true } },
+    { "id": "n11", "type": "relational_db", "label": "Orders DB", "codeName": "orders_db", "parentId": "n7", "position": { "x": 40, "y": 40 },
+      "attributes": { "replicas": 2, "statefulness": "stateful", "failureDomainLevel": "zone", "criticality": "high", "dataClassification": "confidential" },
+      "config": { "engine": "postgresql", "engineMajor": "16", "storageGiB": 50, "backupRetentionDays": 14, "deletionProtection": true } },
+    { "id": "n12", "type": "client", "label": "Customers", "codeName": "customers", "position": { "x": -300, "y": 100 } },
+    { "id": "n13", "type": "external_service", "label": "Payment provider", "codeName": "payments", "position": { "x": 900, "y": 100 } },
+    { "id": "n14", "type": "note", "label": "PII note", "codeName": "pii_note", "position": { "x": -300, "y": 400 }, "annotation": { "text": "Order data stays in the data tier.", "shape": "rect" } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n12", "target": "n8", "label": "HTTPS", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "https", "port": 443 },
+    { "id": "e2", "source": "n8", "target": "n9", "label": "routes to", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "http", "port": 8080 },
+    { "id": "e3", "source": "n9", "target": "n11", "label": "reads and writes orders", "direction": "forward", "kind": "access", "mode": "read_write", "protocol": "sql", "port": 5432 },
+    { "id": "e4", "source": "n9", "target": "n13", "label": "charges cards", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "https", "port": 443 },
+    { "id": "e5", "source": "n9", "target": "n10", "label": "enqueues mail", "direction": "forward", "kind": "access", "mode": "send" },
+    { "id": "e6", "source": "n14", "target": "n11", "label": "", "direction": "forward", "kind": "flow" }
+  ],
+  "deployment": {
+    "profiles": [
+      { "id": "aws_sg", "target": "aws", "label": "AWS Singapore", "options": { "region": "ap-southeast-1", "nat": "single" }, "iacAdapter": "aws-terraform" }
+    ],
+    "bindings": [
+      { "nodeId": "n11", "target": "aws", "realisation": "aws.rds", "config": { "instanceClass": "db.t4g.medium" } }
+    ],
+    "scenarios": [ { "id": "main", "label": "Main", "defaultProfileId": "aws_sg" } ],
+    "activeScenarioId": "main"
+  },
+  "decisions": [
+    { "id": "adr1", "number": 1, "title": "Send mail asynchronously", "status": "accepted", "linkedNodeIds": ["n10"], "source": { "kind": "manual" }, "date": "2026-09-24" }
+  ]
+}
