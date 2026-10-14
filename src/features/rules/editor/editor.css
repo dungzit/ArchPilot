@@ -1,0 +1,30 @@
+/* WP-A2 rule editor (re- prefix); shares rx- styles from ../excel/excel.css. */
+.re-panel { display: flex; flex-direction: column; gap: 12px; font-size: 12px; }
+.re-pack, .re-model-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.re-pack label, .re-model-meta label { display: flex; flex-direction: column; gap: 3px; font-size: 10px; color: var(--muted); min-width: 140px; }
+.re-pack input, .re-model-meta input, .re-model-meta select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; color: var(--ink); }
+.re-wide { flex: 1 1 260px; }
+.re-meta { font-size: 11px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.re-json-box { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.re-json-box textarea, .re-lookups { width: 100%; font: 11px 'DM Mono', monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; box-sizing: border-box; }
+.re-tabs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.re-tab { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 5px 10px; font: 11px 'DM Mono', monospace; cursor: pointer; }
+.re-tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.re-tabs .text-button, .re-section-head .text-button, .re-json .text-button { margin-top: 0; }
+.re-danger { color: var(--coral) !important; }
+.re-compile { display: flex; flex-direction: column; gap: 6px; }
+.re-section { display: flex; flex-direction: column; gap: 4px; }
+.re-section-head { display: flex; justify-content: space-between; align-items: center; }
+.re-section-head h4 { margin: 0; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.re-table td { padding: 2px 3px; }
+.re-table select { width: 100%; padding: 4px; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; }
+.re-input { width: 100%; min-width: 60px; box-sizing: border-box; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; color: var(--ink); }
+.re-input.mono { font-family: 'DM Mono', monospace; }
+.re-input.small { min-width: 50px; }
+.re-input.num { text-align: right; font-family: 'DM Mono', monospace; min-width: 70px; }
+.re-input.invalid { border-color: var(--coral); background: #fdf0ec; }
+.re-formula { display: flex; flex-direction: column; gap: 2px; min-width: 280px; }
+.re-excel { font: 10px 'DM Mono', monospace; color: var(--muted); word-break: break-word; }
+.re-error-row td { color: #b4483a; font-size: 10.5px; background: #fdf0ec; }
+.re-save { border-top: 1px solid var(--line); padding-top: 10px; }
+.re-check { display: inline-flex; gap: 5px; align-items: center; font-size: 11px; }
