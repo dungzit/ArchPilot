@@ -1,0 +1,64 @@
+# ArchPilot pilot stack: ONE container serving the SPA and the API on port 8000.
+#
+# Use the PowerShell wrappers in scripts/pilot/ (start.ps1, stop.ps1, ...). They
+# create pilot.env from pilot.env.example, pass --env-file and wait for health.
+# Manual equivalent (run from this folder):
+#   docker compose -f docker-compose.pilot.yml --env-file pilot.env up -d --build
+#
+# Image: reuses backend/Dockerfile (node:24-alpine builds dist/, python:3.12-slim
+# runs uvicorn as the non-root user archpilot, uid 10001, HEALTHCHECK included).
+# Reusing it - instead of a second Dockerfile - means any COPY line another work
+# package adds to backend/Dockerfile reaches the pilot image automatically.
+#
+# Settings that differ from the image's production defaults live in pilot.env,
+# in particular ARCHPILOT_ENV=pilot and ARCHPILOT_COOKIE_SECURE=false. Why: the
+# app refuses to start with ARCHPILOT_ENV=production and a non-Secure cookie,
+# and a Secure cookie is silently dropped by browsers on http://<lan-ip>:8000,
+# so nobody could stay logged in. See docs/v3/pilot/RUNBOOK.md section "Cookie".
+
+name: archpilot-pilot
+
+services:
+  archpilot:
+    image: archpilot-pilot:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: archpilot-pilot
+    restart: unless-stopped
+    init: true
+    env_file:
+      - pilot.env
+    ports:
+      # Published on every host interface so other PCs on the office LAN can
+      # connect. Change the host side with ARCHPILOT_PILOT_PORT in pilot.env.
+      - "${ARCHPILOT_PILOT_PORT:-8000}:8000"
+    volumes:
+      # Plain files on the host: archpilot.db, backups/, reference/, secrets/.
+      - ./pilot-data:/data
+      # Ops helpers run with `docker exec` (reset_password.py, db_tool.py,
+      # crawl_runner.py). Read-only: editing them on the host takes effect at once.
+      - ./scripts/pilot:/pilot:ro
+    healthcheck:
+      # Deep probe: reads AND writes SQLite, so a locked or read-only database
+      # turns the container unhealthy.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status==200 else 1)"
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    stop_grace_period: 20s
+    mem_limit: 1g
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
