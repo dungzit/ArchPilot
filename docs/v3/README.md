@@ -9,7 +9,7 @@ Nền tảng **Sizing · Design · Knowledge Hub** cho hệ thống IT, dành ch
 | File | Nội dung |
 |---|---|
 | [01-research-sysdesai.md](01-research-sysdesai.md) | Khảo sát SysDesAi: các module, cấu trúc 15 bước của một design, **các lỗi sizing đã kiểm chứng** |
-| [02-requirements.md](02-requirements.md) | **Bộ requirement tổng thể v0.2**: personas, nguyên tắc, luồng nghiệp vụ, epic (Sizing / Design / Knowledge / Platform), NFR, data model, lộ trình, quyết định và câu hỏi còn mở |
+| [02-requirements.md](02-requirements.md) | **Bộ requirement tổng thể v0.3**: personas, nguyên tắc, luồng nghiệp vụ, epic (Sizing / Design / Knowledge / Platform), NFR, data model, lộ trình, quyết định và câu hỏi còn mở |
 | [03-kh-phase1-sysdesai-reference-search.md](03-kh-phase1-sysdesai-reference-search.md) | Spec Knowledge Hub **phase 1**: tìm kiếm tham chiếu trên SysDesAi Gallery, trả về link design và bước cụ thể |
 | [04-knowledge-sources-phase2.md](04-knowledge-sources-phase2.md) | Danh sách nguồn blog public cho **phase 2**, đã kiểm tra feed thật |
 | [05-sizing-rule-builder.md](05-sizing-rule-builder.md) | Spec **rule builder và import rule từ Excel**: DSL có kiểm tra đơn vị, template Excel, 2 chế độ import, vòng đời và test |
