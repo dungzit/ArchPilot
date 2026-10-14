@@ -88,13 +88,13 @@ export const rdbmsModel: SizingModelDef = {
     // 2 nodes = 4760.1667 GB; backup 1428.05 x 0.5 x 4 = 2856.1 GB.
     // IOPS: 1000 x 8 x 0.1 = 800 + 1000 x 2 = 2000 -> 2800 / 0.6 = 4666.67 -> 4667.
     // vCPU: 1000 x 0.004 = 4 / 0.6 = 6.67 -> roundup_to 2 = 8. RAM: 1428.05 x 0.2 = 285.61 + 400 x 10 MB (4 GB) + 8 = 297.61 -> 304 GB.
-    { id: 'T1-default', inputs: {}, expected: { vcpu: 8, ram: 304, iops: 4667, storage_per_node: 2380.0833333, total_storage: 4760.1666667, backup_storage: 2856.1, nodes: 2, buffer_pool: 285.61 }, tolerance: 0.0001 },
+    { id: 'T1-default', inputs: {}, expected: { vcpu: 8, ram: 304, iops: 4667, storage_per_node: 2380.0833333, total_storage: 4760.1666667, backup_storage: 2856.1, nodes: 2, buffer_pool: 285.61 }, tolerance: 0.000001 },
     // 2000 x 1.2^2 = 2880; x 1.5 = 4320; WAL 1080; 5400 / 0.75 = 7200/node; x 3 = 21600; backup 4320 x 0.5 x 2 = 4320.
     // IOPS: 5000 x 10 x 0.1 = 5000 + 5000 x 4 = 20000 -> 25000 / 0.6 = 41666.67 -> 41667.
     // vCPU: 5000 x 0.003 = 15 / 0.6 = 25 -> 26. RAM: 4320 x 0.3 = 1296 + 10 GB + 8 = 1314 -> 1328 GB.
-    { id: 'T2-large', inputs: { data_size: 2000, index_overhead: 0.5, growth_rate: 0.2, years: 2, tps: 5000, reads_per_txn: 10, writes_per_txn: 4, cpu_ms_per_txn: 3, working_set: 0.3, connections: 1000, replicas: 2, backup_fulls: 2 }, expected: { vcpu: 26, ram: 1328, iops: 41667, storage_per_node: 7200, total_storage: 21600, backup_storage: 4320, nodes: 3 }, tolerance: 0.0001 },
+    { id: 'T2-large', inputs: { data_size: 2000, index_overhead: 0.5, growth_rate: 0.2, years: 2, tps: 5000, reads_per_txn: 10, writes_per_txn: 4, cpu_ms_per_txn: 3, working_set: 0.3, connections: 1000, replicas: 2, backup_fulls: 2 }, expected: { vcpu: 26, ram: 1328, iops: 41667, storage_per_node: 7200, total_storage: 21600, backup_storage: 4320, nodes: 3 }, tolerance: 0.000001 },
     // No growth, single node: 100 x 1.2 = 120; WAL 30; 150 / 0.75 = 200; backup 120 x 0.5 x 7 = 420.
     // IOPS: 200 x 5 x 0.1 = 100 + 200 = 300 / 0.6 = 500. vCPU: 200 x 0.01 = 2 / 0.6 = 3.33 -> 4. RAM: 60 + 1 + 8 = 69 -> 80.
-    { id: 'T3-small', inputs: { data_size: 100, index_overhead: 0.2, growth_rate: 0, years: 0, tps: 200, reads_per_txn: 5, writes_per_txn: 1, cpu_ms_per_txn: 10, working_set: 0.5, connections: 100, replicas: 0, backup_fulls: 7 }, expected: { vcpu: 4, ram: 80, iops: 500, storage_per_node: 200, total_storage: 200, backup_storage: 420, nodes: 1 }, tolerance: 0.0001 },
+    { id: 'T3-small', inputs: { data_size: 100, index_overhead: 0.2, growth_rate: 0, years: 0, tps: 200, reads_per_txn: 5, writes_per_txn: 1, cpu_ms_per_txn: 10, working_set: 0.5, connections: 100, replicas: 0, backup_fulls: 7 }, expected: { vcpu: 4, ram: 80, iops: 500, storage_per_node: 200, total_storage: 200, backup_storage: 420, nodes: 1 }, tolerance: 0.000001 },
   ],
 }

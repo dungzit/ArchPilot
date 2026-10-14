@@ -174,9 +174,19 @@ function parseUncached(unit: string): UnitInfo | null {
   return { factor, dim }
 }
 
-/** True when a trace should print the number without its unit (`3`, not `3 count`). */
+/** True when a result card should print the number without its unit (`3`, not `3 count`). */
 export function isSilentUnit(unit: string): boolean {
   return SILENT_UNITS.has(unit.trim())
+}
+
+/**
+ * True for count nouns (`broker`, `host`, `vCPU`, `x`): dimensionless with
+ * factor 1. A trace prints them bare, so it reads `max(8, 14, 3)` as in
+ * docs/v3/02 §10, while `150 MB/s`, `3 day` and `70%` keep their units.
+ */
+export function isCountUnit(unit: string): boolean {
+  const parsed = parseUnit(unit)
+  return parsed !== null && parsed.factor === 1 && isDimensionless(parsed.dim)
 }
 
 /** Every single-word unit, for editor autocomplete and docs. */

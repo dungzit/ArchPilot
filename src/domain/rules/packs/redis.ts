@@ -63,12 +63,15 @@ export const redisModel: SizingModelDef = {
     // US-SZ-02 golden: 40 + 500 + 90 = 630 B/key; 50,000,000 x 630 B = 31.5 GB;
     // / 0.7 = 45 GB per copy; x (1 + 1) = 90 GB; shards: ceil(45 / 25) = ceil(1.8) = 2,
     // ops: ceil(50,000 / 80,000) = 1; max(2, 1) = 2 shards; 2 x 2 = 4 nodes; 45 / 2 = 22.5 GB/node.
-    { id: 'T1-golden', inputs: {}, expected: { data: 31.5, mem_per_copy: 45, total_mem: 90, shards: 2, nodes: 4, mem_per_node: 22.5 }, tolerance: 0.0001 },
+    { id: 'T1-golden', inputs: {}, expected: { data: 31.5, mem_per_copy: 45, total_mem: 90, shards: 2, nodes: 4, mem_per_node: 22.5 }, tolerance: 0.000001 },
     // 50 + 1000 + 90 = 1140 B; 200,000,000 x 1140 = 228 GB; / 0.7 = 325.714 GB; x 3 = 977.143 GB;
     // ceil(325.714 / 25 = 13.03) = 14; ceil(300,000 / 80,000 = 3.75) = 4; 14 shards; 42 nodes; 325.714 / 14 = 23.265 GB.
-    { id: 'T2-large', inputs: { keys: 200_000_000, key_size: 50, value_size: 1000, replicas: 2, ops: 300_000 }, expected: { data: 228, mem_per_copy: 325.7142857, total_mem: 977.1428571, shards: 14, nodes: 42, mem_per_node: 23.2653061 }, tolerance: 0.0001 },
+    { id: 'T2-large', inputs: { keys: 200_000_000, key_size: 50, value_size: 1000, replicas: 2, ops: 300_000 }, expected: { data: 228, mem_per_copy: 325.7142857, total_mem: 977.1428571, shards: 14, nodes: 42, mem_per_node: 23.2653061 }, tolerance: 0.000001 },
+    // QA G-RED-05, exact multiple of the shard cap: 40 + 570 + 90 = 700 B; x 50M = 35 GB; / 0.7 = 50 GB;
+    // ceil(50 / 25) = 2 (2.0000000000000004 in doubles; must stay 2); 25 GB per node; 100 GB total.
+    { id: 'R5-exact-multiple', inputs: { value_size: 570 }, expected: { data: 35, mem_per_copy: 50, total_mem: 100, shards: 2, nodes: 4, mem_per_node: 25 }, tolerance: 0.000001 },
     // Ops-bound: 1,000,000 x 630 B = 0.63 GB; / 0.7 = 0.9 GB; ceil(0.036) = 1; ceil(500,000 / 80,000 = 6.25) = 7;
     // 7 shards; 14 nodes; 1.8 GB total; 0.9 / 7 = 0.128571 GB per node.
-    { id: 'T3-ops-bound', inputs: { keys: 1_000_000, ops: 500_000 }, expected: { data: 0.63, mem_per_copy: 0.9, total_mem: 1.8, shards: 7, nodes: 14, mem_per_node: 0.1285714 }, tolerance: 0.0001 },
+    { id: 'T3-ops-bound', inputs: { keys: 1_000_000, ops: 500_000 }, expected: { data: 0.63, mem_per_copy: 0.9, total_mem: 1.8, shards: 7, nodes: 14, mem_per_node: 0.1285714 }, tolerance: 0.000001 },
   ],
 }

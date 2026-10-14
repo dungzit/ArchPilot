@@ -30,16 +30,16 @@ export const vmwareHostModel: SizingModelDef = {
     { name: 'host_ram', labelVi: 'RAM mỗi host', labelEn: 'RAM per host', unit: 'GB', default: 1024, min: 1, source: 'hardware catalog' },
     { name: 'target_util', labelVi: 'Mức dùng mục tiêu', labelEn: 'Target utilisation', unit: 'ratio', default: 0.7, min: 0.1, max: 1, source: 'best practice' },
     { name: 'spare_hosts', labelVi: 'Host dự phòng (N+x)', labelEn: 'Spare hosts (N+x)', unit: 'host', default: 1, min: 0, source: 'HA admission control' },
-    { name: 'hv_overhead', labelVi: 'Overhead hypervisor', labelEn: 'Hypervisor overhead', unit: 'ratio', default: 0, min: 0, max: 0.5, source: 'assumption' },
+    { name: 'hypervisor_overhead', labelVi: 'Overhead hypervisor', labelEn: 'Hypervisor overhead', unit: 'ratio', default: 0, min: 0, max: 0.5, source: 'assumption' },
   ],
   params: [],
   calc: [
     { name: 'pcores', formula: 'app_vcpu / app_ratio + db_vcpu / db_ratio', unit: 'core', description: 'Physical cores at the overcommit ratios' },
     { name: 'cores_needed', formula: 'pcores / target_util', unit: 'core' },
-    { name: 'usable_cores', formula: 'host_cores * (1 - hv_overhead)', unit: 'core' },
+    { name: 'usable_cores', formula: 'host_cores * (1 - hypervisor_overhead)', unit: 'core' },
     { name: 'cpu_hosts', formula: 'ceil(cores_needed / usable_cores)', unit: 'host', description: 'Hosts for CPU' },
     { name: 'ram_needed', formula: 'ram / target_util', unit: 'GB' },
-    { name: 'usable_ram', formula: 'host_ram * (1 - hv_overhead)', unit: 'GB' },
+    { name: 'usable_ram', formula: 'host_ram * (1 - hypervisor_overhead)', unit: 'GB' },
     { name: 'ram_hosts', formula: 'ceil(ram_needed / usable_ram)', unit: 'host', description: 'Hosts for RAM' },
     { name: 'hosts', formula: 'max(cpu_hosts, ram_hosts) + spare_hosts', unit: 'host', description: 'Binding constraint plus N+x' },
     { name: 'total_cores', formula: 'hosts * host_cores', unit: 'core', description: 'Physical cores to license' },
@@ -64,12 +64,18 @@ export const vmwareHostModel: SizingModelDef = {
   tests: [
     // US-SZ-03 golden: 400 / 3 + 120 / 1 = 253.333 pCore; / 0.7 = 361.905; / 64 = 5.65 -> 6 CPU hosts.
     // RAM 2048 / 0.7 = 2925.714 GB; / 1024 = 2.857 -> 3 RAM hosts. max(6, 3) + 1 = 7 hosts (binding: CPU).
-    { id: 'T1-golden', inputs: {}, expected: { hosts: 7, cpu_hosts: 6, ram_hosts: 3, pcores: 253.3333333, cores_needed: 361.9047619, ram_needed: 2925.7142857, total_cores: 448 }, tolerance: 0.0001 },
+    { id: 'T1-golden', inputs: {}, expected: { hosts: 7, cpu_hosts: 6, ram_hosts: 3, pcores: 253.3333333, cores_needed: 361.9047619, ram_needed: 2925.7142857, total_cores: 448 }, tolerance: 0.000001 },
     // RAM-bound: 100 / 3 = 33.33 pCore; / 0.7 = 47.6 -> 1 CPU host. 4096 / 0.7 = 5851.43 GB; / 1024 = 5.71 -> 6.
     // max(1, 6) + 1 = 7 hosts (binding: RAM).
-    { id: 'T2-ram-bound', inputs: { app_vcpu: 100, db_vcpu: 0, ram: 4096 }, expected: { hosts: 7, cpu_hosts: 1, ram_hosts: 6 }, tolerance: 0.0001 },
+    { id: 'T2-ram-bound', inputs: { app_vcpu: 100, db_vcpu: 0, ram: 4096 }, expected: { hosts: 7, cpu_hosts: 1, ram_hosts: 6 }, tolerance: 0.000001 },
     // 10% hypervisor overhead: 64 x 0.9 = 57.6 usable cores; 361.905 / 57.6 = 6.28 -> 7.
     // 1024 x 0.9 = 921.6 GB; 2925.714 / 921.6 = 3.17 -> 4. max(7, 4) + 1 = 8 hosts.
-    { id: 'T3-overhead', inputs: { hv_overhead: 0.1 }, expected: { hosts: 8, cpu_hosts: 7, ram_hosts: 4 }, tolerance: 0.0001 },
+    // QA G-VMW-02, exact multiple: 300 / 3 + 124 = 224 pCore; / 0.7 = 320; / 64 = 5 exactly -> 5 (not 6).
+    // RAM 3 hosts. max(5, 3) + 1 = 6 hosts (binding: CPU).
+    { id: 'V2-exact-multiple', inputs: { app_vcpu: 300, db_vcpu: 124 }, expected: { hosts: 6, cpu_hosts: 5, ram_hosts: 3, pcores: 224, cores_needed: 320 }, tolerance: 0.000001 },
+    // QA G-VMW-03, RAM-bound: 300 / 3 + 40 = 140; / 0.7 = 200; / 64 = 3.125 -> 4. RAM 6144 / 0.7 = 8777.143; / 1024 = 8.57 -> 9.
+    // max(4, 9) + 1 = 10 hosts (binding: RAM).
+    { id: 'V3-ram-bound', inputs: { app_vcpu: 300, db_vcpu: 40, ram: 6144 }, expected: { hosts: 10, cpu_hosts: 4, ram_hosts: 9, ram_needed: 8777.1428571 }, tolerance: 0.000001 },
+    { id: 'T3-overhead', inputs: { hypervisor_overhead: 0.1 }, expected: { hosts: 8, cpu_hosts: 7, ram_hosts: 4 }, tolerance: 0.000001 },
   ],
 }

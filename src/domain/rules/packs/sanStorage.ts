@@ -81,12 +81,12 @@ export const sanStorageModel: SizingModelDef = {
     // Back-end IOPS: 50,000 x 0.7 + 50,000 x 0.3 x 6 = 35,000 + 90,000 = 125,000; / 10,000 -> 13 disks.
     // roundup_to(max(20, 13), 10) = 20; spares ceil(20 / 24) = 1; total 21; 21 x 7.68 = 161.28 TB.
     // Deliverable: 20 x 10,000 / (0.7 + 0.3 x 6 = 2.5) = 80,000 IOPS.
-    { id: 'T1-raid6', inputs: {}, expected: { total_disks: 21, raw_installed: 161.28, raw: 150, disks_needed: 20, hot_spares: 1, backend_iops: 125000, iops_capacity: 80000 }, tolerance: 0.0001 },
+    { id: 'T1-raid6', inputs: {}, expected: { total_disks: 21, raw_installed: 161.28, raw: 150, disks_needed: 20, hot_spares: 1, backend_iops: 125000, iops_capacity: 80000 }, tolerance: 0.000001 },
     // RAID10, IOPS-bound: 50 x 1.1 = 55; x 2 = 110 TB; / 3.84 = 28.6 -> 29. IOPS 200,000 x 0.5 + 200,000 x 0.5 x 2 = 300,000 -> 30.
     // roundup_to(30, 2) = 30; spares ceil(30 / 24) = 2; total 32; 32 x 3.84 = 122.88 TB; 30 x 10,000 / 1.5 = 200,000.
-    { id: 'T2-raid10-iops', inputs: { usable: 50, raid_level: 10, snapshot_reserve: 0.1, disk_size: 3.84, host_iops: 200_000, read_ratio: 0.5 }, expected: { total_disks: 32, raw_installed: 122.88, raw: 110, disks_needed: 30, hot_spares: 2, backend_iops: 300000, iops_capacity: 200000 }, tolerance: 0.0001 },
+    { id: 'T2-raid10-iops', inputs: { usable: 50, raid_level: 10, snapshot_reserve: 0.1, disk_size: 3.84, host_iops: 200_000, read_ratio: 0.5 }, expected: { total_disks: 32, raw_installed: 122.88, raw: 110, disks_needed: 30, hot_spares: 2, backend_iops: 300000, iops_capacity: 200000 }, tolerance: 0.000001 },
     // RAID5 4+1: 20 x 1.2 = 24; x 1.25 = 30 TB; / 7.68 = 3.9 -> 4. IOPS 5,000 x 0.7 + 5,000 x 0.3 x 4 = 9,500 -> 1.
     // roundup_to(4, 5) = 5; spares 1; total 6; 46.08 TB; 5 x 10,000 / (0.7 + 1.2 = 1.9) = 26,315.79 -> 26,315.
-    { id: 'T3-raid5', inputs: { usable: 20, raid_level: 5, host_iops: 5000 }, expected: { total_disks: 6, raw_installed: 46.08, raw: 30, disks_needed: 5, hot_spares: 1, backend_iops: 9500, iops_capacity: 26315 }, tolerance: 0.0001 },
+    { id: 'T3-raid5', inputs: { usable: 20, raid_level: 5, host_iops: 5000 }, expected: { total_disks: 6, raw_installed: 46.08, raw: 30, disks_needed: 5, hot_spares: 1, backend_iops: 9500, iops_capacity: 26315 }, tolerance: 0.000001 },
   ],
 }

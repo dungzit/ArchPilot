@@ -26,7 +26,7 @@
 import type { RuleLookup, RuleSeverity, RuleTest, SizingModelDef, SizingRun, SizingRunWarning, SizingStep } from '../../contracts/pilot'
 import { formatPlain, withUnit } from './format'
 import { DslSyntaxError, IDENTIFIER_RE, KEYWORDS, parseFormula, printExpr, referencedNames, type Expr } from './parser'
-import { DIMENSIONLESS, dimDiv, dimEquals, dimMul, dimPow, formatDim, isDimensionless, parseUnit, type Dim } from './units'
+import { DIMENSIONLESS, dimDiv, dimEquals, dimMul, dimPow, formatDim, isCountUnit, isDimensionless, parseUnit, type Dim } from './units'
 
 export interface RuleError {
   /** Where the problem is, e.g. "calc.storage", "warnings[0]", "outputs.brokers". */
@@ -683,6 +683,11 @@ function evaluateLookup(node: Extract<Expr, { kind: 'call' }>, state: EvalState)
   return value
 }
 
+/** A value as a trace shows it: `150 MB/s`, `70%`, but `8` for 8 broker. */
+function traceText(value: number, unit: string): string {
+  return isCountUnit(unit) ? formatPlain(value) : withUnit(formatPlain(value), unit)
+}
+
 /** A symbol's value expressed in its own declared unit (what people read). */
 function displayValue(symbol: SymbolInfo, base: number, mode: Mode): number {
   return mode === 'units' ? base / symbol.factor : base
@@ -696,7 +701,7 @@ function substitute(step: CompiledCalc, state: EvalState): string {
       const symbol = compiled.symbols.get(node.name)
       const base = values.get(node.name)
       if (!symbol || base === undefined) return undefined
-      return withUnit(formatPlain(displayValue(symbol, base, compiled.mode)), symbol.unit)
+      return traceText(displayValue(symbol, base, compiled.mode), symbol.unit)
     }
     if (node.kind === 'call' && node.name === 'lookup') {
       const { table, key, columnName } = lookupParts(node, state)
@@ -716,7 +721,7 @@ function substitute(step: CompiledCalc, state: EvalState): string {
   } else if (top.kind === 'call' && !top.paren && top.name === 'roundup_to') {
     const show = (node: Expr) => {
       const value = evaluate(node, state)
-      return compiled.mode === 'units' ? withUnit(formatPlain(value / step.factor), step.unit) : formatPlain(value)
+      return compiled.mode === 'units' ? traceText(value / step.factor, step.unit) : formatPlain(value)
     }
     tail = `roundup_to(${show(top.args[0])}, ${show(top.args[1])})`
   }
@@ -784,7 +789,7 @@ function interpolate(message: string, state: EvalState): string {
     const symbol = state.compiled.symbols.get(name)
     const base = state.values.get(name)
     if (!symbol || base === undefined) return whole
-    return withUnit(formatPlain(displayValue(symbol, base, state.compiled.mode)), symbol.unit)
+    return traceText(displayValue(symbol, base, state.compiled.mode), symbol.unit)
   })
 }
 

@@ -46,7 +46,7 @@ describe('golden figures (docs/v3/02 §7.1, §10 and 05 §9)', () => {
   test("app-tier: CCU 5000, response 1 s, think 9 s -> 500 req/s by Little's law", () => {
     const run = evaluateModel(model('app-tier'), { ccu: 5000, response_time: 1, think_time: 9 }, META)
     expect(out(run, 'rps')).toBeCloseTo(500, 9)
-    expect(step(run, 'rps')!.substituted).toBe('5000 user / (1 s + 9 s)')
+    expect(step(run, 'rps')!.substituted).toBe('5000 / (1 s + 9 s)')
     expect(out(run, 'instances')).toBe(6)
     expect(run.binding).toBe('instances_cpu')
   })
@@ -58,7 +58,7 @@ describe('golden figures (docs/v3/02 §7.1, §10 and 05 §9)', () => {
     expect(out(run, 'total_mem')).toBeCloseTo(90, 9)
     expect(out(run, 'shards')).toBe(2)
     expect(run.binding).toBe('shards_mem')
-    expect(step(run, 'data')!.substituted).toBe('50000000 key × 630 B')
+    expect(step(run, 'data')!.substituted).toBe('50000000 × 630 B')
     expect(step(run, 'shards_mem')!.substituted).toBe('ceil(45 GB / 25 GB) = ceil(1.8)')
   })
 
@@ -71,7 +71,7 @@ describe('golden figures (docs/v3/02 §7.1, §10 and 05 §9)', () => {
     expect(out(run, 'ram_hosts')).toBe(3)
     expect(out(run, 'hosts')).toBe(7)
     expect(run.binding).toBe('cpu_hosts')
-    expect(step(run, 'hosts')!.substituted).toBe('max(6 host, 3 host) + 1 host')
+    expect(step(run, 'hosts')!.substituted).toBe('max(6, 3) + 1')
   })
 
   test('kafka: tp 8, storage 116.64 TB, storage brokers 14, brokers 14, binding storage', () => {
@@ -85,7 +85,7 @@ describe('golden figures (docs/v3/02 §7.1, §10 and 05 §9)', () => {
     expect(step(run, 'tp_brokers')!.substituted).toBe('ceil(150 MB/s × 3 / 100 MB/s / 0.6) = ceil(7.5)')
     expect(step(run, 'storage')!.substituted).toBe('convert(150 MB/s × 3 day × 3, "TB")')
     expect(step(run, 'storage_brokers')!.substituted).toBe('ceil(116.64 TB / (12 TB × 0.7)) = ceil(13.8857)')
-    expect(step(run, 'brokers')!.substituted).toBe('max(8 broker, 14 broker, 3)')
+    expect(step(run, 'brokers')!.substituted).toBe('max(8, 14, 3)')
   })
 
   test('kafka: rf < 3 in Prod raises the high warning; not outside Prod', () => {
@@ -98,6 +98,34 @@ describe('golden figures (docs/v3/02 §7.1, §10 and 05 §9)', () => {
     const run = evaluateModel(model('kafka'), { ingress: 600, retention: 0.5 }, META)
     expect(out(run, 'tp_brokers')).toBe(30)
     expect(run.binding).toBe('tp_brokers')
+  })
+
+  test('kafka QA G-KAF-02: 226.8 TB / 8.4 TB stays 27 brokers (plain doubles give 27.000000000000007 -> 28)', () => {
+    expect(Math.ceil(226.8 / (12 * 0.7))).toBe(28) // the trap this guards against
+    const run = evaluateModel(model('kafka'), { ingress: 175, rf: 3, retention: 5 }, META)
+    expect(out(run, 'storage')).toBeCloseTo(226.8, 9)
+    expect(out(run, 'storage_brokers')).toBe(27)
+    expect(out(run, 'brokers')).toBe(27)
+    expect(run.binding).toBe('storage_brokers')
+  })
+
+  test('kafka QA G-KAF-03/04: throughput binds at rf 2 (with the warning); the RF minimum binds at low load', () => {
+    const k3 = evaluateModel(model('kafka'), { ingress: 100, rf: 2, retention: 1, is_prod: 1 }, META)
+    expect([out(k3, 'brokers'), k3.binding, k3.warnings.map((w) => w.severity)]).toEqual([4, 'tp_brokers', ['high']])
+    const k4 = evaluateModel(model('kafka'), { ingress: 10, rf: 3, retention: 1 }, META)
+    expect([out(k4, 'brokers'), k4.binding]).toEqual([3, 'rf'])
+  })
+
+  test('vmware-host QA G-VMW-02/03: exact multiple stays 5 CPU hosts; RAM-bound case binds on RAM', () => {
+    const v2 = evaluateModel(model('vmware-host'), { app_vcpu: 300, db_vcpu: 124 }, META)
+    expect([out(v2, 'cpu_hosts'), out(v2, 'hosts'), v2.binding]).toEqual([5, 6, 'cpu_hosts'])
+    const v3 = evaluateModel(model('vmware-host'), { app_vcpu: 300, db_vcpu: 40, ram: 6144 }, META)
+    expect([out(v3, 'cpu_hosts'), out(v3, 'ram_hosts'), out(v3, 'hosts'), v3.binding]).toEqual([4, 9, 10, 'ram_hosts'])
+  })
+
+  test('redis QA G-RED-05: 50 GB / 25 GB per shard stays 2 shards', () => {
+    const run = evaluateModel(model('redis'), { value_size: 570 }, META)
+    expect([out(run, 'mem_per_copy'), out(run, 'shards')]).toEqual([expect.closeTo(50, 9), 2])
   })
 
   test('san-storage: RAID6 lookup, disks from capacity, binding data_disks through roundup_to', () => {

@@ -61,11 +61,19 @@ export const kafkaModel: SizingModelDef = {
     // 150 MB/s x 259,200 s x 3 = 1.1664e14 B = 116.64 TB; / (12 x 0.7 = 8.4) = 13.89 -> 14.
     // max(8, 14, 3) = 14 (binding: storage). Partitions max(ceil(150 / 10) = 15, 14) = 15.
     // Egress 150 x (2 + 3 - 1) = 600 MB/s. 116.64 / 14 = 8.3314 TB per broker.
-    { id: 'T1-golden', inputs: { ingress: 150, rf: 3, retention: 3 }, expected: { brokers: 14, storage: 116.64, tp_brokers: 8, storage_brokers: 14, partitions: 15, egress: 600, disk_used_per_broker: 8.3314286 }, tolerance: 0.0001 },
+    { id: 'T1-golden', inputs: { ingress: 150, rf: 3, retention: 3 }, expected: { brokers: 14, storage: 116.64, tp_brokers: 8, storage_brokers: 14, partitions: 15, egress: 600, disk_used_per_broker: 8.3314286 }, tolerance: 0.000001 },
     // Throughput-bound: 600 x 3 / 100 / 0.6 = 30 (30.000000000000004 in doubles; must stay 30).
     // 600 MB/s x 43,200 s x 3 = 77.76 TB; / 8.4 = 9.26 -> 10. max(30, 10, 3) = 30. Partitions max(60, 30) = 60.
-    { id: 'T2-throughput', inputs: { ingress: 600, retention: 0.5 }, expected: { brokers: 30, storage: 77.76, tp_brokers: 30, storage_brokers: 10, partitions: 60 }, tolerance: 0.0001 },
+    { id: 'T2-throughput', inputs: { ingress: 600, retention: 0.5 }, expected: { brokers: 30, storage: 77.76, tp_brokers: 30, storage_brokers: 10, partitions: 60 }, tolerance: 0.000001 },
+    // QA G-KAF-02, float trap: 175 x 3 / 100 / 0.6 = 8.75 -> 9. 175 MB/s x 432,000 s x 3 = 226.8 TB;
+    // / 8.4 = 27 exactly (27.000000000000007 in doubles; must stay 27). max(9, 27, 3) = 27, binding storage.
+    { id: 'K2-exact-multiple', inputs: { ingress: 175, rf: 3, retention: 5 }, expected: { brokers: 27, storage: 226.8, tp_brokers: 9, storage_brokers: 27, partitions: 27 }, tolerance: 0.000001 },
+    // QA G-KAF-03, rf 2 in Prod (fires the high warning): 100 x 2 / 100 / 0.6 = 3.33 -> 4; 100 MB/s x 86,400 s x 2 = 17.28 TB;
+    // / 8.4 = 2.06 -> 3. max(4, 3, 2) = 4, binding throughput.
+    { id: 'K3-rf2-prod', inputs: { ingress: 100, rf: 2, retention: 1, is_prod: 1 }, expected: { brokers: 4, storage: 17.28, tp_brokers: 4, storage_brokers: 3 }, tolerance: 0.000001 },
+    // QA G-KAF-04, the RF minimum binds: tp 10 x 3 / 100 / 0.6 = 0.5 -> 1; 2.592 TB / 8.4 -> 1; max(1, 1, 3) = 3.
+    { id: 'K4-rf-minimum', inputs: { ingress: 10, rf: 3, retention: 1 }, expected: { brokers: 3, storage: 2.592, tp_brokers: 1, storage_brokers: 1 }, tolerance: 0.000001 },
     // Dev: 5 x 1 / 100 / 0.6 = 0.083 -> 1; 5 MB/s x 86,400 s x 1 = 0.432 TB -> 1; max(1, 1, 1) = 1.
-    { id: 'T3-dev', inputs: { ingress: 5, rf: 1, retention: 1, is_prod: 0 }, expected: { brokers: 1, storage: 0.432, partitions: 1 }, tolerance: 0.0001 },
+    { id: 'T3-dev', inputs: { ingress: 5, rf: 1, retention: 1, is_prod: 0 }, expected: { brokers: 1, storage: 0.432, partitions: 1 }, tolerance: 0.000001 },
   ],
 }

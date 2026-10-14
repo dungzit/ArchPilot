@@ -23,7 +23,7 @@ export const appTierModel: SizingModelDef = {
   formulaMode: 'units',
   inputs: [
     { name: 'ccu', labelVi: 'Người dùng đồng thời (CCU)', labelEn: 'Concurrent users (CCU)', unit: 'user', default: 5000, min: 0, source: 'customer' },
-    { name: 'response_time', labelVi: 'Thời gian phản hồi', labelEn: 'Response time', unit: 's', default: 1, min: 0, source: 'customer / NFR' },
+    { name: 'response_time', labelVi: 'Thời gian phản hồi', labelEn: 'Response time', unit: 's', default: 1, min: 0.001, source: 'customer / NFR' },
     { name: 'think_time', labelVi: 'Thời gian suy nghĩ giữa 2 thao tác', labelEn: 'Think time between actions', unit: 's', default: 9, min: 0, source: 'assumption' },
     { name: 'peak_factor', labelVi: 'Hệ số đỉnh sự kiện', labelEn: 'Event peak factor', unit: 'x', default: 1, min: 1, max: 20, source: 'assumption' },
     { name: 'cpu_ms_per_req', labelVi: 'CPU mỗi request', labelEn: 'CPU time per request', unit: 'ms/req', default: 20, min: 0, source: 'profile: medium (light 5-10, heavy 100+)' },
@@ -60,12 +60,12 @@ export const appTierModel: SizingModelDef = {
     // US-SZ-01 golden: 5000 / (1 + 9) = 500 req/s.
     // CPU: 500 x 0.020 s = 10 cores busy; / 0.6 = 16.67 vCPU; / 4 = 4.17 -> 5 instances.
     // max(5, 2) + 1 = 6 instances; 6 x 4 = 24 vCPU; 6 x 8 GB = 48 GB.
-    { id: 'T1-golden', inputs: {}, expected: { rps: 500, instances: 6, total_vcpu: 24, total_ram: 48 }, tolerance: 0.0001 },
+    { id: 'T1-golden', inputs: {}, expected: { rps: 500, instances: 6, total_vcpu: 24, total_ram: 48 }, tolerance: 0.000001 },
     // 20000 / (0.5 + 4.5) = 4000 req/s; x 1.5 = 6000; x 0.003 s = 18 cores; / 0.6 = 30 vCPU;
     // / 4 = 7.5 -> 8; max(8, 2) + 1 = 9 instances; 36 vCPU; 72 GB.
-    { id: 'T2-peak', inputs: { ccu: 20000, response_time: 0.5, think_time: 4.5, peak_factor: 1.5, cpu_ms_per_req: 3 }, expected: { rps: 4000, instances: 9, total_vcpu: 36, total_ram: 72 }, tolerance: 0.0001 },
+    { id: 'T2-peak', inputs: { ccu: 20000, response_time: 0.5, think_time: 4.5, peak_factor: 1.5, cpu_ms_per_req: 3 }, expected: { rps: 4000, instances: 9, total_vcpu: 36, total_ram: 72 }, tolerance: 0.000001 },
     // HA floor decides: 100 / 10 = 10 req/s; x 0.02 = 0.2 cores; / 0.6 = 0.33; / 4 -> 1;
     // max(1, 2) + 1 = 3 instances; 12 vCPU; 24 GB.
-    { id: 'T3-ha-floor', inputs: { ccu: 100 }, expected: { rps: 10, instances: 3, total_vcpu: 12, total_ram: 24 }, tolerance: 0.0001 },
+    { id: 'T3-ha-floor', inputs: { ccu: 100 }, expected: { rps: 10, instances: 3, total_vcpu: 12, total_ram: 24 }, tolerance: 0.000001 },
   ],
 }
