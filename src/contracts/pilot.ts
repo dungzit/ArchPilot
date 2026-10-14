@@ -45,6 +45,8 @@ export interface RuleCalc {
   formula: string
   unit: string
   description?: string
+  /** The original Excel formula when the model was imported from Excel; used to export it back. */
+  excelFormula?: string
 }
 
 export interface RuleOutput {
@@ -86,6 +88,14 @@ export interface SizingModelDef {
   /** Neutral component type it sizes, e.g. "kafka", "redis", "vmware-host". */
   componentType: string
   description?: string
+  /**
+   * 'units' (default): unit-aware DSL. Every value is converted to base units
+   * (bytes, seconds), dimensions are checked, and each calc is expressed in its
+   * declared unit. 'excel': models imported from Excel. Every identifier is its
+   * raw number in its declared unit and no conversion happens, exactly like
+   * the spreadsheet; correctness is proven by the imported tests instead.
+   */
+  formulaMode?: 'units' | 'excel'
   inputs: RuleInput[]
   params: RuleParam[]
   calc: RuleCalc[]
