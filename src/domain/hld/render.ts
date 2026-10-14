@@ -298,12 +298,14 @@ export function renderDocx(model: HldModel, options: RenderOptions = {}): Docume
   })
   const empty = () => new Paragraph({ children: [] })
 
+  // Document properties go to docProps/core.xml unescaped by run(): clean them here too,
+  // so a model built by another caller cannot produce invalid XML.
   return new Document({
-    creator: model.meta.author || 'ArchPilot',
+    creator: cleanText(model.meta.author) || 'ArchPilot',
     lastModifiedBy: 'ArchPilot',
-    title: `HLD ${model.meta.projectName} v${model.meta.version}`,
-    subject: model.chrome.documentTitle,
-    description: model.chrome.generatedBy,
+    title: cleanText(`HLD ${model.meta.projectName} v${model.meta.version}`),
+    subject: cleanText(model.chrome.documentTitle),
+    description: cleanText(model.chrome.generatedBy),
     features: { updateFields: true },
     styles: {
       default: {

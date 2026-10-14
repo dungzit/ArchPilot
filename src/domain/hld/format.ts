@@ -65,7 +65,8 @@ export function orDash(text: string | null | undefined): string {
 export function safeUrl(url: string | null | undefined): string | null {
   if (typeof url !== 'string') return null
   const trimmed = url.trim()
-  if (!/^https?:\/\/[^\s]+$/i.test(trimmed)) return null
+  // No whitespace, C0/C1 controls, lone surrogates or U+FFFE/U+FFFF: the URL is written raw into the .rels XML.
+  if (!/^https?:\/\/[^\s]+$/i.test(trimmed) || cleanText(trimmed) !== trimmed || /[\u007F-\u009F]/.test(trimmed)) return null
   try {
     const parsed = new URL(trimmed)
     return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? trimmed : null

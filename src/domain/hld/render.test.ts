@@ -1,12 +1,13 @@
+// @vitest-environment jsdom
 import { strFromU8, unzipSync } from 'fflate'
-import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
 import { buildHldModel } from './build'
 import { buildDiagramSvg } from './diagram'
 import { renderDocxBytes } from './render'
-import { emptyInput, fullInput, hybridGraph } from './testFixtures'
+import { emptyInput, fullInput, hybridGraph, KAFKA_RUN, PIN } from './testFixtures'
 
-const parser = new new JSDOM('').window.DOMParser()
+// jsdom only for its strict XML parser (well-formedness checks).
+const parser = new DOMParser()
 
 async function unpack(bytes: Promise<Uint8Array>): Promise<Record<string, string>> {
   const files = unzipSync(await bytes)
@@ -74,6 +75,75 @@ describe('renderDocx', () => {
     const files = await unpack(renderDocxBytes(buildHldModel(emptyInput({ runs: null, pins: null, design: { id: 'x', name: 'X', graph: null } }))))
     expectWellFormed(files['word/document.xml'])
     expect(files['word/document.xml']).toContain('Sizing data is not available yet')
+  })
+
+  it('strips U+0000 and U+0008 from the project name, manual sections and run/pin data: every XML part parses', async () => {
+    const C0 = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/
+    const model = buildHldModel(fullInput({
+      meta: { customer: 'Bank\u0000 ABC', projectName: 'Orders\u0008 Platform\u0000', version: '1.\u00082', author: 'An\u0000', reviewer: 'Bi\u0008', date: '2026-10-15', changeNote: 'Init\u0008' },
+      manual: { intro: 'Mục đích\u0008 rõ\u0000 ràng', security: '- TLS\u0000 1.3\n- WAF\u0008', questions: 'Q\u0008? | A\u0000' },
+      runs: [{ ...KAFKA_RUN, componentLabel: 'Kafka\u0000', steps: [{ ...KAFKA_RUN.steps[0], formula: 'a\u0008 * b' }] }],
+      pins: [{ ...PIN, title: 'Pin\u0008 title', url: 'https://www.sysdesai.com/share/x\u0008y' }],
+    }))
+    expect(model.meta.projectName).toBe('Orders Platform')
+    const files = await unpack(renderDocxBytes(model))
+    const xmlParts = Object.keys(files).filter((name) => /\.(xml|rels)$/.test(name))
+    expect(xmlParts.length).toBeGreaterThan(8)
+    for (const name of xmlParts) {
+      expect(C0.test(files[name]), `${name} holds a C0 control character`).toBe(false)
+      expectWellFormed(files[name])
+    }
+    expect(files['word/document.xml']).toContain('Orders Platform')
+    expect(files['word/document.xml']).toContain('Mục đích rõ ràng')
+    expect(files['word/document.xml']).toContain('TLS 1.3')
+    // A URL with a control character is not a link at all.
+    expect(files['word/_rels/document.xml.rels']).not.toContain('share/x')
+  })
+
+  it('cleans a model that bypassed the builder (renderer-side defence)', async () => {
+    const model = buildHldModel(fullInput())
+    model.meta = { ...model.meta, projectName: 'Raw\u0008Name', author: 'X\u0000' }
+    model.chrome = { ...model.chrome, headerText: 'Head\u0000er' }
+    model.sections[1] = { ...model.sections[1], heading: 'Intro\u0008', blocks: [{ kind: 'paragraph', text: 'p\u0000' }, { kind: 'table', columns: ['c\u0008'], rows: [['v\u0000']] }] }
+    const files = await unpack(renderDocxBytes(model))
+    for (const name of Object.keys(files).filter((part) => /\.(xml|rels)$/.test(part))) expectWellFormed(files[name])
+  })
+
+  it('exports a design with ~100 components and 10 sizing runs well within 10 seconds', async () => {
+    const base = hybridGraph()
+    const nodes = Array.from({ length: 100 }, (_, index) => ({
+      id: `s${index}`,
+      type: 'service',
+      label: `Service ${index}`,
+      codeName: `service_${index}`,
+      position: { x: (index % 10) * 220, y: Math.floor(index / 10) * 120 },
+      attributes: { replicas: 2, sizeClass: 'M' as const, failureDomainLevel: 'host' as const },
+      config: { runtime: 'java21', port: 8080 },
+    }))
+    const edges = nodes.slice(1).map((node, index) => ({ id: `x${index}`, source: nodes[index].id, target: node.id, label: 'calls', direction: 'forward' as const, kind: 'access' as const, mode: 'connect' as const, protocol: 'https' as const, port: 443 }))
+    const graph = { ...base, nodes: [...base.nodes, ...nodes], edges: [...base.edges, ...edges] }
+    const runs = Array.from({ length: 10 }, (_, index) => ({
+      ...KAFKA_RUN,
+      id: `run_${index}`,
+      componentLabel: `Cluster ${index}`,
+      inputs: Array.from({ length: 10 }, (__, i) => ({ name: `in${i}`, value: i * 1000.5, unit: 'MB/s' })),
+      steps: Array.from({ length: 15 }, (__, i) => ({ name: `s${i}`, formula: 'a * b', substituted: '1 * 2', value: i * 3.5, unit: 'GB' })),
+      outputs: Array.from({ length: 5 }, (__, i) => ({ name: `o${i}`, value: i * 12345.678, unit: 'GB' })),
+    }))
+    const started = performance.now()
+    const model = buildHldModel(fullInput({ design: { id: 'big', name: 'Big', graph }, runs }))
+    const diagram = buildDiagramSvg(graph, 'vi')
+    const bytes = await renderDocxBytes(model)
+    const elapsed = performance.now() - started
+    expect(model.stats.components).toBe(119)
+    expect(diagram?.nodes).toBe(120)
+    expect(bytes.byteLength).toBeGreaterThan(10_000)
+    expect(elapsed).toBeLessThan(10_000)
+  })
+
+  it('the well-formedness check is not vacuous', () => {
+    expect(parser.parseFromString('<a><b></a>', 'application/xml').getElementsByTagName('parsererror').length).toBeGreaterThan(0)
+    expect(parser.parseFromString('<a>\u0001</a>', 'application/xml').getElementsByTagName('parsererror').length).toBeGreaterThan(0)
   })
 
   it('keeps XML valid with hostile text (markup, ampersands, control characters, lone surrogates)', async () => {
