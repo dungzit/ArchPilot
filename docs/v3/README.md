@@ -1,8 +1,8 @@
-# ArchSizer (tên tạm)
+# ArchPilot v3: Sizing Studio (trước đây tên tạm ArchSizer)
 
 Nền tảng **Sizing · Design · Knowledge Hub** cho hệ thống IT, dành cho Presales/Solution Architect làm RFP và team kiến trúc nội bộ doanh nghiệp. Ý tưởng tham chiếu từ [SysDesAi](https://www.sysdesai.com/). Điểm khác biệt chính là **sizing do engine tất định tính toán** (không để LLM tự đưa ra con số), **rule sizing tự định nghĩa hoặc import từ Excel**, và đi tới **BOM cấu hình** cho on-prem, cloud (AWS, Azure, Viettel, FPT), K8s và hybrid.
 
-**Trạng thái:** Requirement v0.2. Chưa có code. Khuyến nghị hợp nhất với `../ArchPilot/` (xem 07), chờ PO xác nhận (Q-09).
+**Trạng thái:** Requirement v0.3. Đã hợp nhất vào ArchPilot (phương án C). Pilot đang được build trên nhánh `pilot/v1` để dùng sáng 2026-10-15. Phạm vi pilot xem 02 §12.3.
 
 ## Tài liệu
 
@@ -34,3 +34,8 @@ Nền tảng **Sizing · Design · Knowledge Hub** cho hệ thống IT, dành ch
 | 2026-10-14 | Q-06: Dùng template HLD đề xuất; PO upload template công ty sau |
 | 2026-10-14 | Q-07: Hạ tầng cài đặt nội bộ là VMware |
 | 2026-10-14 | Q-08: PO giao đánh giá. Khuyến nghị hợp nhất với ArchPilot thành v3, **chờ PO xác nhận (Q-09)** |
+| 2026-10-14 | Q-09: **Hợp nhất với ArchPilot theo phương án C**; áp dụng hướng xử lý X-1 đến X-6, không cần ký riêng |
+| 2026-10-14 | Q-10: Loại yêu cầu ẩn danh / tắt AI cho RFP có NDA (xem lại sau v1.1) |
+| 2026-10-14 | Q-11: Quy mô v1 là 30 user, 3 người dùng đồng thời |
+| 2026-10-14 | Q-12: Tên sản phẩm **ArchPilot**; module sizing mới là **Sizing Studio** |
+| 2026-10-14 | Pilot sáng 2026-10-15, bắt buộc: Tra cứu SysDesAi, Sizing rule + import Excel, Xuất HLD DOCX. Không AI. Chạy bằng Docker Desktop trên PC |

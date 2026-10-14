@@ -1,8 +1,8 @@
-# ArchSizer — Bộ Requirement v0.2
+# ArchPilot v3 (Sizing Studio) — Bộ Requirement v0.3
 
 | Field | Value |
 |---|---|
-| Sản phẩm | ArchSizer (tên tạm): nền tảng **Sizing · Design · Knowledge Hub** cho hệ thống IT |
+| Sản phẩm | **ArchPilot** v3. Module sizing mới tên **Sizing Studio**. Nền tảng **Sizing · Design · Knowledge Hub** cho hệ thống IT (trước đây tên tạm ArchSizer) |
 | Phiên bản | 0.2: cập nhật theo câu trả lời Q-01 đến Q-08 của PO (2026-10-14) |
 | Ngày | 2026-10-14 |
 | Trạng thái | Chờ review; quyết định và câu hỏi còn mở xem §12 |
@@ -67,7 +67,7 @@
 | PR-2 | **Truy vết đầy đủ.** Bấm vào bất kỳ con số đầu ra nào cũng thấy được công thức, giá trị đầu vào, nguồn của giả định (khách hàng cung cấp / AI đề xuất / mặc định trong catalog / benchmark có trích dẫn) và mức độ tin cậy. |
 | PR-3 | **Một mô hình duy nhất.** Mỗi dự án có một design model (component graph + workload + placement). Sơ đồ, sizing, BOM và tài liệu đều được dựng ra từ model này. |
 | PR-4 | **Tri thức phải được duyệt mới thành tham số.** Mọi số liệu từ nguồn bên ngoài (SysDesAi, blog…) chỉ là tham khảo hoặc ứng viên. Chỉ khi curator duyệt thì mới vào catalog để engine sử dụng. |
-| PR-5 | **Bảo vệ dữ liệu khách hàng khi dùng LLM cloud.** Gửi lên ít dữ liệu nhất có thể, ẩn danh trước khi gửi, có thể tắt AI theo từng dự án. |
+| PR-5 | ~~Bảo vệ dữ liệu khách hàng khi dùng LLM cloud (ẩn danh, tắt AI theo dự án).~~ **Đã loại khỏi phạm vi** theo quyết định Q-10 (2026-10-14), để pilot đơn giản. Xem lại sau pilot v1.1. |
 | PR-6 | **Trung lập nền tảng.** Một design logic có thể ánh xạ sang nhiều nền tảng đích để so sánh. |
 | PR-7 | **Ghi nguồn.** Mọi tri thức bên ngoài hiển thị đều kèm nguồn và link gốc. |
 
@@ -311,10 +311,10 @@ Spec chi tiết ở **03-kh-phase1-sysdesai-reference-search.md** (KH-P1-01 đ�
 | ID | Yêu cầu | Ưu tiên | Release |
 |---|---|---|---|
 | PL2-01 | Lớp trừu tượng nhiều provider. **MVP: Microsoft (Azure OpenAI / Microsoft Foundry) và AWS Bedrock.** Cấu hình model riêng cho từng tính năng (trích xuất RFP, copilot, tóm tắt, RAG). Lưu ý: "Microsoft Copilot" là sản phẩm dành cho người dùng cuối; muốn ứng dụng gọi được model của Microsoft thì dùng API Azure OpenAI / Foundry | M | MVP |
-| PL2-02 | **Ẩn danh trước khi gửi:** thay tên khách hàng, tên hệ thống, IP, hostname, email, số điện thoại bằng token, và khôi phục lại khi nhận kết quả | M | MVP |
-| PL2-03 | Chính sách AI theo dự án: bật / chỉ gửi dữ liệu đã ẩn danh / tắt hoàn toàn | M | MVP |
+| PL2-02 | ~~Ẩn danh trước khi gửi LLM~~: **loại khỏi phạm vi (Q-10)** | — | Sau v1.1 |
+| PL2-03 | ~~Chính sách AI theo dự án~~: **loại khỏi phạm vi (Q-10)**. Pilot không dùng AI nên chưa cần | — | Sau v1.1 |
 | PL2-04 | Chỉ dùng endpoint doanh nghiệp có cam kết không dùng dữ liệu để train và có thời gian lưu dữ liệu giới hạn; chọn được region | M | MVP |
-| PL2-05 | Log prompt/response có kiểm soát; không log dữ liệu chưa ẩn danh | M | MVP |
+| PL2-05 | Log prompt/response có kiểm soát (bật/tắt, thời gian lưu) | S | Khi bật AI |
 | PL2-06 | Quota và theo dõi chi phí token; fallback sang provider khác; timeout và retry | S | MVP |
 | PL2-07 | Tích hợp **Microsoft 365 Copilot**: agent hoặc connector cho phép hỏi ArchSizer ngay trong Teams/Copilot (tra cứu tham chiếu, trạng thái dự án) | C | v2 |
 
@@ -344,10 +344,10 @@ Spec chi tiết ở **03-kh-phase1-sysdesai-reference-search.md** (KH-P1-01 đ�
 |---|---|---|
 | NFR-01 | Tính đúng | Golden test cho mọi sizing model; CI chặn release nếu test fail; kết quả tái lập 100% |
 | NFR-02 | Hiệu năng | Tính lại sizing cho dự án ≤ 200 component: p95 ≤ 2 giây. Canvas 300 node chạy mượt. Tìm kiếm tri thức p95 ≤ 1–2 giây. RAG p95 ≤ 10 giây. Mỗi bước AI design p95 ≤ 60 giây |
-| NFR-03 | Quy mô v1 | 300 user, 50 user đồng thời, 2,000 dự án, 200,000 tài liệu tri thức |
+| NFR-03 | Quy mô v1 | **30 user, 3 user đồng thời** (Q-11), khoảng 200 dự án, khoảng 1,000 design tham chiếu SysDesAi |
 | NFR-04 | Sẵn sàng | 99.5% trong giờ hành chính; RPO ≤ 1 giờ, RTO ≤ 4 giờ cho dữ liệu ứng dụng |
 | NFR-05 | Bảo mật | OWASP ASVS L2; TLS 1.2 trở lên; mã hóa dữ liệu lưu trữ; secret đặt trong vault; quét SAST, DAST và dependency trong CI |
-| NFR-06 | Dữ liệu khách hàng | Cô lập theo workspace. Không gửi dữ liệu khách hàng tới LLM khi chưa qua lớp ẩn danh, trừ khi chính sách của dự án cho phép |
+| NFR-06 | Dữ liệu khách hàng | Cô lập theo workspace. (Yêu cầu ẩn danh khi gửi LLM đã loại khỏi phạm vi, Q-10) |
 | NFR-07 | Dễ dùng | Người dùng mới hoàn thành sizing cho dự án mẫu trong ≤ 2 giờ, sau 30 phút hướng dẫn |
 | NFR-08 | Mở rộng | Thêm sizing model và rule bằng cấu hình; thêm connector nguồn tri thức dạng plugin |
 | NFR-09 | Truy vết | Mọi con số đầu ra truy vết được về input, công thức, version của model và catalog |
@@ -417,11 +417,18 @@ Nguồn tham số: `100 MB/s/broker` và `70% fill` lấy từ tech card Kafka (
 | Q-07 | Hạ tầng cài đặt | **VMware** | PL4-01 |
 | Q-08 | Quan hệ với ArchPilot | PO giao đánh giá và đề xuất. **Khuyến nghị: hợp nhất, phát triển thành ArchPilot v3 theo định vị ArchSizer** | file 07 |
 
-### 12.2 Câu hỏi còn mở
+### 12.2 Quyết định bổ sung (2026-10-14)
 
-| ID | Câu hỏi | Mặc định đang áp dụng nếu chưa trả lời |
+| ID | Câu hỏi | Quyết định |
 |---|---|---|
-| Q-09 | Đồng ý phương án hợp nhất với ArchPilot (07 §1) và các hướng xử lý xung đột X-1 đến X-6? Riêng X-2 cần PO ký lại content policy của ArchPilot | Giữ 2 folder tách biệt cho tới khi PO xác nhận |
-| Q-10 | Với RFP có NDA cấm chia sẻ cho bên thứ ba: chính sách "tắt AI theo dự án" và ẩn danh đã đủ chưa? | Đủ; dự án có NDA mặc định tắt AI |
-| Q-11 | Quy mô người dùng v1 | 300 user, 50 user đồng thời (NFR-03) |
-| Q-12 | Tên sản phẩm chính thức | "ArchSizer" là tên tạm |
+| Q-09 | Hợp nhất với ArchPilot? | **Đồng ý phương án C.** Các hướng xử lý xung đột X-1 đến X-6 (file 07 §4) được áp dụng, không cần ký riêng |
+| Q-10 | RFP có NDA: tắt AI và ẩn danh có đủ không? | **Loại yêu cầu này** cho đơn giản, để kịp pilot đánh giá tính khả dụng. Xem lại sau v1.1 |
+| Q-11 | Quy mô người dùng v1 | **30 user, 3 người dùng đồng thời** |
+| Q-12 | Tên sản phẩm | **ArchPilot** (giữ tên repo, CI, tài liệu đã có). Module sizing mới: **Sizing Studio** |
+
+### 12.3 Phạm vi pilot sáng 2026-10-15
+
+- **Bắt buộc:** Tra cứu SysDesAi (`/reference`); Sizing theo rule + import Excel (`/rules`); Xuất HLD DOCX (`/hld`).
+- **Nếu kịp:** BOM cấu hình và xuất Excel.
+- Chạy trên PC bằng Docker Desktop, truy cập qua LAN. **Không dùng AI** (chưa có key LLM).
+- Code nằm ở nhánh `pilot/v1` của repo ArchPilot, chưa push.
