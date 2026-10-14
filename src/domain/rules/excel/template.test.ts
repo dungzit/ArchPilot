@@ -43,8 +43,9 @@ describe('Excel template (05 §9 Kafka example)', () => {
     expect(calc.getCell('C4').result).toBe(14)
     expect(calc.getCell('C5').formula).toBe('MAX(tp_brokers,storage_brokers,rf)')
     expect(calc.getCell('C5').result).toBe(14)
-    expect(wb.getWorksheet('Warnings')!.getCell('B2').value).toBe('rf<3')
-    expect(wb.getWorksheet('Tests')!.getRow(1).values).toEqual([undefined, 'model_id', 'test_id', 'in:ingress', 'in:rf', 'in:retention_days', 'out:brokers', 'out:storage_tb', 'tolerance'])
+    expect(wb.getWorksheet('Warnings')!.getCell('B2').value).toBe('AND(rf<3,is_prod=1)')
+    expect(wb.getWorksheet('Tests')!.getRow(1).values).toEqual([undefined, 'model_id', 'test_id', 'in:ingress', 'in:rf', 'in:retention_days', 'in:is_prod', 'out:brokers', 'out:storage_tb', 'tolerance'])
+    expect(wb.getWorksheet('Tests')!.getCell('I2').value).toBe(0.000001)
     // Excel recalculates on open; the cached values are what it shows first.
     const workbookXml = strFromU8(unzipSync(data)['xl/workbook.xml'])
     expect(workbookXml).toContain('fullCalcOnLoad="1"')

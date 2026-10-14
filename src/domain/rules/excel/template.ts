@@ -20,6 +20,8 @@ export const KAFKA_TEMPLATE_MODEL: SizingModelDef = {
     { name: 'ingress', labelVi: 'Lưu lượng ghi vào', labelEn: 'Ingress throughput', unit: 'MB/s', default: 150, min: 0, source: 'customer' },
     { name: 'rf', labelVi: 'Hệ số nhân bản', labelEn: 'Replication factor', unit: 'count', default: 3, min: 1, max: 7, source: 'customer' },
     { name: 'retention_days', labelVi: 'Số ngày lưu', labelEn: 'Retention', unit: 'day', default: 3, min: 0, source: 'customer' },
+    // Lead decision (QA F-03): a numeric 0/1 flag instead of a text `env`, since test inputs are numbers.
+    { name: 'is_prod', labelVi: 'Môi trường Prod (1 = có, 0 = không)', labelEn: 'Production environment (1 = yes, 0 = no)', unit: 'flag', default: 1, min: 0, max: 1, source: 'customer' },
   ],
   params: [
     { name: 'broker_write', value: 100, unit: 'MB/s', source: 'catalog:kafka.broker_write_mbps' },
@@ -63,15 +65,17 @@ export const KAFKA_TEMPLATE_MODEL: SizingModelDef = {
   ],
   warnings: [
     {
-      condition: 'rf < 3',
+      // Excel text in the Warnings sheet: AND(rf<3,is_prod=1)
+      condition: '(rf < 3 and is_prod == 1)',
       severity: 'high',
-      messageVi: 'Replication factor < 3: mất một broker có thể làm mất dữ liệu.',
-      messageEn: 'Replication factor < 3: losing one broker can lose data.',
+      messageVi: 'Replication factor < 3 ở môi trường Prod: mất một broker có thể làm mất dữ liệu.',
+      messageEn: 'Replication factor < 3 in Prod: losing one broker can lose data.',
     },
   ],
   lookups: [],
   tests: [
-    { id: 'T1', inputs: { ingress: 150, rf: 3, retention_days: 3 }, expected: { brokers: 14, storage_tb: 116.64 }, tolerance: 0.0001 },
+    // Relative tolerance 1e-6 (lead decision on QA F-05; 05 §9's 0.01 is too loose).
+    { id: 'T1', inputs: { ingress: 150, rf: 3, retention_days: 3, is_prod: 1 }, expected: { brokers: 14, storage_tb: 116.64 }, tolerance: 0.000001 },
   ],
 }
 

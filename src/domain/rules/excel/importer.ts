@@ -24,7 +24,7 @@ import type {
   SizingModelDef,
 } from '../../../contracts/pilot'
 import { formatNumber } from './dsl'
-import { displayExcelFormula } from './excelFormula'
+import { displayExcelFormula, rewriteExcelFormula } from './excelFormula'
 import {
   COLUMNS,
   IDENT_RE,
@@ -37,6 +37,7 @@ import {
   SEVERITIES,
   SHEET,
   excelModelPrefix,
+  excelSafeName,
   unguardText,
 } from './layout'
 import { issueError, issueWarning, msg, type ExcelIssue, type Msg } from './messages'
@@ -252,7 +253,8 @@ export function importWorkbook(wb: ExcelJS.Workbook, fileName: string): ImportRe
   }
   if (issues.length > 0) return { pack: null, preview: null, issues }
 
-  const required = [SHEET.model, SHEET.inputs, SHEET.calc, SHEET.outputs]
+  // Warnings and Lookups may be absent; the Tests sheet must exist even when empty (QA XLS-NEG-11).
+  const required = [SHEET.model, SHEET.inputs, SHEET.params, SHEET.calc, SHEET.outputs, SHEET.tests]
   for (const s of required) if (!findSheet(wb, s)) err(fileName, `Thiếu sheet ${s}.`, `Missing sheet ${s}.`)
   if (issues.length > 0) return { pack: null, preview: null, issues }
 
@@ -657,7 +659,17 @@ export function importWorkbook(wb: ExcelJS.Workbook, fileName: string): ImportRe
     tr.warnings.forEach((w) => issues.push(issueWarning(p.where, w)))
     tr.tables.forEach((t) => usedTables.get(p.model.id)!.add(t))
     deps.set(`${p.model.id}|${p.name}`, new Set(tr.idents))
-    p.model.calc.push({ name: p.name, formula: tr.dsl, unit: p.unit, ...(p.description ? { description: p.description } : {}), excelFormula: row.excelFormula })
+    // Store the Excel text with canonical names (kafka_rf -> rf); the exporter re-applies its own naming.
+    const env = envFor(p.model, calcSheet.name)
+    const canonical = rewriteExcelFormula(formulaText, (name) => {
+      const r = env.resolveName(name, null)
+      if (r.kind === 'value') return r.ident
+      if (r.kind === 'table') return r.table
+      if (r.kind === 'column') return excelSafeName(`${r.table}.${r.columns[r.index]}`)
+      return null
+    })
+    const excelFormula = displayExcelFormula(canonical.formula)
+    p.model.calc.push({ name: p.name, formula: tr.dsl, unit: p.unit, ...(p.description ? { description: p.description } : {}), excelFormula })
   }
 
   // Dependency order (Excel does not care about row order; the rule engine may).

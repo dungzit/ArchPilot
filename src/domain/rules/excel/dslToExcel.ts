@@ -155,7 +155,8 @@ function parse(src: string): Ast {
   const parsePrimary = (): Ast => {
     const t = toks[p++]
     if (t.t === 'num') {
-      if (peek().t === 'id' || peek().t === 'str') throw new DslParseError('unit literal')
+      const after = peek()
+      if ((after.t === 'id' && !['and', 'or'].includes(after.v)) || after.t === 'str') throw new DslParseError('unit literal')
       return { k: 'num', v: t.v }
     }
     if (t.t === 'str') return { k: 'str', v: t.v }
