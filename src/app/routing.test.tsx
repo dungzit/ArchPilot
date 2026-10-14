@@ -69,11 +69,11 @@ afterEach(async () => {
 })
 
 describe('sidebar groups (design-v2 4.2.1)', () => {
-  test('STUDIO lists the seven v1 surfaces in order; unbuilt ones say so', async () => {
+  test('STUDIO lists the v1 surfaces plus the three pilot screens in order; unbuilt ones say so', async () => {
     await open('/')
     const items = $$('.studio-nav .nav-item')
     expect(items.map((item) => item.getAttribute('data-studio'))).toEqual(studioItems.map((item) => item.key))
-    expect(items.map((item) => item.getAttribute('href'))).toEqual(['/', '/designs', '/wizard', '/templates', '/hub', '/sizing', '/learn'])
+    expect(items.map((item) => item.getAttribute('href'))).toEqual(['/', '/designs', '/wizard', '/templates', '/hub', '/reference', '/sizing', '/rules', '/hld', '/learn'])
     expect(items.filter((item) => item.querySelector('.nav-soon')).map((item) => item.getAttribute('data-studio'))).toEqual(['wizard', 'templates', 'hub', 'learn'])
   })
 

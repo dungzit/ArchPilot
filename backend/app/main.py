@@ -27,7 +27,7 @@ from .db import connect, init_database
 from .logging_config import configure_logging
 from .repositories import benchmarks as benchmarks_repo
 from .repositories import users as users_repo
-from .routers import auth, benchmarks, designs, health, workspaces
+from .routers import auth, benchmarks, designs, health, reference, rule_packs, sizing_runs, workspaces
 from .spa import SpaStaticFiles
 
 logger = logging.getLogger(__name__)
@@ -273,6 +273,10 @@ def create_app() -> FastAPI:
     app.include_router(workspaces.router)
     app.include_router(designs.router)
     app.include_router(benchmarks.router)
+    # Pilot v1 (docs/v3): one router per work package.
+    app.include_router(reference.router)
+    app.include_router(rule_packs.router)
+    app.include_router(sizing_runs.router)
 
     # Single-container deployment: if the built SPA is present, serve it from
     # the same origin. Then no CORS is involved and the session cookie is

@@ -30,6 +30,9 @@ import { WorkspaceModal } from '../features/workspace/WorkspaceModal'
 import { PlannedScreen } from '../features/studio/PlannedScreen'
 import { DesignsRoute } from '../features/design/DesignsScreen'
 import { NotFoundScreen } from '../features/studio/NotFoundScreen'
+import { ReferenceScreen } from '../features/reference/ReferenceScreen'
+import { RulesScreen } from '../features/rules/RulesScreen'
+import { HldScreen } from '../features/hld/HldScreen'
 
 type Language = 'vi' | 'en'
 type TextFn = (value: Copy) => string
@@ -163,6 +166,10 @@ function AppShell({ language, onToggleLanguage, user, onLogout }: { language: La
     if (item.key === 'sizing') return screens.sizing()
     // Phase 2: /designs lists designs, /designs/:designId opens the workspace.
     if (item.key === 'designs') return <DesignsRoute text={text} language={language} user={user} />
+    // Pilot v1 screens (docs/v3); each work package owns its feature directory.
+    if (item.key === 'reference') return <ReferenceScreen text={text} language={language} />
+    if (item.key === 'rules') return <RulesScreen text={text} language={language} />
+    if (item.key === 'hld') return <HldScreen text={text} language={language} />
     if (item.key === 'editorial' && !editorial) return <NotFoundScreen text={text} />
     return <PlannedScreen item={item} text={text} />
   }
