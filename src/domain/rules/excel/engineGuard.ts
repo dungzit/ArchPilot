@@ -32,6 +32,43 @@ export function safeRunTests(model: SizingModelDef): EngineOutcome<ModelTestResu
   }
 }
 
+export interface ModelCheck {
+  modelId: string
+  compile: CompileResult
+  /** Empty when the model does not compile (tests are not run then). */
+  tests: ModelTestResult[]
+}
+
+export type PackCheck =
+  | { available: false; message: string }
+  | {
+      available: true
+      models: ModelCheck[]
+      /**
+       * True when every model compiles, has at least one test and every test
+       * passes: the pilot's rule for saving as `published` (05 §7, AC-RB-06).
+       */
+      publishable: boolean
+    }
+
+/** Compile and test every model of a pack. Never throws. */
+export function checkModels(models: SizingModelDef[]): PackCheck {
+  const checks: ModelCheck[] = []
+  for (const model of models) {
+    const compiled = safeCompile(model)
+    if (!compiled.available) return { available: false, message: compiled.message }
+    if (!compiled.value.ok) {
+      checks.push({ modelId: model.id, compile: compiled.value, tests: [] })
+      continue
+    }
+    const tests = safeRunTests(model)
+    if (!tests.available) return { available: false, message: tests.message }
+    checks.push({ modelId: model.id, compile: compiled.value, tests: tests.value })
+  }
+  const publishable = models.length > 0 && checks.every((c) => c.compile.ok && c.tests.length > 0 && c.tests.every((t) => t.passed))
+  return { available: true, models: checks, publishable }
+}
+
 /** A tiny excel-mode model used to probe whether the engine is implemented. */
 export const PROBE_MODEL: SizingModelDef = {
   id: 'probe',
