@@ -25,6 +25,7 @@ from .contract import load_contract
 from .csrf import CSRF_HEADER, enforce_csrf
 from .db import connect, init_database
 from .logging_config import configure_logging
+from .reference import index as reference_index
 from .repositories import benchmarks as benchmarks_repo
 from .repositories import users as users_repo
 from .routers import auth, benchmarks, designs, health, reference, rule_packs, sizing_runs, workspaces
@@ -79,6 +80,9 @@ async def lifespan(app: FastAPI):
     applied = init_database(settings)
     purged = _purge_expired_sessions(settings)
     seeded = _seed_benchmarks(settings)
+    # Pilot WP-B: load the SysDesAi snapshot if it changed. Never raises; a
+    # missing file is a no-op (app/reference/index.py).
+    reference_load = reference_index.autoload(settings)
     logger.info(
         "backend started",
         extra={
@@ -86,6 +90,7 @@ async def lifespan(app: FastAPI):
             "migrations_applied": applied,
             "expired_sessions_purged": purged,
             "benchmarks_seeded": seeded,
+            "reference_snapshot": reference_load,
             "env": settings.env,
         },
     )

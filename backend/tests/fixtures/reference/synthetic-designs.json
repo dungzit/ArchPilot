@@ -1,0 +1,118 @@
+[
+  {
+    "shareId": "DistCache01",
+    "title": "Distributed Cache",
+    "prompt": "Design a distributed in-memory cache like Memcached",
+    "categories": ["Storage & CDN"],
+    "tab": "featured",
+    "designSource": "user",
+    "upvoteCount": 812,
+    "isFeatured": true,
+    "createdAt": "2026-03-01T10:00:00.000Z",
+    "updatedAt": "2026-03-05T10:00:00.000Z",
+    "steps": [
+      {"position": 1, "stepKey": "step-clarify", "phase": "clarify", "title": "Clarify Requirements", "text": "What is the expected key size and value size? I'll assume small values under 1 KB and a read-heavy workload."},
+      {"position": 2, "stepKey": "step-1", "phase": "problem", "title": "Design a distributed cache cluster", "text": "We need a low-latency key-value cache that spreads keys across nodes with consistent hashing and survives node failures."},
+      {"position": 3, "stepKey": "step-2", "phase": "build", "title": "Add LRU Eviction Policy", "text": "Each cache node evicts the least recently used entries when memory is full. TTL expiry runs lazily on read and in a background sweep."},
+      {"position": 4, "stepKey": "step-3", "phase": "scale", "title": "Scaling and Failure Modes", "text": "Add replicas per shard; a failed node is removed from the hash ring and its keys are re-warmed from the database."}
+    ]
+  },
+  {
+    "shareId": "RateLim02",
+    "title": "Rate Limiter",
+    "prompt": "Design a distributed rate limiter for an API gateway",
+    "categories": ["API Platform"],
+    "tab": "featured",
+    "designSource": "user",
+    "upvoteCount": 905,
+    "isFeatured": true,
+    "createdAt": "2026-03-02T10:00:00.000Z",
+    "updatedAt": "2026-03-06T10:00:00.000Z",
+    "steps": [
+      {"position": 1, "stepKey": "step-clarify", "phase": "clarify", "title": "Clarify Requirements", "text": "Per user or per IP limits? I'll assume per API key with a burst allowance."},
+      {"position": 2, "stepKey": "step-1", "phase": "api", "title": "Designing the Rate Limiter API", "text": "The gateway calls checkLimit(key) before forwarding; a rejected request answers HTTP 429 with a Retry-After header."},
+      {"position": 3, "stepKey": "step-2", "phase": "build", "title": "Token Bucket Rate Limiting Service", "text": "Token bucket counters live in Redis; a Lua script refills and decrements atomically so concurrent gateways never over-admit."},
+      {"position": 4, "stepKey": "step-3", "phase": "flows", "title": "Request Throttling Flow", "text": "Client to gateway to limiter to Redis; the limiter returns allow or deny and the gateway forwards or rejects."}
+    ]
+  },
+  {
+    "shareId": "ChatSys03",
+    "title": "Chat Messaging System",
+    "prompt": "Design a real-time chat application like WhatsApp",
+    "categories": ["Messaging", "Real-time"],
+    "tab": "featured",
+    "designSource": "user",
+    "upvoteCount": 701,
+    "isFeatured": true,
+    "createdAt": "2026-03-03T10:00:00.000Z",
+    "updatedAt": "2026-03-07T10:00:00.000Z",
+    "steps": [
+      {"position": 1, "stepKey": "step-clarify", "phase": "clarify", "title": "Clarify Requirements", "text": "One-to-one and group messaging, delivery receipts, online presence."},
+      {"position": 2, "stepKey": "step-1", "phase": "build", "title": "WebSocket Gateway and Message Queue", "text": "Clients hold a WebSocket connection; messages are written to a Kafka queue and fanned out to recipients' gateways."},
+      {"position": 3, "stepKey": "step-2", "phase": "flows", "title": "Message Delivery Flow", "text": "Sender to gateway to queue to recipient gateway; offline recipients get a push notification."}
+    ]
+  },
+  {
+    "shareId": "UrlCopy04",
+    "title": "URL Shortener",
+    "prompt": "Design a URL shortener",
+    "categories": ["Other"],
+    "tab": "community",
+    "designSource": "user",
+    "upvoteCount": 2,
+    "isFeatured": false,
+    "createdAt": "2026-08-01T10:00:00.000Z",
+    "updatedAt": "2026-08-01T10:00:00.000Z",
+    "steps": [
+      {"position": 1, "stepKey": "step-1", "phase": "problem", "title": "Design a simple URL shortener", "text": "Map long URLs to short codes."},
+      {"position": 2, "stepKey": "step-2", "phase": "data", "title": "Store short codes", "text": "A table of short code and long URL."},
+      {"position": 3, "stepKey": "step-3", "phase": "build", "title": "Basic redirect service", "text": "Look up the short code and redirect."}
+    ]
+  },
+  {
+    "shareId": "StripePay05",
+    "title": "Idempotent Payment Processing",
+    "prompt": "How Stripe designs idempotent payment APIs",
+    "categories": ["API Platform"],
+    "tab": "real-world",
+    "designSource": "article",
+    "sourceBlogName": "Stripe Engineering",
+    "sourceArticleUrl": "https://stripe.com/blog/idempotency",
+    "upvoteCount": 140,
+    "isFeatured": false,
+    "createdAt": "2026-04-01T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z",
+    "steps": [
+      {"position": 1, "stepKey": "step-1", "phase": "problem", "title": "Exactly-once payment charges", "text": "Network retries must never charge a customer twice; every payment request carries an idempotency key."},
+      {"position": 2, "stepKey": "step-2", "phase": "data", "title": "Idempotency key store", "text": "Keys and their responses are stored for 24 hours in the payment database so a retry returns the original result."}
+    ]
+  },
+  {
+    "shareId": "EvilUrl06",
+    "title": "Notification Service",
+    "prompt": "Design a notification service for email, SMS and push",
+    "categories": ["Messaging"],
+    "tab": "real-world",
+    "designSource": "article",
+    "sourceBlogName": "Suspicious Blog",
+    "sourceArticleUrl": "javascript:alert(1)",
+    "upvoteCount": 50,
+    "isFeatured": false,
+    "steps": [
+      {"position": 1, "stepKey": "step-1", "phase": "build", "title": "Notification fan-out workers", "text": "Workers consume a queue and send email, SMS and push notifications with retries."}
+    ]
+  },
+  {
+    "shareId": "GoneTwice07",
+    "title": "Deleted URL Shortener Clone",
+    "prompt": "A design that returned 404 twice",
+    "categories": ["Other"],
+    "tab": "community",
+    "status": "gone",
+    "missCount": 2,
+    "upvoteCount": 5000,
+    "steps": [
+      {"position": 1, "stepKey": "step-1", "phase": "build", "title": "URL shortener cache layer for redirects", "text": "URL shortener cache redirect redirect cache."}
+    ]
+  }
+]
