@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * Rule editor in jsdom. The engine is mocked so the per-row compile error
- * mapping and the publish rule can be tested before WP-A lands; one test
- * keeps the real (stub) engine to prove the "engine not available" path.
+ * mapping and the publish rule can be tested deterministically; one test makes
+ * the engine throw to prove the "engine not available" path.
  */
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -13,19 +13,19 @@ import { installFakeFetch, jsonResponse, waitFor, type RecordedRequest } from '.
 import { copy } from '../../../ui/copy'
 import { RuleEditorPanel } from './RuleEditorPanel'
 
-const engine = vi.hoisted(() => ({ mode: 'stub' as 'stub' | 'mock' }))
+const engine = vi.hoisted(() => ({ mode: 'throw' as 'throw' | 'mock' }))
 
 vi.mock('../../../domain/rules/engine', async (importOriginal) => {
   const real = await importOriginal<typeof import('../../../domain/rules/engine')>()
   return {
     ...real,
     compileModel: (model: SizingModelDef) => {
-      if (engine.mode === 'stub') return real.compileModel(model)
+      if (engine.mode === 'throw') throw new Error('rules engine: unavailable (test)')
       const bad = model.calc.filter((c) => c.formula.includes('??'))
       return bad.length === 0 ? { ok: true } : { ok: false, errors: bad.map((c) => ({ where: `calc.${c.name}`, message: `syntax error in ${c.name}` })) }
     },
     runModelTests: (model: SizingModelDef) => {
-      if (engine.mode === 'stub') return real.runModelTests(model)
+      if (engine.mode === 'throw') throw new Error('rules engine: unavailable (test)')
       return model.tests.map((t) => ({ testId: t.id, passed: true, failures: [] }))
     },
   }
@@ -134,7 +134,7 @@ describe('RuleEditorPanel', () => {
   })
 
   test('engine not available: no crash, saved as draft', async () => {
-    engine.mode = 'stub'
+    engine.mode = 'throw'
     await act(async () => { root.render(<RuleEditorPanel text={text} language="en" />) })
     expect($('[data-compile]')!.getAttribute('data-compile')).toBe('unavailable')
     await click($('[data-action="run-tests"]'))
