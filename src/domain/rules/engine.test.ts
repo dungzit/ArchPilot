@@ -306,6 +306,42 @@ describe('the 05 §9 Kafka template (AC-RB-01)', () => {
   })
 })
 
+describe('float noise: near-integer snap before ceil/floor/compare', () => {
+  const rate = (value: number) => ({ unit: 'req/s', value })
+
+  test('subtraction noise: ceil(200 req/s × 1.1 / 110 req/s - 2) is 0, not 1, and the trace says ceil(0)', () => {
+    const model = oneStep('ceil(a * 1.1 / b - 2)', 'count', rate(200), rate(110))
+    const run = evaluateModel(model, {}, META)
+    expect(run.outputs[0].value).toBe(0)
+    expect(run.steps[0].substituted).toBe('ceil(200 req/s × 1.1 / 110 req/s - 2) = ceil(0)')
+    expect(valueOf(oneStep('floor(a * 1.1 / b - 2)', 'count', rate(200), rate(110)))).toBe(0)
+  })
+
+  test('comparisons ignore the same noise; real differences still count', () => {
+    expect(valueOf(oneStep('if(a * 1.1 / b - 2 > 0, 1, 0)', 'count', rate(200), rate(110)))).toBe(0)
+    expect(valueOf(oneStep('if(a + b == 0.3, 1, 0)', ''), { a: 0.1, b: 0.2 })).toBe(1)
+    expect(valueOf(oneStep('if(a + b != 0.3, 1, 0)', ''), { a: 0.1, b: 0.2 })).toBe(0)
+    expect(valueOf(oneStep('if(a < b, 1, 0)', ''), { a: 0.3, b: 0.30001 })).toBe(1)
+    expect(valueOf(oneStep('if(a >= b, 1, 0)', ''), { a: 0.1 + 0.2, b: 0.3 })).toBe(1)
+  })
+
+  test('exact integers of 13+ digits are not altered by ceil, floor or output rounding', () => {
+    const big = 1234567890123
+    expect(valueOf(oneStep('ceil(a)', ''), { a: big })).toBe(big)
+    expect(valueOf(oneStep('floor(a)', ''), { a: big })).toBe(big)
+    const model = oneStep('a', '')
+    model.outputs = [{ name: 'x', from: 'x', unit: '', rounding: 'ceil' }]
+    expect(valueOf(model, { a: big })).toBe(big)
+    expect(valueOf(oneStep('ceil(a)', ''), { a: big + 0.5 })).toBe(big + 1)
+  })
+
+  test('QA K2: 226.8 TB / (12 TB × 0.7) is 27 brokers, not 28', () => {
+    const run = evaluateModel(KAFKA_TEMPLATE, { ingress: 175, rf: 3, retention: 5 }, META)
+    expect(run.steps.find((step) => step.name === 'storage_brokers')?.value).toBe(27)
+    expect(run.outputs[0].value).toBe(27)
+  })
+})
+
 describe('binding detection', () => {
   const bindingOf = (formula: string, inputs: Record<string, number> = {}) => {
     const model = oneStep(formula, '')

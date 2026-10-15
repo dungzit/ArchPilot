@@ -19,9 +19,13 @@
  *    enters as 1.5e8. Each step's value is then expressed in its declared unit
  *    for the trace, so `116.64 TB` is computed as 1.1664e14 bytes / 1e12.
  *    In `excel` mode nothing is converted: identifiers are their raw numbers.
- * 3. ceil/floor/roundup_to, output rounding and comparisons first snap their
- *    operand to 12 significant digits, so float noise never adds a host
- *    (600 MB/s × 3 / 100 MB/s / 0.6 is 30.000000000000004 in IEEE doubles).
+ * 3. ceil/floor/roundup_to and output rounding first snap a near-integer
+ *    operand to that integer (relative tolerance 1e-9, absolute below 1), so
+ *    float noise never adds a host (600 MB/s × 3 / 100 MB/s / 0.6 is
+ *    30.000000000000004 in IEEE doubles) and a difference that should be 0
+ *    but is 4.4e-16 rounds up to 0, not 1. Real fractions and exact integers
+ *    of any size pass through unchanged. Comparisons use the same tolerance:
+ *    two values closer than it are equal.
  */
 import type { RuleLookup, RuleSeverity, RuleTest, SizingModelDef, SizingRun, SizingRunWarning, SizingStep } from '../../contracts/pilot'
 import { formatPlain, withUnit } from './format'
@@ -321,11 +325,10 @@ function columnIndex(table: RuleLookup, name: string): number {
 /** Exact match on the first column: numbers numerically, strings case-insensitively. */
 function findRow(table: RuleLookup, key: number | string): (string | number)[] | undefined {
   if (typeof key === 'number') {
-    const target = snap(key)
     return table.rows.find((row) => {
       const cell = row[0]
-      if (typeof cell === 'number') return snap(cell) === target
-      return typeof cell === 'string' && cell.trim() !== '' && Number(cell) === target
+      if (typeof cell === 'number') return nearlyEqual(cell, key)
+      return typeof cell === 'string' && cell.trim() !== '' && nearlyEqual(Number(cell), key)
     })
   }
   const target = key.trim().toLowerCase()
@@ -544,10 +547,25 @@ function parseChecked(source: unknown, where: string, errors: RuleError[]): Expr
 
 class EvalFailure extends Error {}
 
-/** 12 significant digits: removes IEEE noise before ceil/floor/compare. */
+/** Relative tolerance (absolute below 1) under which float noise is ignored. */
+const NOISE = 1e-9
+
+/**
+ * A value within NOISE of an integer becomes that integer: removes IEEE noise
+ * before ceil/floor (`4.4e-16` -> 0, `27.000000000000004` -> 27) without
+ * touching real fractions or large exact integers (1234567890123 stays).
+ */
 function snap(value: number): number {
-  if (value === 0 || !Number.isFinite(value)) return value
-  return Number(value.toPrecision(12))
+  if (!Number.isFinite(value)) return value
+  const nearest = Math.round(value)
+  return Math.abs(value - nearest) <= NOISE * Math.max(1, Math.abs(nearest)) ? nearest : value
+}
+
+/** Equal within NOISE (relative, absolute below 1): what `==`, `<` and friends use. */
+function nearlyEqual(a: number, b: number): boolean {
+  if (a === b) return true
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false
+  return Math.abs(a - b) <= NOISE * Math.max(1, Math.abs(a), Math.abs(b))
 }
 
 /** Excel ROUND: half away from zero, robust against 1.005-style noise. */
@@ -608,17 +626,17 @@ function evaluateBinary(node: Extract<Expr, { kind: 'binary' }>, state: EvalStat
       return result
     }
     case '<':
-      return snap(left) < snap(right) ? 1 : 0
+      return left < right && !nearlyEqual(left, right) ? 1 : 0
     case '<=':
-      return snap(left) <= snap(right) ? 1 : 0
+      return left <= right || nearlyEqual(left, right) ? 1 : 0
     case '>':
-      return snap(left) > snap(right) ? 1 : 0
+      return left > right && !nearlyEqual(left, right) ? 1 : 0
     case '>=':
-      return snap(left) >= snap(right) ? 1 : 0
+      return left >= right || nearlyEqual(left, right) ? 1 : 0
     case '==':
-      return snap(left) === snap(right) ? 1 : 0
+      return nearlyEqual(left, right) ? 1 : 0
     case '!=':
-      return snap(left) !== snap(right) ? 1 : 0
+      return nearlyEqual(left, right) ? 0 : 1
   }
 }
 
@@ -715,7 +733,9 @@ function substitute(step: CompiledCalc, state: EvalState): string {
   const top = step.expr
   let tail: string | null = null
   if (top.kind === 'call' && !top.paren && ['ceil', 'floor', 'round'].includes(top.name)) {
-    const inner = formatPlain(evaluate(top.args[0], state))
+    // Show what ceil/floor actually round: `ceil(0)`, not `ceil(4.441e-16)`.
+    const raw = evaluate(top.args[0], state)
+    const inner = formatPlain(top.name === 'round' ? raw : snap(raw))
     const digits = top.args[1] ? `, ${formatPlain(evaluate(top.args[1], state))}` : ''
     tail = `${top.name}(${inner}${digits})`
   } else if (top.kind === 'call' && !top.paren && top.name === 'roundup_to') {
@@ -768,9 +788,10 @@ function findBinding(state: EvalState): string | null {
     seen.add(index)
     const call = firstMinMax(compiled.calc[index].expr)
     if (call) {
-      const values = call.args.map((arg) => snap(evaluate(arg, state)))
+      const values = call.args.map((arg) => evaluate(arg, state))
       const target = call.name === 'max' ? Math.max(...values) : Math.min(...values)
-      const winner = call.args[values.indexOf(target)]
+      // Ties, including ties within float noise, go to the first argument.
+      const winner = call.args[values.findIndex((value) => nearlyEqual(value, target))]
       return winner.kind === 'ident' ? winner.name : printExpr(winner)
     }
     for (const name of referencedNames(compiled.calc[index].expr)) {
