@@ -7,7 +7,7 @@ import type { RulePack, RuleStatus, SizingModelDef } from '../../../contracts/pi
 import type { RuleError } from '../../../domain/rules/engine'
 
 export interface EditablePack {
-  /** Set when editing a stored, user-owned pack (save = update). */
+  /** Set when editing a stored pack the user may update (save = update). */
   id?: string
   builtIn: boolean
   name: string
@@ -15,6 +15,14 @@ export interface EditablePack {
   version: number
   status: RuleStatus
   models: SizingModelDef[]
+  /** Set when this is a copy of a pack the user may not update (built-in, or someone else's). */
+  copyOf?: { name: string; owner: string | null; builtIn: boolean }
+}
+
+/** The signed-in user, as far as pack ownership goes (src/api/auth.ts User). */
+export interface PackUser {
+  username: string
+  role: string
 }
 
 export type PackDraft = Omit<RulePack, 'id' | 'builtIn' | 'createdAt' | 'updatedAt'>
@@ -41,16 +49,34 @@ export function blankPack(): EditablePack {
   return { builtIn: false, name: 'Rule pack mới / New rule pack', description: '', version: 1, status: 'draft', models: [blankModel()] }
 }
 
-export function editableFrom(pack: RulePack): EditablePack {
-  return {
-    id: pack.builtIn ? undefined : pack.id,
-    builtIn: pack.builtIn,
-    name: pack.builtIn ? `${pack.name} (copy)` : pack.name,
-    description: pack.description ?? '',
-    version: pack.builtIn ? 1 : pack.version,
-    status: pack.status,
-    models: structuredClone(pack.models),
+/**
+ * May `user` replace `pack` (PUT /api/rule-packs/{id})? Mirrors the backend
+ * rule: the owner (`RulePack.owner` is the owner's username) or an admin.
+ * Built-in packs live in the bundle and are never updated. `undefined` means
+ * "no user known here" (a panel rendered on its own): the server decides.
+ */
+export function canUpdatePack(pack: Pick<RulePack, 'builtIn' | 'owner'>, user: PackUser | null | undefined): boolean {
+  if (pack.builtIn) return false
+  if (user === undefined) return true
+  if (user === null) return false
+  return user.role === 'admin' || (!!pack.owner && pack.owner === user.username)
+}
+
+/**
+ * The editor's working copy of a stored pack. A built-in pack, or a pack
+ * `user` may not update, opens as a copy: no id (save creates a new pack),
+ * version 1, the name suffixed so it does not collide with the original.
+ */
+export function editableFrom(pack: RulePack, user?: PackUser | null): EditablePack {
+  const description = pack.description ?? ''
+  const models = structuredClone(pack.models)
+  if (pack.builtIn) {
+    return { id: undefined, builtIn: true, name: `${pack.name} (copy)`, description, version: 1, status: pack.status, models, copyOf: { name: pack.name, owner: null, builtIn: true } }
   }
+  if (!canUpdatePack(pack, user)) {
+    return { id: undefined, builtIn: false, name: `${pack.name} (bản sao)`, description, version: 1, status: pack.status, models, copyOf: { name: pack.name, owner: pack.owner ?? null, builtIn: false } }
+  }
+  return { id: pack.id, builtIn: false, name: pack.name, description, version: pack.version, status: pack.status, models }
 }
 
 export function toDraft(pack: EditablePack, status: RuleStatus): PackDraft {

@@ -6,6 +6,7 @@ import { LIMITS } from '../../../domain/rules/excel/layout'
 import type { ExcelIssue } from '../../../domain/rules/excel/messages'
 import type { ImportResult, ModelPreview } from '../../../domain/rules/excel/importer'
 import { copy, type TextFn } from '../../../ui/copy'
+import { canUpdatePack, type PackUser } from '../editor/editorModel'
 import { CheckResults } from './CheckResults'
 import { downloadBytes, errorText } from './download'
 import { findPackByName, persistPack } from './savePack'
@@ -23,7 +24,13 @@ const loadExcel = () => (excelModule ??= import('../../../domain/rules/excel'))
 
 type Busy = null | 'template' | 'import' | 'save' | 'export'
 
-export function ExcelPanel({ text, onImported }: { text: TextFn; language: 'vi' | 'en'; onImported?: (pack: RulePack) => void }) {
+export function ExcelPanel({ text, onImported, user }: {
+  text: TextFn
+  language: 'vi' | 'en'
+  onImported?: (pack: RulePack) => void
+  /** The signed-in user: "Update to vN" on a same-name pack is offered only to its owner or an admin. */
+  user?: PackUser | null
+}) {
   const [busy, setBusy] = useState<Busy>(null)
   const [templateError, setTemplateError] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
@@ -118,7 +125,8 @@ export function ExcelPanel({ text, onImported }: { text: TextFn; language: 'vi' 
         }
       }
       const status = c?.available && c.publishable ? 'published' : 'draft'
-      const stored = await persistPack({ ...pack, status }, mode === 'update' ? duplicate : null)
+      const target = mode === 'update' && duplicate && canUpdatePack(duplicate, user) ? duplicate : null
+      const stored = await persistPack({ ...pack, status }, target)
       setSaved(stored)
       setDuplicate(null)
       onImported?.(stored)
@@ -225,14 +233,21 @@ export function ExcelPanel({ text, onImported }: { text: TextFn; language: 'vi' 
           {duplicate && (
             <div className="rx-callout rx-warn" data-dialog="duplicate">
               <span>
-                {text(copy(`Đã có pack "${duplicate.name}" (v${duplicate.version}). Cập nhật thành version mới hay lưu thành pack riêng?`, `A pack named "${duplicate.name}" (v${duplicate.version}) exists. Update it to a new version or save a separate pack?`))}
+                {canUpdatePack(duplicate, user)
+                  ? text(copy(`Đã có pack "${duplicate.name}" (v${duplicate.version}). Cập nhật thành version mới hay lưu thành pack riêng?`, `A pack named "${duplicate.name}" (v${duplicate.version}) exists. Update it to a new version or save a separate pack?`))
+                  : text(copy(
+                    `Đã có pack "${duplicate.name}" (v${duplicate.version})${duplicate.owner ? ` của ${duplicate.owner}` : ''}; chỉ chủ sở hữu hoặc admin mới cập nhật được. Lưu thành pack riêng?`,
+                    `A pack named "${duplicate.name}" (v${duplicate.version})${duplicate.owner ? ` owned by ${duplicate.owner}` : ''} exists; only its owner or an admin can update it. Save it as a separate pack?`,
+                  ))}
               </span>
               <div className="rx-actions">
-                <button type="button" className="primary-button" onClick={() => void save('update')} disabled={busy !== null} data-action="save-update">
-                  {text(copy(`Cập nhật thành v${duplicate.version + 1}`, `Update to v${duplicate.version + 1}`))}
-                </button>
+                {canUpdatePack(duplicate, user) && (
+                  <button type="button" className="primary-button" onClick={() => void save('update')} disabled={busy !== null} data-action="save-update">
+                    {text(copy(`Cập nhật thành v${duplicate.version + 1}`, `Update to v${duplicate.version + 1}`))}
+                  </button>
+                )}
                 <button type="button" className="secondary-button" onClick={() => void save('new')} disabled={busy !== null} data-action="save-new">
-                  {text(copy('Lưu thành pack mới', 'Save as a new pack'))}
+                  {canUpdatePack(duplicate, user) ? text(copy('Lưu thành pack mới', 'Save as a new pack')) : text(copy('Lưu thành pack riêng', 'Save as a separate pack'))}
                 </button>
                 <button type="button" className="text-button" onClick={() => setDuplicate(null)}>
                   {text(copy('Hủy', 'Cancel'))}

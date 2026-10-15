@@ -92,6 +92,33 @@ describe('ExcelPanel', () => {
     expect(onImported).toHaveBeenCalledWith(expect.objectContaining({ id: 'rp_1' }))
   })
 
+  test('a same-name pack owned by someone else: a member only gets "Save as a separate pack"; the owner may update', async () => {
+    const theirs: RulePack = { id: 'rp_9', name: 'Kafka sizing (template)', version: 3, status: 'published', builtIn: false, owner: 'alice', models: [] }
+    stored = [theirs]
+    const member = { username: 'bob', role: 'member' }
+    await act(async () => { root.render(<ExcelPanel text={text} language="en" user={member} />) })
+    const { data } = await buildTemplateWorkbook()
+    await upload(data, 'archpilot-rule-template.xlsx')
+    await waitFor(() => $('[data-action="save"]') !== null, 'imported')
+    await click($('[data-action="save"]'))
+    await waitFor(() => $('[data-dialog="duplicate"]') !== null, 'duplicate prompt')
+    expect($('[data-action="save-update"]')).toBeNull()
+    expect($('[data-dialog="duplicate"]')!.textContent).toContain('owned by alice exists; only its owner or an admin can update it')
+    expect($('[data-action="save-new"]')!.textContent).toBe('Save as a separate pack')
+    await click($('[data-action="save-new"]'))
+    await waitFor(() => $('[data-saved]') !== null, 'saved')
+    expect(calls.filter((c) => c.method !== 'GET').map((c) => c.method)).toEqual(['POST'])
+
+    // The owner sees "Update to v4".
+    await act(async () => { root.render(<ExcelPanel key="owner" text={text} language="en" user={{ username: 'alice', role: 'member' }} />) })
+    stored = [theirs]
+    await upload(data, 'archpilot-rule-template.xlsx')
+    await waitFor(() => $('[data-action="save"]') !== null, 'imported again')
+    await click($('[data-action="save"]'))
+    await waitFor(() => $('[data-dialog="duplicate"]') !== null, 'duplicate prompt for the owner')
+    expect($('[data-action="save-update"]')!.textContent).toBe('Update to v4')
+  })
+
   test('an import error shows the cell address and offers no save', async () => {
     await act(async () => { root.render(<ExcelPanel text={text} language="en" />) })
     const { data } = await buildTemplateWorkbook()

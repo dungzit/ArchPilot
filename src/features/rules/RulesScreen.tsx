@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { User } from '../../api/auth'
 import { isApiError } from '../../api/client'
 import { listRulePacks } from '../../api/rulePacks'
 import type { RulePack } from '../../contracts/pilot'
@@ -28,7 +29,12 @@ const TABS: { key: Tab; label: ReturnType<typeof copy> }[] = [
   { key: 'editor', label: copy('Soạn rule', 'Rule editor') },
 ]
 
-export function RulesScreen({ text, language }: { text: TextFn; language: 'vi' | 'en' }) {
+export function RulesScreen({ text, language, user }: {
+  text: TextFn
+  language: 'vi' | 'en'
+  /** The signed-in user (App passes it): a pack someone else owns opens in the editor as a copy. */
+  user?: User | null
+}) {
   const [tab, setTab] = useState<Tab>('run')
   // Panels mount on first visit and then stay mounted (hidden), so switching
   // tabs never throws away a half-edited rule or an import in progress.
@@ -37,6 +43,10 @@ export function RulesScreen({ text, language }: { text: TextFn; language: 'vi' |
   const [packsError, setPacksError] = useState<string | null>(null)
   const [packId, setPackId] = useState(BUILT_IN_PACKS[0].id)
   const [reloadKey, setReloadKey] = useState(0)
+  // The editor's own open pack: the Run tab picker never changes it, only an
+  // explicit "Open in editor" does (request bumps so reopening resets too).
+  const [editorPack, setEditorPack] = useState<{ pack: RulePack | null; request: number }>({ pack: null, request: 0 })
+  const [editorDirty, setEditorDirty] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -57,11 +67,17 @@ export function RulesScreen({ text, language }: { text: TextFn; language: 'vi' |
   }, [])
 
   const packs = useMemo(() => [...BUILT_IN_PACKS, ...serverPacks], [serverPacks])
-  const selectedPack = packs.find((pack) => pack.id === packId) ?? null
 
   const openTab = (key: Tab) => {
     setTab(key)
     setVisited((previous) => (previous.has(key) ? previous : new Set(previous).add(key)))
+  }
+
+  const openInEditor = (pack: RulePack) => {
+    const discard = text(copy('Trình soạn đang có thay đổi chưa lưu. Bỏ chúng và mở pack này?', 'The rule editor has unsaved changes. Discard them and open this pack?'))
+    if (editorDirty && !window.confirm(discard)) return
+    setEditorPack((current) => ({ pack, request: current.request + 1 }))
+    openTab('editor')
   }
 
   return (
@@ -95,16 +111,24 @@ export function RulesScreen({ text, language }: { text: TextFn; language: 'vi' |
         </p>
       )}
       <div role="tabpanel" id="rules-panel-run" aria-labelledby="rules-tab-run" hidden={tab !== 'run'}>
-        <RunPanel text={text} language={language} packs={packs} packId={packId} onPackChange={setPackId} />
+        <RunPanel text={text} language={language} packs={packs} packId={packId} onPackChange={setPackId} onOpenInEditor={openInEditor} />
       </div>
       {visited.has('excel') && (
         <div role="tabpanel" id="rules-panel-excel" aria-labelledby="rules-tab-excel" hidden={tab !== 'excel'}>
-          <ExcelPanel text={text} language={language} onImported={refresh} />
+          <ExcelPanel text={text} language={language} onImported={refresh} user={user} />
         </div>
       )}
       {visited.has('editor') && (
         <div role="tabpanel" id="rules-panel-editor" aria-labelledby="rules-tab-editor" hidden={tab !== 'editor'}>
-          <RuleEditorPanel text={text} language={language} initial={selectedPack} onSaved={refresh} />
+          <RuleEditorPanel
+            text={text}
+            language={language}
+            initial={editorPack.pack}
+            openRequest={editorPack.request}
+            onSaved={refresh}
+            onDirtyChange={setEditorDirty}
+            user={user}
+          />
         </div>
       )}
     </div>

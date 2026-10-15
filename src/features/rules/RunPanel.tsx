@@ -1,4 +1,4 @@
-import { FlaskConical, RotateCcw } from 'lucide-react'
+import { FlaskConical, PencilLine, RotateCcw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { RulePack, SizingModelDef, SizingRun } from '../../contracts/pilot'
 import { compileModel, evaluateModel, runModelTests, type ModelTestResult } from '../../domain/rules/engine'
@@ -24,12 +24,14 @@ export function packLabel(pack: RulePack, text: TextFn): string {
   return `${pack.name} · v${pack.version} · ${origin}`
 }
 
-export function RunPanel({ text, language, packs, packId, onPackChange }: {
+export function RunPanel({ text, language, packs, packId, onPackChange, onOpenInEditor }: {
   text: TextFn
   language: Language
   packs: RulePack[]
   packId: string
   onPackChange: (id: string) => void
+  /** Open the picked pack in the rule editor tab (the only way the editor's pack changes). */
+  onOpenInEditor?: (pack: RulePack) => void
 }) {
   const pack = packs.find((candidate) => candidate.id === packId) ?? packs[0]
   const [modelId, setModelId] = useState('')
@@ -75,6 +77,11 @@ export function RunPanel({ text, language, packs, packId, onPackChange }: {
           <select id="rules-pack" value={pack.id} onChange={(event) => { onPackChange(event.target.value); setModelId('') }}>
             {packs.map((candidate) => <option key={candidate.id} value={candidate.id}>{packLabel(candidate, text)}</option>)}
           </select>
+          {onOpenInEditor && (
+            <button type="button" className="text-button" onClick={() => onOpenInEditor(pack)} data-action="open-in-editor">
+              <PencilLine size={14} aria-hidden="true" /> {text(copy('Mở trong trình soạn', 'Open in editor'))}
+            </button>
+          )}
         </div>
         <div className="calc-field">
           <label htmlFor="rules-model">{text(copy('Sizing model', 'Sizing model'))}</label>

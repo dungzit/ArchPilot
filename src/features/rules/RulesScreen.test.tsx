@@ -7,6 +7,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { User } from '../../api/auth'
 import type { RulePack, SizingRun } from '../../contracts/pilot'
 import { installFakeFetch, jsonResponse, waitFor, type RecordedRequest } from '../../test/fakeFetch'
 import type { Copy } from '../../ui/copy'
@@ -64,12 +65,20 @@ const edit = (name: string, value: string) => act(async () => { setValue($<HTMLI
 const choose = (selector: string, value: string) => act(async () => { setValue($<HTMLSelectElement>(selector)!, value) })
 const click = (element: Element) => act(async () => { (element as HTMLElement).click() })
 
-async function render(options: { text?: (value: Copy) => string; packs?: 'ok' | 'down' } = {}) {
+let serverPacks: RulePack[]
+
+async function render(options: { text?: (value: Copy) => string; packs?: 'ok' | 'down'; user?: User } = {}) {
   savedRuns = []
+  serverPacks = [TEAM_PACK]
   calls = installFakeFetch(async (request) => {
     const url = new URL(request.url, 'http://localhost')
+    if (url.pathname === '/api/rule-packs' && request.method === 'POST') {
+      const pack = { ...JSON.parse(request.body!), id: `rpk_new${serverPacks.length}`, version: 1, builtIn: false, owner: options.user?.username } as RulePack
+      serverPacks = [...serverPacks, pack]
+      return jsonResponse(201, pack)
+    }
     if (url.pathname === '/api/rule-packs') {
-      return options.packs === 'down' ? jsonResponse(500, { detail: 'internal server error' }) : jsonResponse(200, { items: [TEAM_PACK], total: 1 })
+      return options.packs === 'down' ? jsonResponse(500, { detail: 'internal server error' }) : jsonResponse(200, { items: serverPacks, total: serverPacks.length })
     }
     if (url.pathname === '/api/designs') return jsonResponse(200, { items: [DESIGN], total: 1, limit: 100, offset: 0 })
     if (url.pathname === '/api/sizing-runs' && request.method === 'GET') {
@@ -91,7 +100,7 @@ async function render(options: { text?: (value: Copy) => string; packs?: 'ok' | 
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
-  await act(async () => { root.render(<RulesScreen text={options.text ?? en} language={options.text === vi_ ? 'vi' : 'en'} />) })
+  await act(async () => { root.render(<RulesScreen text={options.text ?? en} language={options.text === vi_ ? 'vi' : 'en'} user={options.user} />) })
   await waitFor(() => calls.some((call) => call.url.startsWith('/api/rule-packs')), 'rule packs requested')
   await waitFor(() => $('#rules-design option[value="dsg_1"]') !== null, 'designs loaded')
 }
@@ -222,6 +231,79 @@ describe('Rules screen: tabs and language', () => {
     expect($('[data-output="instances"] h3')!.textContent).toBe('Số instance')
     await edit('ccu', '-1')
     expect($('#rule-input-ccu-error')!.textContent).toBe('Tối thiểu 0.')
+  })
+})
+
+describe('Rules screen: rule editor', () => {
+  const MEMBER: User = { id: 'usr_m', username: 'minh', displayName: 'Minh', role: 'member' }
+  const packName = () => $<HTMLInputElement>('[data-panel="rules-editor"] [data-field="pack-name"]')!
+
+  async function openInEditor(pack: string) {
+    await waitFor(() => $$('#rules-pack option').length === 2, 'team pack listed')
+    await choose('#rules-pack', pack)
+    await click($('[data-action="open-in-editor"]')!)
+    await waitFor(() => $('[data-panel="rules-editor"]') !== null, 'editor mounted')
+  }
+
+  test('the Run tab picker never resets the editor; only "Open in editor" does', async () => {
+    await render({ user: MEMBER })
+    await click($('#rules-tab-editor')!)
+    expect($('[data-hint="open-in-editor"]')).not.toBeNull()
+    await act(async () => { setValue(packName(), 'Half-done pack') })
+
+    await click($('#rules-tab-run')!)
+    await choose('#rules-pack', 'rpk_team1')
+    await choose('#rules-pack', 'archpilot-core')
+    await click($('#rules-tab-editor')!)
+    expect(packName().value).toBe('Half-done pack')
+
+    // Unsaved edits: "Open in editor" asks first, and Cancel keeps them.
+    const confirm = vi.fn(() => false)
+    vi.stubGlobal('confirm', confirm)
+    await click($('#rules-tab-run')!)
+    await openInEditor('rpk_team1')
+    expect(confirm).toHaveBeenCalledTimes(1)
+    expect(packName().value).toBe('Half-done pack')
+    confirm.mockReturnValue(true)
+    await click($('#rules-tab-run')!)
+    await click($('[data-action="open-in-editor"]')!)
+    expect($<HTMLElement>('#rules-panel-editor')!.hidden).toBe(false)
+    expect(packName().value).toBe('Team pack (bản sao)')
+  })
+
+  test('a member opens someone else\'s pack as a copy, can only save it as a new pack, and keeps the "Saved v1" note', async () => {
+    await render({ user: MEMBER })
+    await openInEditor('rpk_team1')
+    expect(packName().value).toBe('Team pack (bản sao)')
+    expect($('[data-meta]')!.getAttribute('data-meta')).toBe('copy')
+    expect($('[data-copy-of]')!.textContent).toContain('owned by usr_other')
+    const saveButton = $('[data-panel="rules-editor"] [data-action="save"]')!
+    expect(saveButton.textContent).toBe('Save as a new pack')
+
+    await click(saveButton)
+    await waitFor(() => $('[data-panel="rules-editor"] [data-saved]') !== null, 'saved')
+    const writes = calls.filter((call) => call.url.startsWith('/api/rule-packs') && call.method !== 'GET')
+    expect(writes.map((call) => call.method)).toEqual(['POST'])
+    expect(JSON.parse(writes[0].body!)).toMatchObject({ name: 'Team pack (bản sao)' })
+
+    // The list reloads and the Run tab picks the new pack; the editor keeps its confirmation.
+    await waitFor(() => $$('#rules-pack option').length === 3, 'list reloaded')
+    expect($<HTMLSelectElement>('#rules-pack')!.value).toBe('rpk_new1')
+    expect($('[data-panel="rules-editor"] [data-saved]')!.textContent).toContain('Saved "Team pack (bản sao)" v1')
+    // Now the member owns the copy: the next save is an update.
+    expect($('[data-meta]')!.getAttribute('data-meta')).toBe('editing')
+  })
+
+  test('the owner and an admin edit the pack in place', async () => {
+    await render({ user: { ...MEMBER, username: 'usr_other' } })
+    await openInEditor('rpk_team1')
+    expect(packName().value).toBe('Team pack')
+    expect($('[data-meta]')!.getAttribute('data-meta')).toBe('editing')
+    await act(async () => { root.unmount() })
+    container.remove()
+    await render({ user: { ...MEMBER, role: 'admin' } })
+    await openInEditor('rpk_team1')
+    expect(packName().value).toBe('Team pack')
   })
 })
 
