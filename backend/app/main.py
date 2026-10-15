@@ -186,9 +186,11 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         # The schema of every route, including the admin surface, is not
         # something an unauthenticated caller needs in production.
-        docs_url=None if settings.is_production else "/api/docs",
+        # Pilot mode too (security review 2026-10-15 #3): Swagger UI loads its
+        # bundle from a CDN into this origin, so docs exist only in development and tests.
+        docs_url="/api/docs" if settings.env in ("development", "test") else None,
         redoc_url=None,
-        openapi_url=None if settings.is_production else "/api/openapi.json",
+        openapi_url="/api/openapi.json" if settings.env in ("development", "test") else None,
     )
 
     # Innermost (added first): a 413 from here still passes through CORS and

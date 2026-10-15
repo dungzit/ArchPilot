@@ -83,11 +83,30 @@ class Response:
 Transport = Callable[[str, dict[str, str], float], tuple[int, dict[str, str], bytes]]
 
 
+class SameSiteRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only when it stays under BASE_URL (security review 2026-10-15 #2).
+
+    The prefix and robots checks in PoliteFetcher.get only see the first URL; urllib
+    would otherwise follow a 3xx to any host, including LAN or container-internal
+    addresses. An off-site redirect surfaces as an HTTPError with the 3xx code,
+    which the crawler records as a failed fetch.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        if not newurl.startswith(BASE_URL + "/"):
+            raise urllib.error.HTTPError(newurl, code, f"refusing off-site redirect to {newurl}", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(SameSiteRedirectHandler)
+
+
 def urllib_transport(url: str, headers: dict[str, str], timeout: float) -> tuple[int, dict[str, str], bytes]:
     request = urllib.request.Request(url, headers=headers, method="GET")  # noqa: S310 - see below
     try:
-        # S310: only https://www.sysdesai.com/... URLs reach here (PoliteFetcher.get checks the prefix).
-        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+        # S310: only https://www.sysdesai.com/... URLs reach here (PoliteFetcher.get checks the prefix),
+        # and SameSiteRedirectHandler keeps redirects on that site.
+        with _OPENER.open(request, timeout=timeout) as resp:
             return resp.status, {k.lower(): v for k, v in resp.headers.items()}, resp.read(MAX_BODY_BYTES + 1)
     except urllib.error.HTTPError as exc:
         body = exc.read(64 * 1024) if exc.fp else b""

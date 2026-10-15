@@ -15,6 +15,7 @@ import ExcelJS from 'exceljs'
 import type { RuleLookup, RulePack, SizingModelDef } from '../../../contracts/pilot'
 import { FormulaSyntaxError, rewriteExcelFormula } from './excelFormula'
 import { dslToExcel } from './dslToExcel'
+import { isSafeStoredExcelFormula } from './formulaSafety'
 import { COLUMNS, LOOKUP_TABLE_MARKER, PACK_KEYS, SHEET, excelModelPrefix, excelSafeName, guardText } from './layout'
 import { issueWarning, msg, type ExcelIssue } from './messages'
 
@@ -259,7 +260,10 @@ export async function exportRulePackToXlsx(pack: PackForExcel, options: ExportOp
       let formulaCell: CellValue = null
       if (excelMode) {
         let excelText: string | null = null
-        if (c.excelFormula && c.excelFormula.trim() !== '') {
+        if (c.excelFormula && c.excelFormula.trim() !== '' && !isSafeStoredExcelFormula(c.excelFormula)) {
+          // Never re-emit a stored formula outside the import allow-list (e.g. WEBSERVICE, cell refs).
+          issues.push(issueWarning(where, msg(`Bước ${c.name}: công thức Excel đã lưu dùng hàm hoặc tham chiếu không được phép; dùng bản dịch từ DSL.`, `Step ${c.name}: the stored Excel formula uses a function or reference that is not allowed; using the DSL translation.`)))
+        } else if (c.excelFormula && c.excelFormula.trim() !== '') {
           try {
             const rewritten = rewriteExcelFormula(c.excelFormula, rename)
             if (rewritten.unknown.length > 0) {

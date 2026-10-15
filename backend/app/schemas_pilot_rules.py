@@ -26,9 +26,10 @@ reaches the database.
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
 MAX_RULE_BODY_BYTES = 512 * 1024
@@ -82,12 +83,41 @@ class RuleParamIn(_Wire):
     source: ShortText | None = None
 
 
+# Functions an imported Excel formula may use: the same list as
+# src/domain/rules/excel/translate.ts SUPPORTED_EXCEL_FUNCTIONS. Security review
+# 2026-10-15 #1: packs are shared, so a stored formula such as WEBSERVICE(...)
+# must never reach a colleague's export. The exporter re-checks with a real parser.
+_EXCEL_FUNCTIONS = frozenset({
+    "ROUND", "ROUNDUP", "ROUNDDOWN", "CEILING", "CEILING.MATH", "FLOOR", "FLOOR.MATH",
+    "MAX", "MIN", "SUM", "AVERAGE", "ABS", "IF", "IFS", "AND", "OR", "NOT",
+    "VLOOKUP", "XLOOKUP", "INDEX", "MATCH",
+})
+_EXCEL_CALL = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*)\s*\(")
+
+
 class RuleCalcIn(_Wire):
     name: Identifier
     formula: Formula
     unit: UnitText = ""
     description: LongText | None = None
     excel_formula: LongText | None = None
+
+    @field_validator("excel_formula")
+    @classmethod
+    def _excel_formula_allow_list(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        # No sheet, external-workbook or structured references.
+        if any(ch in value for ch in "!['"):
+            raise ValueError("excelFormula: sheet or external references are not allowed")
+        for match in _EXCEL_CALL.finditer(value):
+            name = match.group(1).upper()
+            for prefix in ("_XLFN.", "_XLWS."):
+                if name.startswith(prefix):
+                    name = name[len(prefix):]
+            if name not in _EXCEL_FUNCTIONS:
+                raise ValueError(f"excelFormula: function {name} is not allowed")
+        return value
 
 
 class RuleOutputIn(_Wire):

