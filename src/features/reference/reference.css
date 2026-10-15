@@ -1,0 +1,125 @@
+/* Pilot WP-B: SysDesAi reference search screen. Uses the shell's palette
+   variables (--ink, --muted, --line, --navy, --teal, --mint, --amber, --blue). */
+
+.reference-screen .ref-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.reference-screen .ref-query {
+  flex: 1 1 360px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--teal);
+}
+
+.reference-screen .ref-query:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(15, 139, 122, .12); }
+
+.reference-screen .ref-query input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  min-width: 0;
+}
+
+.reference-screen .ref-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.reference-screen .ref-filter select,
+.reference-screen .ref-pin-form select,
+.reference-screen .ref-pin-form input {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  padding: 9px 10px;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  max-width: 260px;
+}
+
+.reference-screen .ref-status { color: var(--muted); font-size: 12px; margin: 0 0 18px; }
+.reference-screen .ref-hint,
+.reference-screen .ref-loading,
+.reference-screen .ref-empty { color: var(--muted); font-size: 13px; }
+.reference-screen .ref-error { color: #b4442f; font-size: 12px; }
+
+.reference-screen .ref-summary { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+.reference-screen .ref-expanded { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--navy); background: var(--mint); border-radius: 4px; padding: 1px 6px; }
+
+.reference-screen .ref-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+
+.reference-screen .ref-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px 12px;
+}
+
+.reference-screen .ref-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.reference-screen .ref-card h2 { font-family: 'Space Grotesk', sans-serif; font-size: 17px; letter-spacing: -.02em; margin: 0; }
+.reference-screen .ref-card h2 a { color: var(--navy); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.reference-screen .ref-card h2 a:hover { color: var(--teal); text-decoration: underline; }
+
+.reference-screen .ref-badges { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.reference-screen .ref-tab,
+.reference-screen .ref-upvotes { font: 10px 'DM Mono', monospace; border-radius: 4px; padding: 3px 7px; white-space: nowrap; }
+.reference-screen .ref-tab-featured { background: #fff2d7; color: #a67216; }
+.reference-screen .ref-tab-real-world { background: #e4ecf8; color: var(--blue); }
+.reference-screen .ref-tab-community { background: #eef1f4; color: var(--muted); }
+.reference-screen .ref-upvotes { background: #f4f7f6; color: var(--muted); }
+
+.reference-screen .ref-prompt { color: var(--ink); font-size: 13px; margin: 6px 0; }
+.reference-screen .ref-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.reference-screen .ref-chip { background: var(--mint); color: #14806f; border-radius: 999px; padding: 2px 9px; font-size: 10px; }
+.reference-screen .ref-article { font-size: 12px; color: var(--muted); margin: 4px 0; }
+.reference-screen .ref-article a { color: var(--blue); }
+
+.reference-screen .ref-steps { list-style: none; margin: 10px 0 6px; padding: 0 0 0 12px; border-left: 2px solid var(--line); display: grid; gap: 8px; }
+.reference-screen .ref-step-title { font-size: 12.5px; font-weight: 600; color: var(--navy); }
+.reference-screen .ref-phase { font-weight: 400; color: var(--muted); }
+.reference-screen .ref-snippet { font-size: 12px; color: #4a5d70; margin: 3px 0 0; line-height: 1.55; }
+.reference-screen .ref-snippet mark { background: #fff2d7; color: inherit; padding: 0 1px; border-radius: 2px; }
+
+.reference-screen .ref-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px dashed var(--line);
+  margin-top: 10px;
+  padding-top: 8px;
+}
+
+.reference-screen .ref-attribution { font-size: 10.5px; color: var(--muted); }
+.reference-screen .ref-pin-button { padding: 6px 10px; }
+.reference-screen .ref-pin-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.reference-screen .ref-pin-form .primary-button,
+.reference-screen .ref-pin-form .secondary-button { padding: 7px 10px; }
+.reference-screen .ref-pin-note { font-size: 11px; color: var(--muted); }
+.reference-screen .ref-pin-ok { color: #14806f; }
+
+@media (max-width: 720px) {
+  .reference-screen .ref-card-head { flex-direction: column; }
+  .reference-screen .ref-filter select { max-width: none; }
+}

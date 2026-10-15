@@ -91,6 +91,17 @@ class Settings:
         default_factory=lambda: _env_bool("ARCHPILOT_BACKUP_BEFORE_MIGRATE", True)
     )
 
+    # Pilot WP-B (docs/v3/03): the SysDesAi crawler snapshot (JSONL.gz). Loaded
+    # into the reference index at start-up when its hash changed. Empty = the
+    # default `<db dir>/reference/sysdesai-snapshot.jsonl.gz`.
+    reference_snapshot: str = field(default_factory=lambda: os.environ.get("ARCHPILOT_REFERENCE_SNAPSHOT", ""))
+
+    @property
+    def reference_snapshot_path(self) -> Path:
+        if self.reference_snapshot.strip():
+            return Path(self.reference_snapshot.strip()).resolve()
+        return self.db_path.parent / "reference" / "sysdesai-snapshot.jsonl.gz"
+
     @property
     def is_production(self) -> bool:
         return self.env == "production"
