@@ -843,7 +843,7 @@ export function importWorkbook(wb: ExcelJS.Workbook, fileName: string): ImportRe
       const input = model.inputs.find((i) => i.name === o.from)
       let v = input ? input.default : cached.get(o.from)
       if (v === undefined) {
-        warn(SHEET.calc, `Model ${model.id}: bước ${o.from} không có kết quả Excel đã lưu; test "cached" bỏ qua output ${o.name}. Hãy mở và lưu file trong Excel.`, `Model ${model.id}: step ${o.from} has no saved Excel result; the "cached" test skips output ${o.name}. Open and save the file in Excel.`)
+        warn(SHEET.calc, `Model ${model.id}: bước ${o.from} không có kết quả Excel đã lưu; test "cached" bỏ qua output ${o.name}. Hãy mở bằng Excel, tính lại (F9), lưu rồi import lại.`, `Model ${model.id}: step ${o.from} has no saved Excel result; the "cached" test skips output ${o.name}. Open the file in Excel, recalculate (F9), save and import again.`)
         continue
       }
       if (o.rounding === 'ceil') v = Math.ceil(v)
@@ -852,7 +852,11 @@ export function importWorkbook(wb: ExcelJS.Workbook, fileName: string): ImportRe
       expected[o.name] = v
     }
     if (Object.keys(expected).length === 0) {
-      warn(SHEET.tests, `Model ${model.id}: không có test và không có kết quả Excel đã lưu để tự tạo test.`, `Model ${model.id}: no tests and no saved Excel results to build one from.`)
+      warn(
+        SHEET.tests,
+        `Model ${model.id}: chưa có test và không có kết quả Excel đã lưu để tự tạo test; chỉ lưu được dạng draft. Hãy mở bằng Excel, tính lại (F9), lưu rồi import lại.`,
+        `Model ${model.id}: no tests and no saved Excel results to build one from; it can only be saved as draft. Open the file in Excel, recalculate (F9), save and import again.`,
+      )
       continue
     }
     model.tests.push({

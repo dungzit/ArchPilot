@@ -34,10 +34,12 @@ describe('importRulePackXlsx: file safety', () => {
     }
   })
 
-  it('rejects files over 5 MB', async () => {
+  it('rejects files over 5 MiB (5,242,880 bytes) and lets exactly 5 MiB through the size check', async () => {
     const r = await importRulePackXlsx(new Uint8Array(5 * 1024 * 1024 + 1), 'big.xlsx')
     expect(r.pack).toBeNull()
     expect(errors(r)[0].message.en).toMatch(/5 MB/)
+    const boundary = await importRulePackXlsx(new Uint8Array(5 * 1024 * 1024), 'boundary.xlsx')
+    expect(errors(boundary)[0].message.en).toMatch(/Not a valid .xlsx/) // passed the size check, failed later
   })
 
   it('rejects non-zip data and macro packages renamed to .xlsx', async () => {
@@ -169,6 +171,17 @@ describe('importRulePackXlsx: auto-generated tests (05 §5 mode B)', () => {
       { id: 'cached', inputs: { ingress: 150, rf: 3, retention_days: 3, is_prod: 1 }, expected: { brokers: 14, storage_tb: 116.64 }, tolerance: CACHED_TEST_TOLERANCE },
     ])
     expect(r.preview!.models[0].autoTestIds).toEqual(['cached'])
+  })
+
+  it('imports a workbook without tests or cached values as a model with no tests (draft only), with the F9 hint', async () => {
+    const r = await importEdited((wb) => {
+      wb.getWorksheet('Tests')!.spliceRows(2, 1)
+      const calc = wb.getWorksheet('Calc')!
+      for (const address of ['C2', 'C3', 'C4', 'C5']) calc.getCell(address).value = { formula: calc.getCell(address).formula }
+    })
+    expect(errors(r)).toEqual([])
+    expect(r.pack!.models[0].tests).toEqual([])
+    expect(warnings(r).some((w) => /can only be saved as draft/.test(w.message.en) && /F9/.test(w.message.en))).toBe(true)
   })
 
   it('warns and skips an output whose cached result is missing', async () => {
