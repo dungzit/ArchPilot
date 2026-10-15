@@ -367,6 +367,54 @@ describe('binding detection', () => {
   test('no max/min means no binding', () => {
     expect(bindingOf('a + b')).toBeNull()
   })
+
+  test('the untaken branch of if() is never evaluated: if(n > 0, max(a / n, 2), 1) with n = 0', () => {
+    const model = oneStep('if(b > 0, max(a / b, 2), 1)', '')
+    const run = evaluateModel(model, { b: 0 }, META)
+    expect(run.outputs[0].value).toBe(1)
+    expect(run.binding).toBeNull()
+    expect(run.steps[0].substituted).toBe('if(0 > 0, max(a / b, 2), 1)')
+    // The taken branch still reports its binding.
+    expect(evaluateModel(model, { a: 9, b: 3 }, META).binding).toBe('a / b')
+  })
+
+  test('a max() reached only through an untaken branch in an earlier step is not the binding', () => {
+    const model = makeModel({
+      inputs: [{ name: 'a', labelVi: '', labelEn: '', unit: '', default: 5 }, { name: 'b', labelVi: '', labelEn: '', unit: '', default: 3 }],
+      calc: [{ name: 'peak', formula: 'max(a, b)', unit: '' }, { name: 'total', formula: 'if(a > 10, peak, a + b)', unit: '' }],
+      outputs: [{ name: 'total', from: 'total', unit: '' }],
+    })
+    expect(evaluateModel(model, {}, META).binding).toBeNull()
+    expect(evaluateModel(model, { a: 11 }, META).binding).toBe('a')
+  })
+})
+
+describe('if() trace with a lookup in the untaken branch', () => {
+  const model = makeModel({
+    inputs: [{ name: 'tier', labelVi: '', labelEn: '', unit: 'count', default: 5 }],
+    lookups: [{ name: 't', columns: ['tier', 'v'], rows: [[1, 10], [2, 20]] }],
+    calc: [{ name: 'x', formula: 'if(tier <= 2, lookup(t, tier, "v"), 1)', unit: '' }],
+    outputs: [{ name: 'x', from: 'x', unit: '' }],
+  })
+
+  test('tier 5 (no row) runs: the untaken lookup prints as written instead of throwing', () => {
+    const run = evaluateModel(model, {}, META)
+    expect(run.outputs[0].value).toBe(1)
+    expect(run.steps[0].substituted).toBe('if(5 <= 2, lookup(t, tier, "v"), 1)')
+  })
+
+  test('tier 2 takes the lookup branch and shows its value', () => {
+    const run = evaluateModel(model, { tier: 2 }, META)
+    expect(run.outputs[0].value).toBe(20)
+    expect(run.steps[0].substituted).toBe('if(2 <= 2, lookup(t, 2 → v = 20), 1)')
+  })
+
+  test('a lookup behind a short-circuited `and` falls back to plain printing', () => {
+    const guarded = { ...model, calc: [{ name: 'x', formula: 'if(tier <= 2 and lookup(t, tier, "v") > 15, 1, 0)', unit: '' }] }
+    const run = evaluateModel(guarded, {}, META)
+    expect(run.outputs[0].value).toBe(0)
+    expect(run.steps[0].substituted).toBe('if(5 <= 2 and lookup(t, 5, "v") > 15, 1, 0)')
+  })
 })
 
 describe('runModelTests', () => {

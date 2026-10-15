@@ -29,7 +29,7 @@
  */
 import type { RuleLookup, RuleSeverity, RuleTest, SizingModelDef, SizingRun, SizingRunWarning, SizingStep } from '../../contracts/pilot'
 import { formatPlain, withUnit } from './format'
-import { DslSyntaxError, IDENTIFIER_RE, KEYWORDS, parseFormula, printExpr, referencedNames, type Expr } from './parser'
+import { DslSyntaxError, IDENTIFIER_RE, KEYWORDS, parseFormula, printExpr, type Expr } from './parser'
 import { DIMENSIONLESS, dimDiv, dimEquals, dimMul, dimPow, formatDim, isCountUnit, isDimensionless, parseUnit, type Dim } from './units'
 
 export interface RuleError {
@@ -721,10 +721,26 @@ function substitute(step: CompiledCalc, state: EvalState): string {
       if (!symbol || base === undefined) return undefined
       return traceText(displayValue(symbol, base, compiled.mode), symbol.unit)
     }
+    if (node.kind === 'call' && node.name === 'if' && node.args.length === 3) {
+      // Only the taken branch was evaluated; the other one prints as written,
+      // so a lookup or division there that would fail is never touched.
+      let taken: number
+      try {
+        taken = truthy(evaluate(node.args[0], state)) ? 1 : 2
+      } catch {
+        return undefined
+      }
+      return `if(${node.args.map((arg, index) => (index === 0 || index === taken ? printExpr(arg, leaf) : printExpr(arg))).join(', ')})`
+    }
     if (node.kind === 'call' && node.name === 'lookup') {
-      const { table, key, columnName } = lookupParts(node, state)
-      const keyText = node.args[1].kind === 'str' ? JSON.stringify(key) : printExpr(node.args[1], leaf)
-      return `lookup(${table.name}, ${keyText} → ${columnName} = ${formatPlain(evaluate(node, state))})`
+      try {
+        const { table, key, columnName } = lookupParts(node, state)
+        const keyText = node.args[1].kind === 'str' ? JSON.stringify(key) : printExpr(node.args[1], leaf)
+        return `lookup(${table.name}, ${keyText} → ${columnName} = ${formatPlain(evaluate(node, state))})`
+      } catch {
+        // Not evaluated on this run (e.g. the right side of a short-circuited `and`): print it plain.
+        return undefined
+      }
     }
     return undefined
   }
@@ -748,23 +764,48 @@ function substitute(step: CompiledCalc, state: EvalState): string {
   return tail === null || tail === text ? text : `${text} = ${tail}`
 }
 
-/** First max()/min() with 2+ arguments, depth-first. */
-function firstMinMax(expr: Expr): Extract<Expr, { kind: 'call' }> | null {
+/**
+ * The sub-expressions this run actually evaluated, in source order: an if()
+ * contributes its condition and the taken branch only, a short-circuited
+ * `and`/`or` only its left side, a lookup() its key (not the table name).
+ */
+function liveChildren(expr: Expr, state: EvalState): Expr[] {
   switch (expr.kind) {
     case 'call':
-      if ((expr.name === 'max' || expr.name === 'min') && expr.args.length >= 2) return expr
-      for (const arg of expr.args) {
-        const found = firstMinMax(arg)
-        if (found) return found
+      if (expr.name === 'if' && expr.args.length === 3) {
+        return [expr.args[0], truthy(evaluate(expr.args[0], state)) ? expr.args[1] : expr.args[2]]
       }
-      return null
+      if (expr.name === 'lookup') return expr.args.slice(1, 2)
+      return expr.args
     case 'binary':
-      return firstMinMax(expr.left) ?? firstMinMax(expr.right)
+      if (expr.op === 'and' && !truthy(evaluate(expr.left, state))) return [expr.left]
+      if (expr.op === 'or' && truthy(evaluate(expr.left, state))) return [expr.left]
+      return [expr.left, expr.right]
     case 'unary':
-      return firstMinMax(expr.arg)
+      return [expr.arg]
     default:
-      return null
+      return []
   }
+}
+
+/** First max()/min() with 2+ arguments on the evaluated path, depth-first. */
+function firstMinMax(expr: Expr, state: EvalState): Extract<Expr, { kind: 'call' }> | null {
+  if (expr.kind === 'call' && (expr.name === 'max' || expr.name === 'min') && expr.args.length >= 2) return expr
+  for (const child of liveChildren(expr, state)) {
+    const found = firstMinMax(child, state)
+    if (found) return found
+  }
+  return null
+}
+
+/** Names read on the evaluated path, in source order, without duplicates. */
+function liveNames(expr: Expr, state: EvalState, seen: string[] = []): string[] {
+  if (expr.kind === 'ident') {
+    if (!seen.includes(expr.name)) seen.push(expr.name)
+    return seen
+  }
+  for (const child of liveChildren(expr, state)) liveNames(child, state, seen)
+  return seen
 }
 
 /**
@@ -772,6 +813,7 @@ function firstMinMax(expr: Expr): Extract<Expr, { kind: 'call' }> | null {
  * feeds the first output and walks back through the steps it reads (nearest
  * first) until it meets a max()/min(); `hosts = max(cpu_hosts, ram_hosts) +
  * spare_hosts` therefore reports `cpu_hosts`. Ties go to the first argument.
+ * Only the evaluated path counts: an if() is followed into its taken branch.
  */
 function findBinding(state: EvalState): string | null {
   const { compiled } = state
@@ -786,7 +828,7 @@ function findBinding(state: EvalState): string | null {
     const index = queue.shift() as number
     if (seen.has(index)) continue
     seen.add(index)
-    const call = firstMinMax(compiled.calc[index].expr)
+    const call = firstMinMax(compiled.calc[index].expr, state)
     if (call) {
       const values = call.args.map((arg) => evaluate(arg, state))
       const target = call.name === 'max' ? Math.max(...values) : Math.min(...values)
@@ -794,7 +836,7 @@ function findBinding(state: EvalState): string | null {
       const winner = call.args[values.findIndex((value) => nearlyEqual(value, target))]
       return winner.kind === 'ident' ? winner.name : printExpr(winner)
     }
-    for (const name of referencedNames(compiled.calc[index].expr)) {
+    for (const name of liveNames(compiled.calc[index].expr, state)) {
       const ref = indexByName.get(name)
       if (ref !== undefined && ref < index) queue.push(ref)
     }
