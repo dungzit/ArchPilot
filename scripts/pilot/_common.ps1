@@ -241,7 +241,8 @@ function Invoke-PilotHttp {
         return New-Object psobject -Property @{ Status = [int]$r.StatusCode; Content = [string]$r.Content; Headers = $r.Headers; Error = $null }
     }
     catch {
-        $resp = $_.Exception.Response
+        $err = $_
+        $resp = $err.Exception.Response
         if ($null -ne $resp) {
             $text = ''
             try {
@@ -250,7 +251,10 @@ function Invoke-PilotHttp {
                 $reader.Close()
             }
             catch { }
-            return New-Object psobject -Property @{ Status = [int]$resp.StatusCode; Content = $text; Headers = $resp.Headers; Error = $_.Exception.Message }
+            # Windows PowerShell 5.1 has already consumed the error body by the time we get here;
+            # it is exposed as ErrorDetails.Message instead of the response stream.
+            if ([string]::IsNullOrEmpty($text) -and $null -ne $err.ErrorDetails) { $text = [string]$err.ErrorDetails.Message }
+            return New-Object psobject -Property @{ Status = [int]$resp.StatusCode; Content = $text; Headers = $resp.Headers; Error = $err.Exception.Message }
         }
         return New-Object psobject -Property @{ Status = 0; Content = ''; Headers = $null; Error = $_.Exception.Message }
     }

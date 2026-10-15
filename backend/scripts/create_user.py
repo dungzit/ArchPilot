@@ -36,7 +36,10 @@ from app.security import WeakPasswordError
 def read_password(args: argparse.Namespace) -> str | None:
     if args.password_stdin:
         line = sys.stdin.readline()
-        return line.rstrip("\r\n")
+        # Windows PowerShell 5.1 prefixes a UTF-8 BOM when it pipes text into a
+        # native command (e.g. `$pw | docker exec -i ...`), even with an ASCII
+        # $OutputEncoding. A BOM is never part of a real password: drop it.
+        return line.lstrip("\ufeff").rstrip("\r\n")
     if not sys.stdin.isatty():
         print(
             "error: stdin is not a terminal; pipe the password with --password-stdin",

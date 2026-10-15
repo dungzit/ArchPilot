@@ -30,7 +30,9 @@ def main(argv: list[str]) -> int:
         print("usage: reset_password.py <username>   (new password on stdin)", file=sys.stderr)
         return 2
     username = argv[1]
-    password = sys.stdin.readline().rstrip("\r\n")
+    # lstrip the UTF-8 BOM that Windows PowerShell 5.1 adds when piping into
+    # `docker exec -i` (same fix as backend/scripts/create_user.py).
+    password = sys.stdin.readline().lstrip("\ufeff").rstrip("\r\n")
 
     settings = get_settings()
     conn = connect(settings.db_path)
