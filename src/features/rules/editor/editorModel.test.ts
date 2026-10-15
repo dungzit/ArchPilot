@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { RulePack } from '../../../contracts/pilot'
+import { compileModel } from '../../../domain/rules/engine'
 import { KAFKA_TEMPLATE_MODEL } from '../../../domain/rules/excel/template'
 import { blankModel, editableFrom, errorMatchesRow, formatKv, nextModelId, packFromJson, parseKv, rowErrors, unmatchedErrors } from './editorModel'
 
 describe('editor model helpers', () => {
+  it('a new model defaults to units mode and compiles', () => {
+    const model = blankModel()
+    expect(model.formulaMode).toBe('units')
+    expect(compileModel(model)).toEqual({ ok: true })
+  })
+
   it('parses and formats key=value test fields', () => {
     expect(parseKv('ingress=150, rf = 3; retention_days=1e1')).toEqual({ ingress: 150, rf: 3, retention_days: 10 })
     expect(parseKv('')).toEqual({})

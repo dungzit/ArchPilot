@@ -164,6 +164,23 @@ describe('compile: unit checking (units mode)', () => {
     expect(messages(oneStep('a ^ 2 / a', 'GB', { unit: 'GB', value: 1 }))).toEqual([])
   })
 
+  test('a % value compared with a literal above 1 is an error (90% is 0.9, so util > 80 never fires)', () => {
+    const pct = { unit: '%', value: 90 }
+    const [message] = messages(oneStep('if(a > 80, 1, 0)', '', pct))
+    expect(message).toMatch(/^unit error at calc\.x: "a" is in % and is compared as a fraction \(90% = 0\.9\), so comparing it with 80 never does what you mean; write 0\.8 for 80%/)
+    expect(messages(oneStep('if(100 <= a, 1, 0)', '', pct))[0]).toContain('write 1 for 100%')
+    const model = oneStep('a', '%', pct)
+    model.warnings = [{ condition: 'a > 80', severity: 'high', messageVi: '', messageEn: '' }]
+    expect(messages(model)[0]).toMatch(/^unit error at warnings\[0\]: "a" is in %/)
+    // Fractions, other % values and non-% units are fine.
+    model.warnings = [{ condition: 'a > 0.8 or a >= 1 or a > b', severity: 'high', messageVi: '', messageEn: '' }]
+    expect(compileModel({ ...model, inputs: [model.inputs[0], { ...model.inputs[1], unit: '%' }] })).toEqual({ ok: true })
+    expect(messages(oneStep('if(a > 80, 1, 0)', '', { unit: 'count', value: 90 }))).toEqual([])
+    // The fraction does fire as intended.
+    model.warnings = [{ condition: 'a > 0.8', severity: 'high', messageVi: 'cao', messageEn: 'high' }]
+    expect(evaluateModel(model, {}, META).warnings).toHaveLength(1)
+  })
+
   test('units convert to base and back: GB + MB expressed in TB', () => {
     expect(valueOf(oneStep('a + b', 'TB', { unit: 'GB', value: 500 }, { unit: 'MB', value: 500_000 }))).toBeCloseTo(1, 12)
     expect(valueOf(oneStep('a * b', '%', { unit: '%', value: 50 }, { unit: 'ratio', value: 0.5 }))).toBeCloseTo(25, 12)
@@ -207,7 +224,18 @@ describe('excel mode', () => {
     expect(compileModel(excel('a + b'))).toEqual({ ok: true })
     expect(valueOf(excel('a + b'))).toBe(152)
     expect(valueOf(excel('ceil(a / 7)'))).toBe(22)
-    expect(valueOf(excel('convert(a, "TB")'))).toBe(150)
+  })
+
+  test('convert() is a compile error in excel mode (it could only return its argument), with a VI/EN message', () => {
+    const [error] = errorsOf(compileModel(excel('convert(a, "TB")')))
+    expect(error.where).toBe('calc.x')
+    expect(error.message).toMatch(/^mode error at calc\.x: convert\(\) only works in formula mode "units"/)
+    expect(error.message).toContain('convert() chỉ dùng được ở chế độ "units"')
+    expect(() => evaluateModel(excel('convert(a, "TB")'), {}, META)).toThrow(/^mode error at calc\.x/)
+  })
+
+  test('the % check is a units-mode rule: excel mode compares raw numbers as written', () => {
+    expect(compileModel(oneStep('if(a > 80, 1, 0)', '', { unit: '%', value: 90 }, { unit: '', value: 0 }, 'excel'))).toEqual({ ok: true })
   })
 
   test('the same formula in units mode is rejected', () => {

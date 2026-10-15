@@ -18,7 +18,10 @@
  * 2. Evaluation works in base units (bytes, seconds): an input of `150 MB/s`
  *    enters as 1.5e8. Each step's value is then expressed in its declared unit
  *    for the trace, so `116.64 TB` is computed as 1.1664e14 bytes / 1e12.
- *    In `excel` mode nothing is converted: identifiers are their raw numbers.
+ *    In `excel` mode nothing is converted: identifiers are their raw numbers,
+ *    and convert() is a compile error (it could only return its argument).
+ *    In `units` mode a `%` value is a fraction (90% is 0.9), so comparing it
+ *    with a literal above 1 (`util > 80`) is a compile error too.
  * 3. ceil/floor/roundup_to and output rounding first snap a near-integer
  *    operand to that integer (relative tolerance 1e-9, absolute below 1), so
  *    float noise never adds a host (600 MB/s × 3 / 100 MB/s / 0.6 is
@@ -229,7 +232,37 @@ function checkBinary(node: Extract<Expr, { kind: 'binary' }>, ctx: CheckContext)
       if (left && right && !dimEquals(left, right)) {
         return fail(ctx, 'unit error', `cannot compare ${formatDim(left)} with ${formatDim(right)}${column(node)}`)
       }
+      if (ctx.units) checkPercentLiteral(node, ctx)
       return known(DIMENSIONLESS)
+  }
+}
+
+/** Name of a `%` input/param/calc when `node` is just that identifier. */
+function percentName(node: Expr, ctx: CheckContext): string | null {
+  if (node.kind !== 'ident') return null
+  const symbol = ctx.symbols.get(node.name)
+  return symbol && symbol.unit.trim() === '%' ? node.name : null
+}
+
+/**
+ * In units mode a `%` value is a fraction (90% is 0.9), so `util > 80` is
+ * always false and `util < 80` always true. A literal above 1 next to a `%`
+ * value is therefore a mistake: report it with the fraction to write instead.
+ */
+function checkPercentLiteral(node: Extract<Expr, { kind: 'binary' }>, ctx: CheckContext): void {
+  const pairs: [Expr, Expr][] = [[node.left, node.right], [node.right, node.left]]
+  for (const [side, other] of pairs) {
+    const name = percentName(side, ctx)
+    const literal = constantNumber(other)
+    if (name === null || literal === null || Math.abs(literal) <= 1) continue
+    const fraction = formatPlain(literal / 100)
+    fail(
+      ctx,
+      'unit error',
+      `"${name}" is in % and is compared as a fraction (90% = 0.9), so comparing it with ${formatPlain(literal)} never does what you mean; write ${fraction} for ${formatPlain(literal)}% | ` +
+        `"${name}" có đơn vị % nên được so sánh dưới dạng phân số (90% = 0.9); so sánh với ${formatPlain(literal)} sẽ không cho kết quả như mong muốn; hãy viết ${fraction} thay cho ${formatPlain(literal)}%${column(node)}`,
+    )
+    return
   }
 }
 
@@ -281,7 +314,17 @@ function checkCall(node: Extract<Expr, { kind: 'call' }>, ctx: CheckContext): Di
       const dim = check(node.args[0], ctx)
       const target = node.args[1]
       if (target.kind !== 'str') return fail(ctx, 'type error', `convert(x, "unit") needs the unit as a quoted string${column(target)}`)
-      if (!ctx.units) return null
+      if (!ctx.units) {
+        // In excel mode numbers carry no unit, so convert() would silently return its argument.
+        return fail(
+          ctx,
+          'mode error',
+          'convert() only works in formula mode "units"; in "excel" mode numbers have no unit, so nothing would be converted. ' +
+            'Switch the model to units mode or convert by hand (e.g. / 1000) | ' +
+            'convert() chỉ dùng được ở chế độ "units"; ở chế độ "excel" số không có đơn vị nên không quy đổi gì. ' +
+            `Hãy chuyển model sang chế độ units hoặc tự quy đổi (ví dụ / 1000)${column(node)}`,
+        )
+      }
       const unit = parseUnit(target.value)
       if (!unit) return fail(ctx, 'unknown unit', `"${target.value}" in convert()${column(target)}`)
       if (dim && !dimEquals(dim, unit.dim)) {

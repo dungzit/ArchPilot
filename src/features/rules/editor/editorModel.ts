@@ -25,7 +25,8 @@ export function blankModel(id = 'model_1'): SizingModelDef {
     nameVi: 'Model mới',
     nameEn: 'New model',
     componentType: 'generic',
-    formulaMode: 'excel',
+    // Units mode by default: unit-checked and converted. Imported Excel sheets stay in excel mode.
+    formulaMode: 'units',
     inputs: [{ name: 'x', labelVi: 'x', labelEn: 'x', unit: 'count', default: 1 }],
     params: [],
     calc: [{ name: 'y', formula: 'x * 2', unit: 'count' }],

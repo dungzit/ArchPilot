@@ -227,8 +227,8 @@ export function RuleEditorPanel({ text, initial, onSaved }: { text: TextFn; lang
         <label>
           <span>formula mode</span>
           <select value={model.formulaMode ?? 'units'} onChange={(e) => updateModel({ formulaMode: e.target.value as 'units' | 'excel' })} data-field="formula-mode">
-            <option value="excel">{text(copy('excel (số thô, như bảng tính)', 'excel (raw numbers, like a spreadsheet)'))}</option>
             <option value="units">{text(copy('units (có đơn vị, tự quy đổi)', 'units (unit-aware, converts)'))}</option>
+            <option value="excel">{text(copy('excel (số thô, như bảng tính)', 'excel (raw numbers, like a spreadsheet)'))}</option>
           </select>
         </label>
         <label className="re-wide">
