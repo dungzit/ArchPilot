@@ -11,16 +11,19 @@ import type { SizingModelDef } from '../../../contracts/pilot'
  * - Back-end IOPS = reads + writes x write penalty (RAID10/1: 2, RAID5: 4, RAID6: 6).
  * - Per-disk IOPS is the planning figure for the drive class (SSD ~10,000
  *   after array overhead; 10k SAS HDD ~150).
- * - Snapshot reserve is added on top of usable capacity.
+ * - Thin provisioning (02 SZ3-05): `thin_ratio` = provisioned / physical
+ *   capacity. The array only needs usable / thin_ratio of physical space;
+ *   1 (the default) means thick provisioning and changes nothing.
+ * - Snapshot reserve is added on top of that physical capacity.
  * - One hot spare per `spare_every` disks, at least one.
- * - Thin provisioning, dedup and compression credits are NOT applied.
+ * - Dedup and compression credits are NOT applied.
  */
 export const sanStorageModel: SizingModelDef = {
   id: 'san-storage',
   nameVi: 'Lưu trữ SAN (block)',
   nameEn: 'SAN block storage',
   componentType: 'san-storage',
-  description: 'Raw = usable x (1 + snapshot reserve) x RAID factor; disks = whole RAID groups covering max(capacity, IOPS); hot spares on top.',
+  description: 'Raw = usable / thin ratio x (1 + snapshot reserve) x RAID factor; disks = whole RAID groups covering max(capacity, IOPS); hot spares on top.',
   formulaMode: 'units',
   inputs: [
     { name: 'usable', labelVi: 'Dung lượng usable cần', labelEn: 'Required usable capacity', unit: 'TB', default: 100, min: 0, source: 'sizing of workloads' },
@@ -31,6 +34,7 @@ export const sanStorageModel: SizingModelDef = {
     { name: 'host_iops', labelVi: 'IOPS front-end cần', labelEn: 'Required front-end IOPS', unit: 'IOPS', default: 50_000, min: 0, source: 'sizing of workloads' },
     { name: 'read_ratio', labelVi: 'Tỉ lệ đọc', labelEn: 'Read ratio', unit: 'ratio', default: 0.7, min: 0, max: 1, source: 'workload profile' },
     { name: 'spare_every', labelVi: '1 hot spare cho mỗi N đĩa', labelEn: 'One hot spare per N disks', unit: 'disk', default: 24, min: 1, source: 'vendor practice' },
+    { name: 'thin_ratio', labelVi: 'Tỉ lệ thin provisioning (cấp phát / vật lý, 1 = thick)', labelEn: 'Thin-provisioning ratio (provisioned / physical, 1 = thick)', unit: 'ratio', default: 1, min: 1, max: 5, source: 'storage policy' },
   ],
   params: [
     { name: 'large_disk', value: 4, unit: 'TB', source: 'RAID5 rebuild-risk threshold' },
@@ -39,7 +43,7 @@ export const sanStorageModel: SizingModelDef = {
     { name: 'raid_factor', formula: 'lookup(raid, raid_level, "factor")', unit: 'ratio', description: 'Raw / usable for the RAID level' },
     { name: 'write_penalty', formula: 'lookup(raid, raid_level, "write_penalty")', unit: 'count' },
     { name: 'raid_group', formula: 'lookup(raid, raid_level, "group")', unit: 'disk', description: 'Disks per RAID group' },
-    { name: 'capacity_needed', formula: 'usable * (1 + snapshot_reserve)', unit: 'TB' },
+    { name: 'capacity_needed', formula: 'usable / thin_ratio * (1 + snapshot_reserve)', unit: 'TB', description: 'Physical capacity incl. snapshot reserve' },
     { name: 'raw', formula: 'capacity_needed * raid_factor', unit: 'TB' },
     { name: 'data_disks', formula: 'ceil(raw / disk_size)', unit: 'disk', description: 'Capacity' },
     { name: 'backend_iops', formula: 'host_iops * read_ratio + host_iops * (1 - read_ratio) * write_penalty', unit: 'IOPS' },
@@ -63,6 +67,7 @@ export const sanStorageModel: SizingModelDef = {
     { condition: 'raid_level == 5 and disk_size >= large_disk', severity: 'high', messageVi: 'RAID5 với đĩa lớn ({disk_size}): rebuild lâu, nguy cơ hỏng đĩa thứ hai. Nên dùng RAID6.', messageEn: 'RAID5 with large disks ({disk_size}): long rebuilds risk a second failure. Prefer RAID6.' },
     { condition: 'iops_disks > data_disks', severity: 'info', messageVi: 'IOPS quyết định số đĩa, không phải dung lượng: cân nhắc đĩa nhanh hơn.', messageEn: 'IOPS, not capacity, decides the disk count: consider a faster drive class.' },
     { condition: 'snapshot_reserve < 0.1', severity: 'low', messageVi: 'Dự phòng snapshot < 10%.', messageEn: 'Snapshot reserve below 10%.' },
+    { condition: 'thin_ratio > 1', severity: 'info', messageVi: 'Đã trừ thin provisioning ({thin_ratio}x): cần giám sát và cảnh báo mức đầy của pool.', messageEn: 'Thin-provisioning credit applied ({thin_ratio}x): monitor pool usage and alert before it fills.' },
   ],
   lookups: [
     {
@@ -88,5 +93,9 @@ export const sanStorageModel: SizingModelDef = {
     // RAID5 4+1: 20 x 1.2 = 24; x 1.25 = 30 TB; / 7.68 = 3.9 -> 4. IOPS 5,000 x 0.7 + 5,000 x 0.3 x 4 = 9,500 -> 1.
     // roundup_to(4, 5) = 5; spares 1; total 6; 46.08 TB; 5 x 10,000 / (0.7 + 1.2 = 1.9) = 26,315.79 -> 26,315.
     { id: 'T3-raid5', inputs: { usable: 20, raid_level: 5, host_iops: 5000 }, expected: { total_disks: 6, raw_installed: 46.08, raw: 30, disks_needed: 5, hot_spares: 1, backend_iops: 9500, iops_capacity: 26315 }, tolerance: 0.000001 },
+    // Thin 2:1, RAID6: 100 / 2 = 50 TB physical; x 1.2 = 60; x 1.25 = 75 TB raw; / 7.68 = 9.77 -> 10 disks.
+    // IOPS 20,000 x 0.7 + 20,000 x 0.3 x 6 = 50,000 -> 5 disks. roundup_to(10, 10) = 10; spares 1; total 11; 84.48 TB.
+    // Deliverable: 10 x 10,000 / 2.5 = 40,000 IOPS.
+    { id: 'T4-thin', inputs: { thin_ratio: 2, host_iops: 20_000 }, expected: { total_disks: 11, raw_installed: 84.48, raw: 75, disks_needed: 10, hot_spares: 1, backend_iops: 50000, iops_capacity: 40000 }, tolerance: 0.000001 },
   ],
 }

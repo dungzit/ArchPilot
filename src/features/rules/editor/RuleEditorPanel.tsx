@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type {
   RuleCalc,
   RuleInput,
@@ -20,6 +20,7 @@ import { findPackByName, persistPack } from '../excel/savePack'
 import {
   blankModel,
   blankPack,
+  canUpdatePack,
   editableFrom,
   formatKv,
   nextModelId,
@@ -29,6 +30,7 @@ import {
   toDraft,
   unmatchedErrors,
   type EditablePack,
+  type PackUser,
   type Section,
 } from './editorModel'
 import '../excel/excel.css'
@@ -40,8 +42,20 @@ import './editor.css'
  * compileModel errors per row; run tests; save (published only when every
  * model compiles and every test passes); "Paste JSON" import.
  */
-export function RuleEditorPanel({ text, initial, onSaved }: { text: TextFn; language: 'vi' | 'en'; initial?: RulePack | null; onSaved?: (pack: RulePack) => void }) {
-  const [pack, setPack] = useState<EditablePack>(() => (initial ? editableFrom(initial) : blankPack()))
+export function RuleEditorPanel({ text, initial, onSaved, user, openRequest, onDirtyChange }: {
+  text: TextFn
+  language: 'vi' | 'en'
+  /** The pack to open. A built-in pack, or one `user` may not update, opens as a copy. */
+  initial?: RulePack | null
+  onSaved?: (pack: RulePack) => void
+  /** The signed-in user; decides whether a stored pack is edited in place or as a copy. */
+  user?: PackUser | null
+  /** Bumped by the parent for each explicit "Open in editor"; reopening the same pack resets the editor. */
+  openRequest?: number
+  /** Unsaved edits exist (true) or not (false), so the parent can confirm before replacing them. */
+  onDirtyChange?: (dirty: boolean) => void
+}) {
+  const [pack, setPack] = useState<EditablePack>(() => (initial ? editableFrom(initial, user) : blankPack()))
   const [selected, setSelected] = useState(0)
   const [check, setCheck] = useState<PackCheck | null>(null)
   const [forceDraft, setForceDraft] = useState(false)
@@ -52,18 +66,28 @@ export function RuleEditorPanel({ text, initial, onSaved }: { text: TextFn; lang
   const [jsonText, setJsonText] = useState('')
   const [jsonError, setJsonError] = useState<string | null>(null)
   const [jsonOpen, setJsonOpen] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  // id@version of the pack this editor just stored, while it has not been edited since.
+  const justStored = useRef<string | null>(null)
 
   const initialKey = initial ? `${initial.id}@${initial.version}` : ''
   useEffect(() => {
-    setPack(initial ? editableFrom(initial) : blankPack())
+    // The parent handing back the pack we just stored changes nothing: keep the "Saved vN" note.
+    if (initialKey !== '' && initialKey === justStored.current) return
+    setPack(initial ? editableFrom(initial, user) : blankPack())
     setSelected(0)
     setCheck(null)
     setSaved(null)
     setSaveError(null)
     setDuplicate(null)
-    // Reset only when a different pack (or version) is handed in.
+    setDirty(false)
+    // Reset only when a different pack (or version) is handed in, or on an explicit reopen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialKey])
+  }, [initialKey, openRequest])
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
 
   const model = pack.models[Math.min(selected, pack.models.length - 1)]
   const modelIndex = pack.models.indexOf(model)
@@ -74,6 +98,8 @@ export function RuleEditorPanel({ text, initial, onSaved }: { text: TextFn; lang
     setPack(next)
     setCheck(null)
     setSaved(null)
+    setDirty(true)
+    justStored.current = null
   }
   const updateModel = (patch: Partial<SizingModelDef>) => {
     touch({ ...pack, models: pack.models.map((m, i) => (i === modelIndex ? { ...m, ...patch } : m)) })
@@ -123,12 +149,14 @@ export function RuleEditorPanel({ text, initial, onSaved }: { text: TextFn; lang
           return
         }
       } else if (mode === 'update') {
-        existing = duplicate
+        existing = duplicate && canUpdatePack(duplicate, user) ? duplicate : null
       }
       const stored = await persistPack(toDraft(pack, status), existing)
-      setPack(editableFrom(stored))
+      justStored.current = `${stored.id}@${stored.version}`
+      setPack(editableFrom(stored, user))
       setSaved(stored)
       setDuplicate(null)
+      setDirty(false)
       onSaved?.(stored)
     } catch (e) {
       setSaveError(errorText(e))
@@ -165,9 +193,22 @@ export function RuleEditorPanel({ text, initial, onSaved }: { text: TextFn; lang
           <span>{text(copy('Mô tả', 'Description'))}</span>
           <input value={pack.description} onChange={(e) => touch({ ...pack, description: e.target.value })} />
         </label>
-        <div className="re-meta">
+        <div className="re-meta" data-meta={pack.id ? 'editing' : pack.copyOf ? 'copy' : 'new'}>
           {pack.id ? text(copy(`Đang sửa v${pack.version}`, `Editing v${pack.version}`)) : text(copy('Pack mới', 'New pack'))}
-          {initial?.builtIn && <span className="status-pill amber">{text(copy('bản sao của pack built-in', 'copy of a built-in pack'))}</span>}
+          {pack.copyOf?.builtIn && <span className="status-pill amber">{text(copy('bản sao của pack built-in', 'copy of a built-in pack'))}</span>}
+          {pack.copyOf && !pack.copyOf.builtIn && (
+            <span className="status-pill amber" data-copy-of={pack.copyOf.name}>
+              {text(copy(
+                `bản sao của "${pack.copyOf.name}"${pack.copyOf.owner ? ` (của ${pack.copyOf.owner})` : ''}: chỉ chủ sở hữu hoặc admin mới cập nhật được pack gốc`,
+                `copy of "${pack.copyOf.name}"${pack.copyOf.owner ? ` (owned by ${pack.copyOf.owner})` : ''}: only its owner or an admin can update the original`,
+              ))}
+            </span>
+          )}
+          {!pack.id && !pack.copyOf && (
+            <span className="muted-copy" data-hint="open-in-editor">
+              {text(copy('Muốn sửa pack có sẵn: chọn pack ở tab "Chạy sizing" rồi bấm "Mở trong trình soạn".', 'To edit an existing pack, pick it on the "Run sizing" tab and click "Open in editor".'))}
+            </span>
+          )}
         </div>
       </div>
 
@@ -227,8 +268,8 @@ export function RuleEditorPanel({ text, initial, onSaved }: { text: TextFn; lang
         <label>
           <span>formula mode</span>
           <select value={model.formulaMode ?? 'units'} onChange={(e) => updateModel({ formulaMode: e.target.value as 'units' | 'excel' })} data-field="formula-mode">
-            <option value="excel">{text(copy('excel (số thô, như bảng tính)', 'excel (raw numbers, like a spreadsheet)'))}</option>
             <option value="units">{text(copy('units (có đơn vị, tự quy đổi)', 'units (unit-aware, converts)'))}</option>
+            <option value="excel">{text(copy('excel (số thô, như bảng tính)', 'excel (raw numbers, like a spreadsheet)'))}</option>
           </select>
         </label>
         <label className="re-wide">
@@ -388,18 +429,33 @@ export function RuleEditorPanel({ text, initial, onSaved }: { text: TextFn; lang
           {text(copy('Lưu dạng nháp', 'Save as draft'))}
         </label>
         <button type="button" className="primary-button" onClick={() => void save('auto')} disabled={saving} data-action="save">
-          {saving ? text(copy('Đang lưu…', 'Saving…')) : pack.id ? text(copy('Lưu version mới', 'Save new version')) : text(copy('Lưu vào thư viện', 'Save to library'))}
+          {saving
+            ? text(copy('Đang lưu…', 'Saving…'))
+            : pack.id
+              ? text(copy('Lưu version mới', 'Save new version'))
+              : pack.copyOf && !pack.copyOf.builtIn
+                ? text(copy('Lưu thành pack mới', 'Save as a new pack'))
+                : text(copy('Lưu vào thư viện', 'Save to library'))}
         </button>
       </div>
       {check && <CheckResults text={text} check={check} />}
       {duplicate && (
         <div className="rx-callout rx-warn" data-dialog="duplicate">
-          <span>{text(copy(`Đã có pack "${duplicate.name}" (v${duplicate.version}).`, `A pack named "${duplicate.name}" (v${duplicate.version}) exists.`))}</span>
+          <span>
+            {canUpdatePack(duplicate, user)
+              ? text(copy(`Đã có pack "${duplicate.name}" (v${duplicate.version}).`, `A pack named "${duplicate.name}" (v${duplicate.version}) exists.`))
+              : text(copy(
+                `Đã có pack "${duplicate.name}" (v${duplicate.version})${duplicate.owner ? ` của ${duplicate.owner}` : ''}; chỉ chủ sở hữu hoặc admin mới cập nhật được. Lưu thành pack riêng?`,
+                `A pack named "${duplicate.name}" (v${duplicate.version})${duplicate.owner ? ` owned by ${duplicate.owner}` : ''} exists; only its owner or an admin can update it. Save a separate pack?`,
+              ))}
+          </span>
           <div className="rx-actions">
-            <button type="button" className="primary-button" onClick={() => void save('update')} disabled={saving}>
-              {text(copy(`Cập nhật thành v${duplicate.version + 1}`, `Update to v${duplicate.version + 1}`))}
-            </button>
-            <button type="button" className="secondary-button" onClick={() => void save('new')} disabled={saving}>
+            {canUpdatePack(duplicate, user) && (
+              <button type="button" className="primary-button" onClick={() => void save('update')} disabled={saving} data-action="save-update">
+                {text(copy(`Cập nhật thành v${duplicate.version + 1}`, `Update to v${duplicate.version + 1}`))}
+              </button>
+            )}
+            <button type="button" className="secondary-button" onClick={() => void save('new')} disabled={saving} data-action="save-new">
               {text(copy('Lưu thành pack mới', 'Save as a new pack'))}
             </button>
             <button type="button" className="text-button" onClick={() => setDuplicate(null)}>{text(copy('Hủy', 'Cancel'))}</button>

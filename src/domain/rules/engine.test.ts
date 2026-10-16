@@ -164,6 +164,23 @@ describe('compile: unit checking (units mode)', () => {
     expect(messages(oneStep('a ^ 2 / a', 'GB', { unit: 'GB', value: 1 }))).toEqual([])
   })
 
+  test('a % value compared with a literal above 1 is an error (90% is 0.9, so util > 80 never fires)', () => {
+    const pct = { unit: '%', value: 90 }
+    const [message] = messages(oneStep('if(a > 80, 1, 0)', '', pct))
+    expect(message).toMatch(/^unit error at calc\.x: "a" is in % and is compared as a fraction \(90% = 0\.9\), so comparing it with 80 never does what you mean; write 0\.8 for 80%/)
+    expect(messages(oneStep('if(100 <= a, 1, 0)', '', pct))[0]).toContain('write 1 for 100%')
+    const model = oneStep('a', '%', pct)
+    model.warnings = [{ condition: 'a > 80', severity: 'high', messageVi: '', messageEn: '' }]
+    expect(messages(model)[0]).toMatch(/^unit error at warnings\[0\]: "a" is in %/)
+    // Fractions, other % values and non-% units are fine.
+    model.warnings = [{ condition: 'a > 0.8 or a >= 1 or a > b', severity: 'high', messageVi: '', messageEn: '' }]
+    expect(compileModel({ ...model, inputs: [model.inputs[0], { ...model.inputs[1], unit: '%' }] })).toEqual({ ok: true })
+    expect(messages(oneStep('if(a > 80, 1, 0)', '', { unit: 'count', value: 90 }))).toEqual([])
+    // The fraction does fire as intended.
+    model.warnings = [{ condition: 'a > 0.8', severity: 'high', messageVi: 'cao', messageEn: 'high' }]
+    expect(evaluateModel(model, {}, META).warnings).toHaveLength(1)
+  })
+
   test('units convert to base and back: GB + MB expressed in TB', () => {
     expect(valueOf(oneStep('a + b', 'TB', { unit: 'GB', value: 500 }, { unit: 'MB', value: 500_000 }))).toBeCloseTo(1, 12)
     expect(valueOf(oneStep('a * b', '%', { unit: '%', value: 50 }, { unit: 'ratio', value: 0.5 }))).toBeCloseTo(25, 12)
@@ -207,7 +224,18 @@ describe('excel mode', () => {
     expect(compileModel(excel('a + b'))).toEqual({ ok: true })
     expect(valueOf(excel('a + b'))).toBe(152)
     expect(valueOf(excel('ceil(a / 7)'))).toBe(22)
-    expect(valueOf(excel('convert(a, "TB")'))).toBe(150)
+  })
+
+  test('convert() is a compile error in excel mode (it could only return its argument), with a VI/EN message', () => {
+    const [error] = errorsOf(compileModel(excel('convert(a, "TB")')))
+    expect(error.where).toBe('calc.x')
+    expect(error.message).toMatch(/^mode error at calc\.x: convert\(\) only works in formula mode "units"/)
+    expect(error.message).toContain('convert() chỉ dùng được ở chế độ "units"')
+    expect(() => evaluateModel(excel('convert(a, "TB")'), {}, META)).toThrow(/^mode error at calc\.x/)
+  })
+
+  test('the % check is a units-mode rule: excel mode compares raw numbers as written', () => {
+    expect(compileModel(oneStep('if(a > 80, 1, 0)', '', { unit: '%', value: 90 }, { unit: '', value: 0 }, 'excel'))).toEqual({ ok: true })
   })
 
   test('the same formula in units mode is rejected', () => {
@@ -306,6 +334,42 @@ describe('the 05 §9 Kafka template (AC-RB-01)', () => {
   })
 })
 
+describe('float noise: near-integer snap before ceil/floor/compare', () => {
+  const rate = (value: number) => ({ unit: 'req/s', value })
+
+  test('subtraction noise: ceil(200 req/s × 1.1 / 110 req/s - 2) is 0, not 1, and the trace says ceil(0)', () => {
+    const model = oneStep('ceil(a * 1.1 / b - 2)', 'count', rate(200), rate(110))
+    const run = evaluateModel(model, {}, META)
+    expect(run.outputs[0].value).toBe(0)
+    expect(run.steps[0].substituted).toBe('ceil(200 req/s × 1.1 / 110 req/s - 2) = ceil(0)')
+    expect(valueOf(oneStep('floor(a * 1.1 / b - 2)', 'count', rate(200), rate(110)))).toBe(0)
+  })
+
+  test('comparisons ignore the same noise; real differences still count', () => {
+    expect(valueOf(oneStep('if(a * 1.1 / b - 2 > 0, 1, 0)', 'count', rate(200), rate(110)))).toBe(0)
+    expect(valueOf(oneStep('if(a + b == 0.3, 1, 0)', ''), { a: 0.1, b: 0.2 })).toBe(1)
+    expect(valueOf(oneStep('if(a + b != 0.3, 1, 0)', ''), { a: 0.1, b: 0.2 })).toBe(0)
+    expect(valueOf(oneStep('if(a < b, 1, 0)', ''), { a: 0.3, b: 0.30001 })).toBe(1)
+    expect(valueOf(oneStep('if(a >= b, 1, 0)', ''), { a: 0.1 + 0.2, b: 0.3 })).toBe(1)
+  })
+
+  test('exact integers of 13+ digits are not altered by ceil, floor or output rounding', () => {
+    const big = 1234567890123
+    expect(valueOf(oneStep('ceil(a)', ''), { a: big })).toBe(big)
+    expect(valueOf(oneStep('floor(a)', ''), { a: big })).toBe(big)
+    const model = oneStep('a', '')
+    model.outputs = [{ name: 'x', from: 'x', unit: '', rounding: 'ceil' }]
+    expect(valueOf(model, { a: big })).toBe(big)
+    expect(valueOf(oneStep('ceil(a)', ''), { a: big + 0.5 })).toBe(big + 1)
+  })
+
+  test('QA K2: 226.8 TB / (12 TB × 0.7) is 27 brokers, not 28', () => {
+    const run = evaluateModel(KAFKA_TEMPLATE, { ingress: 175, rf: 3, retention: 5 }, META)
+    expect(run.steps.find((step) => step.name === 'storage_brokers')?.value).toBe(27)
+    expect(run.outputs[0].value).toBe(27)
+  })
+})
+
 describe('binding detection', () => {
   const bindingOf = (formula: string, inputs: Record<string, number> = {}) => {
     const model = oneStep(formula, '')
@@ -330,6 +394,54 @@ describe('binding detection', () => {
 
   test('no max/min means no binding', () => {
     expect(bindingOf('a + b')).toBeNull()
+  })
+
+  test('the untaken branch of if() is never evaluated: if(n > 0, max(a / n, 2), 1) with n = 0', () => {
+    const model = oneStep('if(b > 0, max(a / b, 2), 1)', '')
+    const run = evaluateModel(model, { b: 0 }, META)
+    expect(run.outputs[0].value).toBe(1)
+    expect(run.binding).toBeNull()
+    expect(run.steps[0].substituted).toBe('if(0 > 0, max(a / b, 2), 1)')
+    // The taken branch still reports its binding.
+    expect(evaluateModel(model, { a: 9, b: 3 }, META).binding).toBe('a / b')
+  })
+
+  test('a max() reached only through an untaken branch in an earlier step is not the binding', () => {
+    const model = makeModel({
+      inputs: [{ name: 'a', labelVi: '', labelEn: '', unit: '', default: 5 }, { name: 'b', labelVi: '', labelEn: '', unit: '', default: 3 }],
+      calc: [{ name: 'peak', formula: 'max(a, b)', unit: '' }, { name: 'total', formula: 'if(a > 10, peak, a + b)', unit: '' }],
+      outputs: [{ name: 'total', from: 'total', unit: '' }],
+    })
+    expect(evaluateModel(model, {}, META).binding).toBeNull()
+    expect(evaluateModel(model, { a: 11 }, META).binding).toBe('a')
+  })
+})
+
+describe('if() trace with a lookup in the untaken branch', () => {
+  const model = makeModel({
+    inputs: [{ name: 'tier', labelVi: '', labelEn: '', unit: 'count', default: 5 }],
+    lookups: [{ name: 't', columns: ['tier', 'v'], rows: [[1, 10], [2, 20]] }],
+    calc: [{ name: 'x', formula: 'if(tier <= 2, lookup(t, tier, "v"), 1)', unit: '' }],
+    outputs: [{ name: 'x', from: 'x', unit: '' }],
+  })
+
+  test('tier 5 (no row) runs: the untaken lookup prints as written instead of throwing', () => {
+    const run = evaluateModel(model, {}, META)
+    expect(run.outputs[0].value).toBe(1)
+    expect(run.steps[0].substituted).toBe('if(5 <= 2, lookup(t, tier, "v"), 1)')
+  })
+
+  test('tier 2 takes the lookup branch and shows its value', () => {
+    const run = evaluateModel(model, { tier: 2 }, META)
+    expect(run.outputs[0].value).toBe(20)
+    expect(run.steps[0].substituted).toBe('if(2 <= 2, lookup(t, 2 → v = 20), 1)')
+  })
+
+  test('a lookup behind a short-circuited `and` falls back to plain printing', () => {
+    const guarded = { ...model, calc: [{ name: 'x', formula: 'if(tier <= 2 and lookup(t, tier, "v") > 15, 1, 0)', unit: '' }] }
+    const run = evaluateModel(guarded, {}, META)
+    expect(run.outputs[0].value).toBe(0)
+    expect(run.steps[0].substituted).toBe('if(5 <= 2 and lookup(t, 5, "v") > 15, 1, 0)')
   })
 })
 

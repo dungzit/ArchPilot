@@ -196,15 +196,40 @@ Closed forms with these parameters: `tp_brokers = ceil(ingress x rf / 60)` and `
 
 **G-KAF-05 (P1)** Retention fraction and large value. retention = 0.5 day (150 MB/s, rf 3): storage = 150 x 86,400 x 0.5 x 3 = 19,440,000 MB = 19.44 TB; 19.44 / 8.4 = 2.314 -> 3; tp 8 -> brokers **8**, binding throughput. Then retention = 365 days: storage = 150 x 86,400 x 365 x 3 = 14,191,200,000 MB = 14,191.2 TB; 14,191.2 / 8.4 = 1,689.43 -> **1,690**; binding storage. Expected: no overflow, thousands separators readable, unit stays TB.
 
-### 4.5 rdbms (to confirm against the implemented formulas)
+### 4.5 rdbms (aligned with the implemented inputs, 2026-10-16)
 
-The formulas are being designed tonight. The inputs in 02 section 7.1 are: data size, index overhead %, read TPS, write TPS, working-set %, connections, replicas. Outputs: vCPU, RAM (buffer pool), IOPS, storage for data, log, archive and backup. The structure below is frozen; the numbers are filled after the formulas are published. **Do not mark Pass from this table until the "Hand result" column is filled by someone who did not write the engine.**
+The implemented model (`src/domain/rules/packs/rdbms.ts`) does **not** take "read TPS / write TPS". It takes total peak `tps` plus `reads_per_txn` and `writes_per_txn` (logical I/Os per transaction), and also `growth_rate` (a fraction per year, 0.3 = 30%, max 2), `years`, `cpu_ms_per_txn` and `backup_fulls`. There is no `env` input: the single-node warning fires whenever `replicas < 1`. Every case below is entered with exactly these fields. Ratios are fractions (20% is 0.2).
 
-| ID | Priority | Test data (proposed) | Expected |
+Fixed params (shown under "Fixed parameters"): buffer hit 0.9, target utilisation 0.6, WAL/archive 0.25 of DB size, disk fill 0.75, backup compression 0.5, 10 MB RAM per connection, 8 GB OS RAM, vCPU step 2, RAM step 16 GB, IOPS warning 20,000. Units are decimal (1 GB = 1,000 MB).
+
+| ID | Priority | Inputs to enter | Expected (hand result) |
 |---|---|---|---|
-| G-RDB-01 | P0 | data 2,000 GB; index overhead 30%; read TPS 2,000; write TPS 500; working set 20%; connections 800; replicas 1; env prod | To confirm. Fill the worksheet below. |
-| G-RDB-02 | P1 | Same as 01 with replicas = 0, env prod | To confirm. Must raise the "DB chỉ 1 node ở Prod" warning (02 SZ2-03). |
-| G-RDB-03 | P1 | data = 0, read TPS = 0 | To confirm. Either a clear validation message or zero-valued outputs; never NaN. |
+| G-RDB-01 | P0 | data_size 2000 GB; index_overhead 0.3; growth_rate 0.25; years 2; tps 2500; reads_per_txn 6; writes_per_txn 2; cpu_ms_per_txn 4; working_set 0.2; connections 800; replicas 1; backup_fulls 4 | vCPU **18**; RAM **832 GB**; IOPS **10,834**; storage per node **6,770.83 GB**; total storage **13,541.67 GB**; backup **8,125 GB**; nodes **2**; buffer pool **812.5 GB**; no warning; no binding (no max/min). |
+| G-RDB-02 | P1 | Same as 01 with replicas 0 | Nodes **1**; total storage **6,770.83 GB**; every other output as in 01; **high** warning "DB chỉ có 1 node: không có failover." / "Single database node: no failover." (02 SZ2-03). |
+| G-RDB-03 | P1 | Same as 01 with data_size 0 and tps 0 | Zero-valued outputs, never NaN: vCPU **0**; IOPS **0**; storage per node, total, backup and buffer pool **0 GB**; RAM **16 GB** (connections and OS only); nodes **2**; no warning. |
+
+Hand arithmetic for G-RDB-01 (each line is one trace step):
+
+```
+data_future      = 2000 x (1 + 0.25)^2         = 2000 x 1.5625          = 3125 GB
+db_size          = 3125 x (1 + 0.3)                                     = 4062.5 GB
+wal_archive      = 4062.5 x 0.25                                        = 1015.625 GB
+storage_per_node = (4062.5 + 1015.625) / 0.75  = 5078.125 / 0.75        = 6770.8333 GB
+nodes            = 1 + 1                                                = 2
+total_storage    = 6770.8333 x 2                                        = 13541.6667 GB
+backup_storage   = 4062.5 x 0.5 x 4                                     = 8125 GB
+read_iops        = 2500 x 6 x (1 - 0.9)                                 = 1500 IOPS
+write_iops       = 2500 x 2                                             = 5000 IOPS
+iops             = (1500 + 5000) / 0.6         = 10833.33 -> output ceil = 10834 IOPS
+vcpu             = roundup_to(2500 x 0.004 s / 0.6, 2) = roundup_to(16.67, 2) = 18
+buffer_pool      = 4062.5 x 0.2                                         = 812.5 GB
+ram_needed       = 812.5 + 800 x 10 MB (8 GB) + 8                       = 828.5 GB
+ram              = roundup_to(828.5, 16)       = 52 x 16                = 832 GB
+```
+
+G-RDB-02 changes only `nodes = 1 + 0 = 1` and `total_storage = 6770.8333 x 1`; the warning condition `replicas < 1` is true. G-RDB-03: every size and rate is 0 x something = 0; `vcpu = roundup_to(0, 2) = 0`; `ram_needed = 0 + 8 + 8 = 16 GB`, `roundup_to(16, 16) = 16 GB`.
+
+These three cases are also asserted in `src/domain/rules/packs/packs.test.ts` ("rdbms QA G-RDB-0x"), so a formula change that breaks them fails CI.
 
 Worksheet (one row per trace step; copy it for each case):
 
@@ -220,17 +245,40 @@ Property checks that hold for any correct formula set (run them even before the 
 4. P-RDB-4: running the same inputs twice gives identical outputs and an identical trace.
 5. P-RDB-5: every output has at least one test in the pack (05 section 7).
 
-### 4.6 san-storage (to confirm against the implemented formulas)
+### 4.6 san-storage (aligned with the implemented inputs, 2026-10-16)
 
-02 SZ3-05: usable capacity to raw by RAID or erasure coding, plus spare, snapshot reserve and thin-provisioning ratio, then disk count and IOPS check by tier. Same rules as 4.5.
+02 SZ3-05: usable capacity to raw by RAID, plus snapshot reserve, hot spares and thin-provisioning ratio, then disk count and IOPS check. The implemented model (`src/domain/rules/packs/sanStorage.ts`) takes: `usable` (TB), `raid_level` (a number: 10, 6 = 8+2, 5 = 4+1, 1), `snapshot_reserve` (fraction), `thin_ratio` (provisioned / physical, 1 = thick, default 1; added 2026-10-16 per SZ3-05), `disk_size` (TB), `disk_iops`, `host_iops` (front-end), `read_ratio`, and spares as `spare_every` = **one hot spare per N disks** (not a percentage: "spare 5%" is entered as `spare_every` 20). Erasure coding and per-tier (NVMe/SSD/HDD) splits are not modelled; enter the drive class through `disk_iops`.
 
-| ID | Priority | Test data (proposed) | Expected |
+RAID table: RAID10 factor 2.0, write penalty 2, group 2; RAID6 1.25, 6, 10; RAID5 1.25, 4, 5; RAID1 2.0, 2, 2. Units are decimal TB.
+
+| ID | Priority | Inputs to enter | Expected (hand result) |
 |---|---|---|---|
-| G-SAN-01 | P0 | usable 100 TB; scheme RAID6 8+2; snapshot reserve 20%; thin ratio 1.0; spare 5%; disk 7.68 TB; required IOPS 50,000 | To confirm. |
-| G-SAN-02 | P1 | Same with scheme RAID10 | To confirm. Raw must be larger than RAID6 for equal usable. |
-| G-SAN-03 | P1 | Same as 01 with thin ratio 2.0 | To confirm. Raw must be smaller than in 01. |
+| G-SAN-01 | P0 | usable 100 TB; raid_level 6; snapshot_reserve 0.2; thin_ratio 1; spare_every 20; disk_size 7.68 TB; disk_iops 10000; host_iops 50000; read_ratio 0.7 | Raw **150 TB**; data disks **20**; hot spares **1**; total disks **21**; raw installed **161.28 TB**; back-end IOPS **125,000**; deliverable front-end IOPS **80,000**; binding **data_disks**; no warning. |
+| G-SAN-02 | P1 | Same as 01 with raid_level 10 | Raw **240 TB** (larger than RAID6, P-SAN-4); data disks **32**; hot spares **2**; total **34**; raw installed **261.12 TB**; back-end IOPS **65,000**; deliverable **246,153** IOPS (floor); binding **data_disks**. |
+| G-SAN-03 | P1 | Same as 01 with thin_ratio 2 | Raw **75 TB** (smaller than 01); data disks **20**; hot spares **1**; total **21**; raw installed **161.28 TB**; deliverable **80,000** IOPS; binding **iops_disks**; two **info** warnings: "IOPS, not capacity, decides the disk count" and "Thin-provisioning credit applied (2x)". Total disks do not drop: IOPS binds once capacity halves. |
 
-Property checks: P-SAN-1 raw >= usable; P-SAN-2 disks x disk size >= raw (disks rounded up); P-SAN-3 raw is non-decreasing in usable; P-SAN-4 RAID10 raw > RAID6 raw for equal inputs; P-SAN-5 the unit base (TB, decimal) matches F-01; P-SAN-6 same as P-RDB-1 and P-RDB-4.
+Hand arithmetic for G-SAN-01:
+
+```
+capacity_needed = 100 / 1 x (1 + 0.2)                          = 120 TB
+raw             = 120 x 1.25 (RAID6)                           = 150 TB
+data_disks      = ceil(150 / 7.68) = ceil(19.53)               = 20
+backend_iops    = 50000 x 0.7 + 50000 x 0.3 x 6 = 35000 + 90000 = 125000 IOPS
+iops_disks      = ceil(125000 / 10000) = ceil(12.5)            = 13
+disks_needed    = roundup_to(max(20, 13), 10)                  = 20
+hot_spares      = ceil(20 / 20)                                = 1
+total_disks     = 20 + 1                                       = 21
+raw_installed   = 21 x 7.68                                    = 161.28 TB
+iops_capacity   = 20 x 10000 / (0.7 + 0.3 x 6) = 200000 / 2.5  = 80000 IOPS
+```
+
+G-SAN-02 (RAID10): raw = 120 x 2.0 = 240 TB; data_disks = ceil(240 / 7.68 = 31.25) = 32; backend = 35,000 + 50,000 x 0.3 x 2 = 65,000; iops_disks = ceil(6.5) = 7; disks_needed = roundup_to(32, 2) = 32; spares = ceil(32 / 20 = 1.6) = 2; total = 34; raw installed = 34 x 7.68 = 261.12 TB; iops_capacity = 32 x 10,000 / (0.7 + 0.3 x 2 = 1.3) = 246,153.85, floor 246,153.
+
+G-SAN-03 (thin 2): capacity_needed = 100 / 2 x 1.2 = 60 TB; raw = 60 x 1.25 = 75 TB; data_disks = ceil(75 / 7.68 = 9.77) = 10; iops_disks = 13 (as 01); disks_needed = roundup_to(max(10, 13), 10) = 20; spares 1; total 21; raw installed 161.28 TB; iops_capacity 80,000.
+
+These three cases are also asserted in `src/domain/rules/packs/packs.test.ts` ("san-storage QA G-SAN-0x").
+
+Property checks: P-SAN-1 raw >= usable / thin_ratio (with thin_ratio 1, raw >= usable); P-SAN-2 data disks x disk size >= raw (disks rounded up); P-SAN-3 raw is non-decreasing in usable; P-SAN-4 RAID10 raw > RAID6 raw for equal inputs; P-SAN-5 the unit base (TB, decimal) matches F-01; P-SAN-6 same as P-RDB-1 and P-RDB-4.
 
 ### 4.7 Cross-model checks (apply to all six models)
 
@@ -425,7 +473,7 @@ describe('golden: kafka', () => {
 **Gate G1: build done (before 07:30 on 2026-10-15).**
 
 1. CI green on `typecheck`, `npm test`, `ruff`, `pytest`.
-2. All P0 cases in sections 4 to 8 are Pass; the TBC cases (G-APP-05, G-RDB-*, G-SAN-*) are either frozen and Pass, or the model is hidden from the pilot pack with the PO's agreement.
+2. All P0 cases in sections 4 to 8 are Pass; the TBC case G-APP-05 is either frozen and Pass, or the model is hidden from the pilot pack with the PO's agreement; G-RDB-* and G-SAN-* carry hand results since 2026-10-16 (4.5, 4.6) and must Pass.
 3. Zero open Blockers; no open Critical without an agreed workaround.
 4. Traceability matrix (section 11) has no empty "Test case" cell for a Must feature.
 5. `UAT-checklist.md` dry run by one non-technical person finishes in 45 minutes or less.
@@ -450,8 +498,8 @@ Status is "Not run" everywhere because the application could not be run in this 
 | US-SZ-02 (Redis), SZ2-03 | `/rules` redis | G-RED-01 to 05 | Doc arithmetic OK; Not run |
 | US-SZ-03 (VMware N+1), SZ3-03 | `/rules` vmware-host | G-VMW-01 to 04 | Doc arithmetic OK; Not run |
 | 02 section 10 (Kafka trace), 05 section 9, AC-RB-01, PR-2 | `/rules` kafka; trace panel; `SizingStep` | G-KAF-01 to 05, G-X-03 | Doc arithmetic OK; Not run |
-| SZ2-01, SZ2-03 (RDBMS, warnings) | `/rules` rdbms | G-RDB-01 to 03, P-RDB-1 to 5 | Not run; formulas to confirm |
-| SZ3-05 (SAN) | `/rules` san-storage | G-SAN-01 to 03, P-SAN-1 to 6 | Not run; formulas to confirm |
+| SZ2-01, SZ2-03 (RDBMS, warnings) | `/rules` rdbms | G-RDB-01 to 03, P-RDB-1 to 5 | Hand results in 4.5; automated in packs.test.ts; Not run in the UI |
+| SZ3-05 (SAN) | `/rules` san-storage | G-SAN-01 to 03, P-SAN-1 to 6 | Hand results in 4.6; automated in packs.test.ts; Not run in the UI |
 | SZ2-01, NFR-01 (golden test per model, determinism), PR-1 | `runModelTests`; run-tests control | G-X-01, G-X-02, G-X-08 | Not run |
 | SZ2-05, RB-02, AC-RB-02 (unit check) | rule editor; DSL compile | XLS-NEG-06, 06b, 14 | Not run |
 | SZ2-06, RB-03, RB-05, AC-RB-01, AC-RB-05 (Excel in and out) | Excel panel; template | XLS-POS-01 to 05 | Not run |
@@ -475,7 +523,7 @@ Status is "Not run" everywhere because the application could not be run in this 
 |---|---|---|---|
 | 1 | Confirm the items in section 13 (units base, `env` input, rounding, size limit, tie rule) | PO with WP-A, WP-B, WP-C leads | Written answers; this file updated |
 | 2 | Add the golden vitest suite (section 9 skeleton) to the WP-A branch | WP-A dev | G-APP, G-RED, G-VMW, G-KAF automated and green on the first merge |
-| 3 | Fill the rdbms and san-storage worksheets by hand from the published formulas | QA (not the formula author) | G-RDB-01, G-SAN-01 frozen with hand results |
+| 3 | Re-check the rdbms and san-storage hand results (4.5, 4.6) against the published formulas | QA (not the formula author) | G-RDB-01, G-SAN-01 confirmed, or a finding raised |
 | 4 | Download the template, run `make-negative-xlsx.mjs`, run XLS cases | QA | XLS-POS and XLS-NEG results recorded |
 | 5 | Build the reference design "UAT-HLD", export, run `check-hld.mjs` | QA with WP-C dev | HLD-01 to 17 recorded |
 | 6 | Run `search-queries.csv` and the S-INJ set against the pilot index | QA with WP-B dev | REF-00 to 16 recorded; hit rate computed |
@@ -845,3 +893,11 @@ export default function () {
   sleep(10)
 }
 ```
+
+## Known pilot limitations
+
+Read these before the usability evaluation; do not log them as new defects.
+
+1. **No version history for rule packs.** `PUT /api/rule-packs/{id}` replaces the pack and bumps `version`; the previous version is not kept. A saved run that cites `v2` after the pack moved to `v3` cannot be re-run on `v2`; its stored inputs, trace and outputs stay readable.
+2. **DSL subset.** Unit literals (`150 MB/s` inside a formula), `switch(...)` and `catalog(...)` from 05 section 3 are not supported. A quantity with a unit must come from an input or a param; use `if()` and `lookup()` instead of `switch()`; enter catalog figures as params.
+3. **Reference reload locks the database briefly.** Loading a new SysDesAi snapshot (`crawl-reference.ps1`, or a restart that loads one) holds the SQLite write lock for a short time, so saves can stall or fail meanwhile. Do not run crawls or reloads during evaluation sessions.

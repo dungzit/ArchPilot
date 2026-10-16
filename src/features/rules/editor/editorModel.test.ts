@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { RulePack } from '../../../contracts/pilot'
+import { compileModel } from '../../../domain/rules/engine'
 import { KAFKA_TEMPLATE_MODEL } from '../../../domain/rules/excel/template'
-import { blankModel, editableFrom, errorMatchesRow, formatKv, nextModelId, packFromJson, parseKv, rowErrors, unmatchedErrors } from './editorModel'
+import { blankModel, canUpdatePack, editableFrom, errorMatchesRow, formatKv, nextModelId, packFromJson, parseKv, rowErrors, unmatchedErrors } from './editorModel'
 
 describe('editor model helpers', () => {
+  it('a new model defaults to units mode and compiles', () => {
+    const model = blankModel()
+    expect(model.formulaMode).toBe('units')
+    expect(compileModel(model)).toEqual({ ok: true })
+  })
+
   it('parses and formats key=value test fields', () => {
     expect(parseKv('ingress=150, rf = 3; retention_days=1e1')).toEqual({ ingress: 150, rf: 3, retention_days: 10 })
     expect(parseKv('')).toEqual({})
@@ -54,5 +61,18 @@ describe('editor model helpers', () => {
     expect(editable.models[0]).not.toBe(KAFKA_TEMPLATE_MODEL)
     expect(nextModelId([blankModel('model_2')])).toBe('model_3')
     expect(nextModelId([blankModel('model_1'), blankModel('model_3')])).toBe('model_4')
+  })
+
+  it('opens someone else\'s pack as a copy for a member; the owner and an admin edit it in place', () => {
+    const team: RulePack = { id: 'rp_5', name: 'Kafka', version: 4, status: 'published', builtIn: false, owner: 'alice', models: [KAFKA_TEMPLATE_MODEL] }
+    const member = { username: 'bob', role: 'member' }
+    expect(canUpdatePack(team, member)).toBe(false)
+    expect(editableFrom(team, member)).toMatchObject({ id: undefined, name: 'Kafka (bản sao)', version: 1, copyOf: { name: 'Kafka', owner: 'alice', builtIn: false } })
+    expect(canUpdatePack(team, { username: 'alice', role: 'member' })).toBe(true)
+    expect(editableFrom(team, { username: 'alice', role: 'member' })).toMatchObject({ id: 'rp_5', name: 'Kafka', version: 4 })
+    expect(editableFrom(team, { username: 'root', role: 'admin' })).toMatchObject({ id: 'rp_5', name: 'Kafka' })
+    // No owner recorded (owner account deleted): only an admin may update.
+    expect(canUpdatePack({ ...team, owner: null }, member)).toBe(false)
+    expect(canUpdatePack({ ...team, builtIn: true }, { username: 'root', role: 'admin' })).toBe(false)
   })
 })

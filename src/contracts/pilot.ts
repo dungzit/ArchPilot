@@ -147,11 +147,14 @@ export interface SizingRun {
   componentLabel?: string | null
   rulePackId: string
   rulePackVersion: number
+  /** The pack's display name when it was run (optional; older runs only have the id). */
+  rulePackName?: string | null
   modelId: string
   modelName: string
   inputs: { name: string; value: number; unit: string; source?: string }[]
   steps: SizingStep[]
-  outputs: { name: string; value: number; unit: string; label?: string }[]
+  /** `from`: the calc step (or input/param) the output reads; optional, older runs lack it. */
+  outputs: { name: string; value: number; unit: string; label?: string; from?: string }[]
   /** Which constraint decided the result, when the model takes a max/min. */
   binding?: string | null
   warnings: SizingRunWarning[]

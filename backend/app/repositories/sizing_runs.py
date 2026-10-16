@@ -80,6 +80,7 @@ def run_out_fields(row: sqlite3.Row) -> dict[str, Any]:
         "component_label": body.get("componentLabel"),
         "rule_pack_id": body.get("rulePackId", ""),
         "rule_pack_version": body.get("rulePackVersion", 0),
+        "rule_pack_name": body.get("rulePackName"),
         "model_id": body.get("modelId", ""),
         "model_name": body.get("modelName", ""),
         "inputs": body.get("inputs", []),

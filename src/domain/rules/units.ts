@@ -82,6 +82,7 @@ const ATOMS: Record<string, UnitInfo> = {
   QPS: { factor: 1, dim: PER_SECOND },
   RPS: { factor: 1, dim: PER_SECOND },
   // Dimensionless.
+  // A % value is a fraction in base units (90% is 0.9); the engine rejects comparing one with a literal above 1.
   '%': { factor: 0.01, dim: DIMENSIONLESS },
   '1': { factor: 1, dim: DIMENSIONLESS },
 }

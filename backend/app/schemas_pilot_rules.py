@@ -249,6 +249,9 @@ class RunOutputIn(_Wire):
     value: FiniteNumber
     unit: UnitText = ""
     label: ShortText | None = None
+    # The calc step (or input/param) the output reads, so the HLD can mark the
+    # output the binding constraint decided. Optional: older runs lack it.
+    from_: Identifier | None = Field(default=None, alias="from")
 
 
 class RunWarningIn(_Wire):
@@ -265,6 +268,8 @@ class SizingRunWrite(_Wire):
     component_label: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
     rule_pack_id: Annotated[str, StringConstraints(min_length=1, max_length=64)]
     rule_pack_version: Annotated[int, Field(ge=0)]
+    # Display name of the pack at run time (optional), cited by the HLD.
+    rule_pack_name: ShortText | None = None
     model_id: ModelId
     model_name: ShortText = ""
     inputs: Annotated[list[RunInputIn], Field(max_length=500)] = Field(default_factory=list)
@@ -284,6 +289,7 @@ class SizingRunOut(_Wire):
     component_label: str | None = None
     rule_pack_id: str
     rule_pack_version: int
+    rule_pack_name: str | None = None
     model_id: str
     model_name: str
     inputs: list[dict[str, Any]]

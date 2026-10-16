@@ -18,14 +18,21 @@
  * 2. Evaluation works in base units (bytes, seconds): an input of `150 MB/s`
  *    enters as 1.5e8. Each step's value is then expressed in its declared unit
  *    for the trace, so `116.64 TB` is computed as 1.1664e14 bytes / 1e12.
- *    In `excel` mode nothing is converted: identifiers are their raw numbers.
- * 3. ceil/floor/roundup_to, output rounding and comparisons first snap their
- *    operand to 12 significant digits, so float noise never adds a host
- *    (600 MB/s × 3 / 100 MB/s / 0.6 is 30.000000000000004 in IEEE doubles).
+ *    In `excel` mode nothing is converted: identifiers are their raw numbers,
+ *    and convert() is a compile error (it could only return its argument).
+ *    In `units` mode a `%` value is a fraction (90% is 0.9), so comparing it
+ *    with a literal above 1 (`util > 80`) is a compile error too.
+ * 3. ceil/floor/roundup_to and output rounding first snap a near-integer
+ *    operand to that integer (relative tolerance 1e-9, absolute below 1), so
+ *    float noise never adds a host (600 MB/s × 3 / 100 MB/s / 0.6 is
+ *    30.000000000000004 in IEEE doubles) and a difference that should be 0
+ *    but is 4.4e-16 rounds up to 0, not 1. Real fractions and exact integers
+ *    of any size pass through unchanged. Comparisons use the same tolerance:
+ *    two values closer than it are equal.
  */
 import type { RuleLookup, RuleSeverity, RuleTest, SizingModelDef, SizingRun, SizingRunWarning, SizingStep } from '../../contracts/pilot'
 import { formatPlain, withUnit } from './format'
-import { DslSyntaxError, IDENTIFIER_RE, KEYWORDS, parseFormula, printExpr, referencedNames, type Expr } from './parser'
+import { DslSyntaxError, IDENTIFIER_RE, KEYWORDS, parseFormula, printExpr, type Expr } from './parser'
 import { DIMENSIONLESS, dimDiv, dimEquals, dimMul, dimPow, formatDim, isCountUnit, isDimensionless, parseUnit, type Dim } from './units'
 
 export interface RuleError {
@@ -225,7 +232,37 @@ function checkBinary(node: Extract<Expr, { kind: 'binary' }>, ctx: CheckContext)
       if (left && right && !dimEquals(left, right)) {
         return fail(ctx, 'unit error', `cannot compare ${formatDim(left)} with ${formatDim(right)}${column(node)}`)
       }
+      if (ctx.units) checkPercentLiteral(node, ctx)
       return known(DIMENSIONLESS)
+  }
+}
+
+/** Name of a `%` input/param/calc when `node` is just that identifier. */
+function percentName(node: Expr, ctx: CheckContext): string | null {
+  if (node.kind !== 'ident') return null
+  const symbol = ctx.symbols.get(node.name)
+  return symbol && symbol.unit.trim() === '%' ? node.name : null
+}
+
+/**
+ * In units mode a `%` value is a fraction (90% is 0.9), so `util > 80` is
+ * always false and `util < 80` always true. A literal above 1 next to a `%`
+ * value is therefore a mistake: report it with the fraction to write instead.
+ */
+function checkPercentLiteral(node: Extract<Expr, { kind: 'binary' }>, ctx: CheckContext): void {
+  const pairs: [Expr, Expr][] = [[node.left, node.right], [node.right, node.left]]
+  for (const [side, other] of pairs) {
+    const name = percentName(side, ctx)
+    const literal = constantNumber(other)
+    if (name === null || literal === null || Math.abs(literal) <= 1) continue
+    const fraction = formatPlain(literal / 100)
+    fail(
+      ctx,
+      'unit error',
+      `"${name}" is in % and is compared as a fraction (90% = 0.9), so comparing it with ${formatPlain(literal)} never does what you mean; write ${fraction} for ${formatPlain(literal)}% | ` +
+        `"${name}" có đơn vị % nên được so sánh dưới dạng phân số (90% = 0.9); so sánh với ${formatPlain(literal)} sẽ không cho kết quả như mong muốn; hãy viết ${fraction} thay cho ${formatPlain(literal)}%${column(node)}`,
+    )
+    return
   }
 }
 
@@ -277,7 +314,17 @@ function checkCall(node: Extract<Expr, { kind: 'call' }>, ctx: CheckContext): Di
       const dim = check(node.args[0], ctx)
       const target = node.args[1]
       if (target.kind !== 'str') return fail(ctx, 'type error', `convert(x, "unit") needs the unit as a quoted string${column(target)}`)
-      if (!ctx.units) return null
+      if (!ctx.units) {
+        // In excel mode numbers carry no unit, so convert() would silently return its argument.
+        return fail(
+          ctx,
+          'mode error',
+          'convert() only works in formula mode "units"; in "excel" mode numbers have no unit, so nothing would be converted. ' +
+            'Switch the model to units mode or convert by hand (e.g. / 1000) | ' +
+            'convert() chỉ dùng được ở chế độ "units"; ở chế độ "excel" số không có đơn vị nên không quy đổi gì. ' +
+            `Hãy chuyển model sang chế độ units hoặc tự quy đổi (ví dụ / 1000)${column(node)}`,
+        )
+      }
       const unit = parseUnit(target.value)
       if (!unit) return fail(ctx, 'unknown unit', `"${target.value}" in convert()${column(target)}`)
       if (dim && !dimEquals(dim, unit.dim)) {
@@ -321,11 +368,10 @@ function columnIndex(table: RuleLookup, name: string): number {
 /** Exact match on the first column: numbers numerically, strings case-insensitively. */
 function findRow(table: RuleLookup, key: number | string): (string | number)[] | undefined {
   if (typeof key === 'number') {
-    const target = snap(key)
     return table.rows.find((row) => {
       const cell = row[0]
-      if (typeof cell === 'number') return snap(cell) === target
-      return typeof cell === 'string' && cell.trim() !== '' && Number(cell) === target
+      if (typeof cell === 'number') return nearlyEqual(cell, key)
+      return typeof cell === 'string' && cell.trim() !== '' && nearlyEqual(Number(cell), key)
     })
   }
   const target = key.trim().toLowerCase()
@@ -544,10 +590,25 @@ function parseChecked(source: unknown, where: string, errors: RuleError[]): Expr
 
 class EvalFailure extends Error {}
 
-/** 12 significant digits: removes IEEE noise before ceil/floor/compare. */
+/** Relative tolerance (absolute below 1) under which float noise is ignored. */
+const NOISE = 1e-9
+
+/**
+ * A value within NOISE of an integer becomes that integer: removes IEEE noise
+ * before ceil/floor (`4.4e-16` -> 0, `27.000000000000004` -> 27) without
+ * touching real fractions or large exact integers (1234567890123 stays).
+ */
 function snap(value: number): number {
-  if (value === 0 || !Number.isFinite(value)) return value
-  return Number(value.toPrecision(12))
+  if (!Number.isFinite(value)) return value
+  const nearest = Math.round(value)
+  return Math.abs(value - nearest) <= NOISE * Math.max(1, Math.abs(nearest)) ? nearest : value
+}
+
+/** Equal within NOISE (relative, absolute below 1): what `==`, `<` and friends use. */
+function nearlyEqual(a: number, b: number): boolean {
+  if (a === b) return true
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false
+  return Math.abs(a - b) <= NOISE * Math.max(1, Math.abs(a), Math.abs(b))
 }
 
 /** Excel ROUND: half away from zero, robust against 1.005-style noise. */
@@ -608,17 +669,17 @@ function evaluateBinary(node: Extract<Expr, { kind: 'binary' }>, state: EvalStat
       return result
     }
     case '<':
-      return snap(left) < snap(right) ? 1 : 0
+      return left < right && !nearlyEqual(left, right) ? 1 : 0
     case '<=':
-      return snap(left) <= snap(right) ? 1 : 0
+      return left <= right || nearlyEqual(left, right) ? 1 : 0
     case '>':
-      return snap(left) > snap(right) ? 1 : 0
+      return left > right && !nearlyEqual(left, right) ? 1 : 0
     case '>=':
-      return snap(left) >= snap(right) ? 1 : 0
+      return left >= right || nearlyEqual(left, right) ? 1 : 0
     case '==':
-      return snap(left) === snap(right) ? 1 : 0
+      return nearlyEqual(left, right) ? 1 : 0
     case '!=':
-      return snap(left) !== snap(right) ? 1 : 0
+      return nearlyEqual(left, right) ? 0 : 1
   }
 }
 
@@ -703,10 +764,26 @@ function substitute(step: CompiledCalc, state: EvalState): string {
       if (!symbol || base === undefined) return undefined
       return traceText(displayValue(symbol, base, compiled.mode), symbol.unit)
     }
+    if (node.kind === 'call' && node.name === 'if' && node.args.length === 3) {
+      // Only the taken branch was evaluated; the other one prints as written,
+      // so a lookup or division there that would fail is never touched.
+      let taken: number
+      try {
+        taken = truthy(evaluate(node.args[0], state)) ? 1 : 2
+      } catch {
+        return undefined
+      }
+      return `if(${node.args.map((arg, index) => (index === 0 || index === taken ? printExpr(arg, leaf) : printExpr(arg))).join(', ')})`
+    }
     if (node.kind === 'call' && node.name === 'lookup') {
-      const { table, key, columnName } = lookupParts(node, state)
-      const keyText = node.args[1].kind === 'str' ? JSON.stringify(key) : printExpr(node.args[1], leaf)
-      return `lookup(${table.name}, ${keyText} → ${columnName} = ${formatPlain(evaluate(node, state))})`
+      try {
+        const { table, key, columnName } = lookupParts(node, state)
+        const keyText = node.args[1].kind === 'str' ? JSON.stringify(key) : printExpr(node.args[1], leaf)
+        return `lookup(${table.name}, ${keyText} → ${columnName} = ${formatPlain(evaluate(node, state))})`
+      } catch {
+        // Not evaluated on this run (e.g. the right side of a short-circuited `and`): print it plain.
+        return undefined
+      }
     }
     return undefined
   }
@@ -715,7 +792,9 @@ function substitute(step: CompiledCalc, state: EvalState): string {
   const top = step.expr
   let tail: string | null = null
   if (top.kind === 'call' && !top.paren && ['ceil', 'floor', 'round'].includes(top.name)) {
-    const inner = formatPlain(evaluate(top.args[0], state))
+    // Show what ceil/floor actually round: `ceil(0)`, not `ceil(4.441e-16)`.
+    const raw = evaluate(top.args[0], state)
+    const inner = formatPlain(top.name === 'round' ? raw : snap(raw))
     const digits = top.args[1] ? `, ${formatPlain(evaluate(top.args[1], state))}` : ''
     tail = `${top.name}(${inner}${digits})`
   } else if (top.kind === 'call' && !top.paren && top.name === 'roundup_to') {
@@ -728,23 +807,48 @@ function substitute(step: CompiledCalc, state: EvalState): string {
   return tail === null || tail === text ? text : `${text} = ${tail}`
 }
 
-/** First max()/min() with 2+ arguments, depth-first. */
-function firstMinMax(expr: Expr): Extract<Expr, { kind: 'call' }> | null {
+/**
+ * The sub-expressions this run actually evaluated, in source order: an if()
+ * contributes its condition and the taken branch only, a short-circuited
+ * `and`/`or` only its left side, a lookup() its key (not the table name).
+ */
+function liveChildren(expr: Expr, state: EvalState): Expr[] {
   switch (expr.kind) {
     case 'call':
-      if ((expr.name === 'max' || expr.name === 'min') && expr.args.length >= 2) return expr
-      for (const arg of expr.args) {
-        const found = firstMinMax(arg)
-        if (found) return found
+      if (expr.name === 'if' && expr.args.length === 3) {
+        return [expr.args[0], truthy(evaluate(expr.args[0], state)) ? expr.args[1] : expr.args[2]]
       }
-      return null
+      if (expr.name === 'lookup') return expr.args.slice(1, 2)
+      return expr.args
     case 'binary':
-      return firstMinMax(expr.left) ?? firstMinMax(expr.right)
+      if (expr.op === 'and' && !truthy(evaluate(expr.left, state))) return [expr.left]
+      if (expr.op === 'or' && truthy(evaluate(expr.left, state))) return [expr.left]
+      return [expr.left, expr.right]
     case 'unary':
-      return firstMinMax(expr.arg)
+      return [expr.arg]
     default:
-      return null
+      return []
   }
+}
+
+/** First max()/min() with 2+ arguments on the evaluated path, depth-first. */
+function firstMinMax(expr: Expr, state: EvalState): Extract<Expr, { kind: 'call' }> | null {
+  if (expr.kind === 'call' && (expr.name === 'max' || expr.name === 'min') && expr.args.length >= 2) return expr
+  for (const child of liveChildren(expr, state)) {
+    const found = firstMinMax(child, state)
+    if (found) return found
+  }
+  return null
+}
+
+/** Names read on the evaluated path, in source order, without duplicates. */
+function liveNames(expr: Expr, state: EvalState, seen: string[] = []): string[] {
+  if (expr.kind === 'ident') {
+    if (!seen.includes(expr.name)) seen.push(expr.name)
+    return seen
+  }
+  for (const child of liveChildren(expr, state)) liveNames(child, state, seen)
+  return seen
 }
 
 /**
@@ -752,6 +856,7 @@ function firstMinMax(expr: Expr): Extract<Expr, { kind: 'call' }> | null {
  * feeds the first output and walks back through the steps it reads (nearest
  * first) until it meets a max()/min(); `hosts = max(cpu_hosts, ram_hosts) +
  * spare_hosts` therefore reports `cpu_hosts`. Ties go to the first argument.
+ * Only the evaluated path counts: an if() is followed into its taken branch.
  */
 function findBinding(state: EvalState): string | null {
   const { compiled } = state
@@ -766,14 +871,15 @@ function findBinding(state: EvalState): string | null {
     const index = queue.shift() as number
     if (seen.has(index)) continue
     seen.add(index)
-    const call = firstMinMax(compiled.calc[index].expr)
+    const call = firstMinMax(compiled.calc[index].expr, state)
     if (call) {
-      const values = call.args.map((arg) => snap(evaluate(arg, state)))
+      const values = call.args.map((arg) => evaluate(arg, state))
       const target = call.name === 'max' ? Math.max(...values) : Math.min(...values)
-      const winner = call.args[values.indexOf(target)]
+      // Ties, including ties within float noise, go to the first argument.
+      const winner = call.args[values.findIndex((value) => nearlyEqual(value, target))]
       return winner.kind === 'ident' ? winner.name : printExpr(winner)
     }
-    for (const name of referencedNames(compiled.calc[index].expr)) {
+    for (const name of liveNames(compiled.calc[index].expr, state)) {
       const ref = indexByName.get(name)
       if (ref !== undefined && ref < index) queue.push(ref)
     }
@@ -852,7 +958,7 @@ function runCompiled(compiled: CompiledModel, inputs: Record<string, number>, me
     const base = values.get(output.from) as number
     const factor = mode === 'units' ? (parseUnit(output.unit)?.factor ?? 1) : 1
     const value = applyRounding(base / factor, output.rounding)
-    return { name: output.name, value, unit: output.unit, label: output.labelEn ?? output.labelVi ?? output.name }
+    return { name: output.name, value, unit: output.unit, label: output.labelEn ?? output.labelVi ?? output.name, from: output.from }
   })
 
   let binding: string | null = null

@@ -168,7 +168,7 @@ function AppShell({ language, onToggleLanguage, user, onLogout }: { language: La
     if (item.key === 'designs') return <DesignsRoute text={text} language={language} user={user} />
     // Pilot v1 screens (docs/v3); each work package owns its feature directory.
     if (item.key === 'reference') return <ReferenceScreen text={text} language={language} />
-    if (item.key === 'rules') return <RulesScreen text={text} language={language} />
+    if (item.key === 'rules') return <RulesScreen text={text} language={language} user={user} />
     if (item.key === 'hld') return <HldScreen text={text} language={language} />
     if (item.key === 'editorial' && !editorial) return <NotFoundScreen text={text} />
     return <PlannedScreen item={item} text={text} />
