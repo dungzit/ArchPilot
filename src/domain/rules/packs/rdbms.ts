@@ -29,7 +29,7 @@ export const rdbmsModel: SizingModelDef = {
   inputs: [
     { name: 'data_size', labelVi: 'Dữ liệu hiện tại', labelEn: 'Current data size', unit: 'GB', default: 500, min: 0, source: 'customer' },
     { name: 'index_overhead', labelVi: 'Overhead index', labelEn: 'Index overhead', unit: 'ratio', default: 0.3, min: 0, max: 3, source: 'assumption' },
-    { name: 'growth_rate', labelVi: 'Tăng trưởng mỗi năm', labelEn: 'Growth per year', unit: 'ratio', default: 0.3, min: 0, max: 10, source: 'customer' },
+    { name: 'growth_rate', labelVi: 'Tăng trưởng mỗi năm (0.3 = 30%)', labelEn: 'Growth per year (0.3 = 30%)', unit: 'ratio', default: 0.3, min: 0, max: 2, source: 'customer' },
     { name: 'years', labelVi: 'Số năm kế hoạch', labelEn: 'Planning years', unit: 'count', default: 3, min: 0, max: 10, source: 'project' },
     { name: 'tps', labelVi: 'Giao dịch/giây (đỉnh)', labelEn: 'Peak transactions per second', unit: 'TPS', default: 1000, min: 0, source: 'customer' },
     { name: 'reads_per_txn', labelVi: 'Lượt đọc mỗi giao dịch', labelEn: 'Reads per transaction', unit: 'count', default: 8, min: 0, source: 'assumption' },

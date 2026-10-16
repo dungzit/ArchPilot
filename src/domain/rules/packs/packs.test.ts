@@ -151,6 +151,13 @@ describe('golden figures (docs/v3/02 §7.1, §10 and 05 §9)', () => {
     expect(large.warnings.map((w) => w.messageEn)).toEqual(['IOPS per node 41666.7 IOPS above 20,000: needs an NVMe/all-flash tier.'])
   })
 
+  test('rdbms: growth_rate is a fraction capped at 2 (200%/year), and the label says 0.3 = 30%', () => {
+    const growth = model('rdbms').inputs.find((input) => input.name === 'growth_rate')!
+    expect(growth).toMatchObject({ unit: 'ratio', min: 0, max: 2 })
+    expect(growth.labelEn).toContain('0.3 = 30%')
+    expect(growth.labelVi).toContain('0.3 = 30%')
+  })
+
   test('a run carries meta, defaults and param provenance', () => {
     const run = evaluateModel(model('kafka'), { ingress: 200 }, { ...META, designId: 'dsg_1', componentLabel: 'Kafka (Prod)' })
     expect(run).toMatchObject({ rulePackId: 'archpilot-core', rulePackVersion: 1, modelId: 'kafka', modelName: 'Kafka cluster', designId: 'dsg_1', componentLabel: 'Kafka (Prod)' })

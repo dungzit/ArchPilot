@@ -14,6 +14,7 @@ import type { Copy } from '../../ui/copy'
 import { parseInputs } from './inputValues'
 import { RulesScreen } from './RulesScreen'
 import { kafkaModel } from '../../domain/rules/packs/kafka'
+import { rdbmsModel } from '../../domain/rules/packs/rdbms'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -308,6 +309,12 @@ describe('Rules screen: rule editor', () => {
 })
 
 describe('parseInputs', () => {
+  test('rdbms growth_rate typed as a percentage (30) is rejected with the 0 – 2 range', () => {
+    const { errors } = parseInputs(rdbmsModel, { growth_rate: '30' })
+    expect(errors.growth_rate?.en).toBe('Outside the allowed range 0 – 2.')
+    expect(parseInputs(rdbmsModel, { growth_rate: '0.3' }).errors.growth_rate).toBeUndefined()
+  })
+
   test('required, not a number, min, max and range messages', () => {
     const { values, errors } = parseInputs(kafkaModel, { ingress: '', rf: 'abc', retention: '-1', fanout: '2', is_prod: '2' })
     expect(values).toEqual({ fanout: 2 })
