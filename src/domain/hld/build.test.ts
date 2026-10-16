@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import type { SizingRun } from '../../contracts/pilot'
 import { validateGraph } from '../graph/validate'
-import { buildHldModel, enabledSections, mergeManual, sectionNumbers } from './build'
+import { buildHldModel, enabledSections, isBindingOutput, mergeManual, packText, sectionNumbers } from './build'
 import { buildSkeleton } from './skeleton'
 import { fileSafe, formatNumber, hldFileName, parseManualText, safeUrl } from './format'
 import { SECTION_IDS, type HldBlock, type HldModel, type SectionId } from './types'
@@ -183,6 +184,27 @@ describe('buildHldModel: content and counts', () => {
     expect(all).toContain('Broker count (Binding constraint)')
     expect(all).toContain('[High] More than 50 brokers')
     expect(all).toContain('6.2.2 Redis memory')
+  })
+
+  it('section 6 cites the pack by name when the run carries it, and marks the output whose `from` is the binding step', () => {
+    const named: SizingRun = {
+      ...KAFKA_RUN,
+      rulePackName: 'Kafka sizing (team)',
+      binding: 'storage_brokers',
+      outputs: [
+        { name: 'brokers', value: 63, unit: 'count', label: 'Broker count', from: 'brokers' },
+        { name: 'disk_bound', value: 63, unit: 'count', label: 'Brokers for storage', from: 'storage_brokers' },
+      ],
+    }
+    const model = buildHldModel(fullInput({ language: 'en', runs: [named] }))
+    const all = texts(section(model, 'sizing').blocks)
+    expect(all).toContain('Kafka sizing (team) v3')
+    expect(all).toContain('Kafka sizing (team) v3 (builtin-kafka)')
+    expect(all).toContain('Brokers for storage (Binding constraint)')
+    expect(all).toContain('Broker count')
+    expect(all).not.toContain('Broker count (Binding constraint)')
+    expect(packText(KAFKA_RUN)).toBe('builtin-kafka v3')
+    expect(isBindingOutput(KAFKA_RUN, KAFKA_RUN.outputs[0])).toBe(true) // older run without `from`: same name
   })
 
   it('section 7 summarises outputs, estimates size classes and promises the BOM later', () => {

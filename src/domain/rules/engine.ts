@@ -958,7 +958,7 @@ function runCompiled(compiled: CompiledModel, inputs: Record<string, number>, me
     const base = values.get(output.from) as number
     const factor = mode === 'units' ? (parseUnit(output.unit)?.factor ?? 1) : 1
     const value = applyRounding(base / factor, output.rounding)
-    return { name: output.name, value, unit: output.unit, label: output.labelEn ?? output.labelVi ?? output.name }
+    return { name: output.name, value, unit: output.unit, label: output.labelEn ?? output.labelVi ?? output.name, from: output.from }
   })
 
   let binding: string | null = null

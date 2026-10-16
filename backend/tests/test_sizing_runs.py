@@ -85,6 +85,17 @@ def test_save_without_a_design_round_trips_the_run(user_a):
     assert user_a.get(f"{URL}/{run['id']}").json() == run
 
 
+def test_pack_name_and_output_source_step_round_trip_and_stay_optional(user_a):
+    outputs = [{"name": "brokers", "value": 14, "unit": "broker", "label": "Brokers", "from": "brokers"}]
+    run = save(user_a, rulePackName="ArchPilot core sizing", outputs=outputs)
+    assert run["rulePackName"] == "ArchPilot core sizing"
+    assert run["outputs"] == outputs
+    assert user_a.get(f"{URL}/{run['id']}").json()["outputs"][0]["from"] == "brokers"
+    older = save(user_a)
+    assert older["rulePackName"] is None
+    assert "from" not in older["outputs"][0]
+
+
 def test_save_against_own_design_and_list_by_design(user_a):
     design_id = make_design(user_a)
     other_design = make_design(user_a, "Other")
@@ -141,6 +152,11 @@ def test_owner_deletes_a_run(user_a):
         ({"warnings": [{"severity": "fatal", "messageVi": "", "messageEn": ""}]}, "severity"),
         ({"steps": [{"name": f"s{i}", "formula": "1", "substituted": "1", "value": 1, "unit": ""} for i in range(201)]}, "steps"),
         ({"componentLabel": "x" * 201}, "componentLabel"),
+        # The caps the SPA clips to before saving (src/api/sizingRuns.ts fitRunToServerCaps).
+        ({"inputs": [{"name": "p", "value": 1, "unit": "", "source": "param: " + "x" * 200}]}, "source"),
+        ({"binding": "x" * 201}, "binding"),
+        ({"rulePackName": "x" * 201}, "rulePackName"),
+        ({"outputs": [{"name": "o", "value": 1, "unit": "", "from": "not an identifier"}]}, "from"),
     ],
 )
 def test_invalid_runs_are_422(user_a, migrated_db, overrides, fragment):

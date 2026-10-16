@@ -87,6 +87,24 @@ export function runLabel(run: SizingRun): string {
   return cleanText(run.componentLabel ?? '').trim() || cleanText(run.modelName).trim() || run.modelId
 }
 
+/** `Kafka sizing v3` when the run carries the pack name; older runs only have the id (`builtin-kafka v3`). */
+export function packText(run: SizingRun, withId = false): string {
+  const name = cleanText(run.rulePackName ?? '').trim()
+  const id = cleanText(run.rulePackId)
+  if (!name) return `${id} v${run.rulePackVersion}`
+  return withId && id ? `${name} v${run.rulePackVersion} (${id})` : `${name} v${run.rulePackVersion}`
+}
+
+/**
+ * The output the binding constraint decided. `binding` is a calc step name,
+ * so the output whose `from` is that step is marked; runs saved before
+ * outputs carried `from` fall back to an output with the same name.
+ */
+export function isBindingOutput(run: SizingRun, output: SizingRun['outputs'][number]): boolean {
+  if (!run.binding) return false
+  return (output.from ?? output.name) === run.binding
+}
+
 function roleLabel(node: ArchNodeV2, language: HldLanguage): string {
   const role = getRole(node.type)
   const base = role?.label[language] ?? node.type
@@ -440,7 +458,7 @@ export function buildHldModel(input: HldInput): HldModel {
         {
           kind: 'table',
           columns: ['#', lbl('component'), lbl('model'), lbl('rulePack'), lbl('createdAt')],
-          rows: runs.map((run, index) => [String(index + 1), runLabel(run), cleanText(run.modelName), `${cleanText(run.rulePackId)} v${run.rulePackVersion}`, orDash(run.createdAt?.slice(0, 16).replace('T', ' '))]),
+          rows: runs.map((run, index) => [String(index + 1), runLabel(run), cleanText(run.modelName), packText(run), orDash(run.createdAt?.slice(0, 16).replace('T', ' '))]),
           widths: [0.5, 2.2, 2.2, 2, 1.6],
         },
         { kind: 'heading', level: 2, text: `${no}.2 ${lbl('sizingResults')}` },
@@ -452,7 +470,7 @@ export function buildHldModel(input: HldInput): HldModel {
             kind: 'fields',
             rows: [
               { label: lbl('model'), value: `${cleanText(run.modelName)} (${cleanText(run.modelId)})` },
-              { label: lbl('rulePack'), value: `${cleanText(run.rulePackId)} v${run.rulePackVersion}` },
+              { label: lbl('rulePack'), value: packText(run, true) },
               { label: lbl('binding'), value: orDash(run.binding) },
             ],
           },
@@ -466,7 +484,7 @@ export function buildHldModel(input: HldInput): HldModel {
           table(
             [lbl('output'), lbl('value'), lbl('unit')],
             (run.outputs ?? []).map((item) => [
-              `${cleanText(item.label || item.name)}${run.binding && run.binding === item.name ? ` (${lbl('binding')})` : ''}`,
+              `${cleanText(item.label || item.name)}${isBindingOutput(run, item) ? ` (${lbl('binding')})` : ''}`,
               num(item.value),
               orDash(item.unit),
             ]),
@@ -544,7 +562,7 @@ export function buildHldModel(input: HldInput): HldModel {
       const blocks: HldBlock[] = [{ kind: 'paragraph', text: lbl('traceIntro'), tone: 'note' }]
       runs.forEach((run, index) => {
         blocks.push(
-          { kind: 'heading', level: 2, text: `${no}.${index + 1} ${runLabel(run)} — ${cleanText(run.modelName)} (${cleanText(run.rulePackId)} v${run.rulePackVersion})` },
+          { kind: 'heading', level: 2, text: `${no}.${index + 1} ${runLabel(run)} — ${cleanText(run.modelName)} (${packText(run)})` },
           table(
             [lbl('step'), lbl('formula'), lbl('substituted'), lbl('value')],
             (run.steps ?? []).map((step) => [cleanText(step.name), cleanText(step.formula), cleanText(step.substituted), `${num(step.value)} ${cleanText(step.unit)}`.trim()]),

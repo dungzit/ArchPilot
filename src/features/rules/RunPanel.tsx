@@ -47,7 +47,8 @@ export function RunPanel({ text, language, packs, packId, onPackChange, onOpenIn
   const outcome = useMemo((): { run: SizingRun } | { error: string } | null => {
     if (!model || !pack || !compiled?.ok || !parsed || Object.keys(parsed.errors).length) return null
     try {
-      return { run: evaluateModel(model, parsed.values, { rulePackId: pack.id, rulePackVersion: pack.version }) }
+      // The pack name travels with the saved run so the HLD can cite it by name, not only by id.
+      return { run: { ...evaluateModel(model, parsed.values, { rulePackId: pack.id, rulePackVersion: pack.version }), rulePackName: pack.name } }
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) }
     }
