@@ -137,6 +137,40 @@ describe('golden figures (docs/v3/02 §7.1, §10 and 05 §9)', () => {
     expect(iopsBound.binding).toBe('iops_disks')
   })
 
+  test('san-storage: thin_ratio (02 SZ3-05) defaults to 1 and divides the physical capacity', () => {
+    expect(model('san-storage').inputs.find((input) => input.name === 'thin_ratio')).toMatchObject({ default: 1, min: 1, unit: 'ratio' })
+    const thick = evaluateModel(model('san-storage'), {}, META)
+    expect([out(thick, 'raw'), out(thick, 'total_disks'), thick.warnings.map((w) => w.severity)]).toEqual([150, 21, []])
+    const thin = evaluateModel(model('san-storage'), { thin_ratio: 2, host_iops: 20_000 }, META)
+    expect(step(thin, 'capacity_needed')!.substituted).toBe('100 TB / 2 × (1 + 0.2)')
+    expect([out(thin, 'raw'), out(thin, 'disks_needed'), out(thin, 'total_disks')]).toEqual([75, 10, 11])
+    expect(thin.warnings.map((w) => w.messageEn)).toEqual(['Thin-provisioning credit applied (2x): monitor pool usage and alert before it fills.'])
+  })
+
+  // docs/v3/pilot/test-cases.md 4.6, hand arithmetic shown there.
+  const SAN_01 = { usable: 100, raid_level: 6, snapshot_reserve: 0.2, thin_ratio: 1, spare_every: 20, disk_size: 7.68, disk_iops: 10_000, host_iops: 50_000, read_ratio: 0.7 }
+  test.each([
+    ['G-SAN-01', SAN_01, { raw: 150, disks_needed: 20, hot_spares: 1, total_disks: 21, raw_installed: 161.28, backend_iops: 125_000, iops_capacity: 80_000 }, 'data_disks'],
+    ['G-SAN-02', { ...SAN_01, raid_level: 10 }, { raw: 240, disks_needed: 32, hot_spares: 2, total_disks: 34, raw_installed: 261.12, backend_iops: 65_000, iops_capacity: 246_153 }, 'data_disks'],
+    ['G-SAN-03', { ...SAN_01, thin_ratio: 2 }, { raw: 75, disks_needed: 20, hot_spares: 1, total_disks: 21, raw_installed: 161.28, backend_iops: 125_000, iops_capacity: 80_000 }, 'iops_disks'],
+  ] as const)('san-storage QA %s matches the hand result', (_id, inputs, expected, binding) => {
+    const run = evaluateModel(model('san-storage'), inputs, META)
+    for (const [name, value] of Object.entries(expected)) expect(out(run, name), name).toBeCloseTo(value, 6)
+    expect(run.binding).toBe(binding)
+  })
+
+  // docs/v3/pilot/test-cases.md 4.5, hand arithmetic shown there.
+  const RDB_01 = { data_size: 2000, index_overhead: 0.3, growth_rate: 0.25, years: 2, tps: 2500, reads_per_txn: 6, writes_per_txn: 2, cpu_ms_per_txn: 4, working_set: 0.2, connections: 800, replicas: 1, backup_fulls: 4 }
+  test.each([
+    ['G-RDB-01', RDB_01, { vcpu: 18, ram: 832, iops: 10_834, storage_per_node: 6770.833333, total_storage: 13_541.666667, backup_storage: 8125, nodes: 2, buffer_pool: 812.5 }, []],
+    ['G-RDB-02', { ...RDB_01, replicas: 0 }, { vcpu: 18, ram: 832, iops: 10_834, storage_per_node: 6770.833333, total_storage: 6770.833333, backup_storage: 8125, nodes: 1, buffer_pool: 812.5 }, ['high']],
+    ['G-RDB-03', { ...RDB_01, data_size: 0, tps: 0 }, { vcpu: 0, ram: 16, iops: 0, storage_per_node: 0, total_storage: 0, backup_storage: 0, nodes: 2, buffer_pool: 0 }, []],
+  ] as const)('rdbms QA %s matches the hand result', (_id, inputs, expected, severities) => {
+    const run = evaluateModel(model('rdbms'), inputs, META)
+    for (const [name, value] of Object.entries(expected)) expect(out(run, name), name).toBeCloseTo(value, 5)
+    expect(run.warnings.map((w) => w.severity)).toEqual(severities)
+  })
+
   test('san-storage: an unknown RAID level fails at run time naming the step', () => {
     expect(() => evaluateModel(model('san-storage'), { raid_level: 7 }, META)).toThrow(/evaluation error at calc\.raid_factor: lookup table "raid" has no row with key 7/)
   })
