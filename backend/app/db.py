@@ -41,7 +41,15 @@ def connect(db_path: Path | str | None = None, *, read_only: bool = False) -> sq
     if str(path) != ":memory:":
         path.parent.mkdir(parents=True, exist_ok=True)
 
-    conn = sqlite3.connect(str(path), timeout=10.0, isolation_level=None)
+    # check_same_thread=False (review-v2-phase0 B1): FastAPI runs a sync yield
+    # dependency's setup, every other sync dependency, the handler and the
+    # teardown as SEPARATE threadpool calls, and under concurrent requests they
+    # land on different worker threads. With the default True, sqlite3 raised
+    # ProgrammingError on 599 of 600 concurrent GETs - after a write had already
+    # committed. Safe here: a connection belongs to one request and is used by
+    # one thread at a time, in sequence - never concurrently - which SQLite
+    # allows in both its multi-thread and serialized modes.
+    conn = sqlite3.connect(str(path), timeout=10.0, isolation_level=None, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")

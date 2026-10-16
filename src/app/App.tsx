@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
+import { BrowserRouter, matchPath, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
 import { ChevronDown, ChevronRight, Compass, LogOut, Search, Settings2 } from 'lucide-react'
 import { currentUser, logout, type User } from '../api/auth'
 import { isApiError, setUnauthorizedHandler } from '../api/client'
@@ -28,7 +28,11 @@ import { Investment } from '../features/investment/InvestmentScreen'
 import { InvestmentModal } from '../features/investment/InvestmentModal'
 import { WorkspaceModal } from '../features/workspace/WorkspaceModal'
 import { PlannedScreen } from '../features/studio/PlannedScreen'
+import { DesignsRoute } from '../features/design/DesignsScreen'
 import { NotFoundScreen } from '../features/studio/NotFoundScreen'
+import { ReferenceScreen } from '../features/reference/ReferenceScreen'
+import { RulesScreen } from '../features/rules/RulesScreen'
+import { HldScreen } from '../features/hld/HldScreen'
 
 type Language = 'vi' | 'en'
 type TextFn = (value: Copy) => string
@@ -160,6 +164,12 @@ function AppShell({ language, onToggleLanguage, user, onLogout }: { language: La
   const studioElement = (item: StudioItem): ReactNode => {
     if (item.key === 'home') return screens.overview()
     if (item.key === 'sizing') return screens.sizing()
+    // Phase 2: /designs lists designs, /designs/:designId opens the workspace.
+    if (item.key === 'designs') return <DesignsRoute text={text} language={language} user={user} />
+    // Pilot v1 screens (docs/v3); each work package owns its feature directory.
+    if (item.key === 'reference') return <ReferenceScreen text={text} language={language} />
+    if (item.key === 'rules') return <RulesScreen text={text} language={language} user={user} />
+    if (item.key === 'hld') return <HldScreen text={text} language={language} />
     if (item.key === 'editorial' && !editorial) return <NotFoundScreen text={text} />
     return <PlannedScreen item={item} text={text} />
   }
@@ -167,7 +177,8 @@ function AppShell({ language, onToggleLanguage, user, onLogout }: { language: La
   const soon = <span className="nav-soon">{text(copy('SẮP CÓ', 'SOON'))}</span>
 
   return (
-    <div className="app-shell">
+    // Design-v2 4.2.1: on /designs/:id the sidebar collapses to an icon rail.
+    <div className={`app-shell${matchPath('/designs/:designId', pathname) ? ' focus-rail' : ''}`}>
       <aside className="sidebar">
         <div className="brand-lockup">
           <div className="brand-mark"><Compass size={20} strokeWidth={2.5} /></div>

@@ -42,16 +42,23 @@ function serialise(value: unknown, path: string): string {
       if (!Number.isFinite(value)) throw new CanonicalJsonError(`${path}: ${value} has no JSON form`)
       return JSON.stringify(value) // ECMAScript Number::toString = the JCS number form; -0 -> "0"
     case 'string':
-      return JSON.stringify(value.normalize('NFC'))
+      return JSON.stringify(wellFormed(value, path).normalize('NFC'))
     case 'object': {
       if (Array.isArray(value)) {
-        return `[${value.map((item, index) => (item === undefined ? 'null' : serialise(item, `${path}[${index}]`))).join(',')}]`
+        // Array.from, not .map: .map skips holes, so [ , 1] became the invalid "[,1]".
+        return `[${Array.from(value, (item, index) => (item === undefined ? 'null' : serialise(item, `${path}[${index}]`))).join(',')}]`
+      }
+      // Only plain data. A Date or Map has no own enumerable fields, so it
+      // silently hashed as {} - two different dates, one hash.
+      const proto = Object.getPrototypeOf(value)
+      if (proto !== Object.prototype && proto !== null) {
+        throw new CanonicalJsonError(`${path}: a ${(proto as { constructor?: { name?: string } }).constructor?.name ?? 'non-plain object'} has no canonical JSON form`)
       }
       const entries: [string, unknown][] = []
       const seen = new Set<string>()
       for (const [rawKey, item] of Object.entries(value as Record<string, unknown>)) {
         if (item === undefined) continue // JSON.stringify drops these too
-        const key = rawKey.normalize('NFC')
+        const key = wellFormed(rawKey, path).normalize('NFC')
         if (seen.has(key)) throw new CanonicalJsonError(`${path}: two keys normalise to ${JSON.stringify(key)}`)
         seen.add(key)
         entries.push([key, item])
@@ -63,6 +70,14 @@ function serialise(value: unknown, path: string): string {
     default:
       throw new CanonicalJsonError(`${path}: a ${typeof value} has no JSON form`)
   }
+}
+
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
+
+/** RFC 8785 works on I-JSON: an unpaired surrogate has no UTF-8 form (the server refuses it too). */
+function wellFormed(text: string, path: string): string {
+  if (LONE_SURROGATE.test(text)) throw new CanonicalJsonError(`${path}: text contains an unpaired UTF-16 surrogate`)
+  return text
 }
 
 export function sha256Hex(text: string): string {

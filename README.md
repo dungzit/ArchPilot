@@ -8,6 +8,22 @@ ArchPilot is a decision-support platform for the technology decision lifecycle:
 
 The product helps an individual architect make technology decisions with traceable evidence. It does not replace ERP, CMDB, monitoring, CI/CD, accounting, or enterprise approval workflows.
 
+## Pilot v1: Sizing Studio (2026-10-16)
+
+The v3 direction (formerly "ArchSizer") is merged into ArchPilot: deterministic,
+rule-based **sizing** for presales and enterprise architects, plus a knowledge hub.
+The pilot (branch `pilot/v1`, for ~30 internal users) adds three Studio screens:
+
+| Screen | What it does |
+|---|---|
+| `/reference` | Search ~800 SysDesAi gallery designs in Vietnamese or English; results link to the design and the matching step, with attribution |
+| `/rules` | Rule-based sizing with a unit-checked formula DSL, a built-in pack (app tier, RDBMS, Redis, Kafka, VMware host N+1, SAN), step-by-step traces, Excel rule import/export and a rule editor |
+| `/hld` | Generate the HLD as a DOCX from a design, its sizing runs and pinned references |
+
+No AI/LLM is used in the pilot. Requirements and decisions: [docs/v3](docs/v3/README.md).
+Run it on a Windows PC with Docker Desktop: [docs/v3/pilot/RUNBOOK.md](docs/v3/pilot/RUNBOOK.md)
+(`scripts/pilot/start.ps1`, then `scripts/pilot/smoke.ps1`).
+
 ## First build slice
 
 The first product slice focuses on two connected workflows:

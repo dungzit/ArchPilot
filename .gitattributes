@@ -1,0 +1,5 @@
+# Generated IaC goldens and adapter data files (static .terraform.lock.hcl)
+# must be byte-identical on every OS (NFR2-DET-001). Never let core.autocrlf
+# rewrite them to CRLF on a Windows checkout.
+src/domain/iac/** text eol=lf
+scripts/iac-validate.mjs text eol=lf

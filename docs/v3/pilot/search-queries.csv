@@ -1,0 +1,26 @@
+id,language,query,expected_share_id,expected_title,expected_step_hint,notes
+vi-01,vi,bộ nhớ đệm cho chuyển hướng link rút gọn,ExMwREO,URL Shortener,Bước 8: Add Cache Layer for Redirects,"AC-03 (03 §7); pass=top3 and step 8 listed; glossary-hint: bộ nhớ đệm=cache, chuyển hướng=redirect, rút gọn=short, link=url; also run folded: bo nho dem cho chuyen huong link rut gon"
+vi-02,vi,cache cho chuyển hướng link rút gọn,ExMwREO,URL Shortener,Bước 8: Add Cache Layer for Redirects,sample query of 03 §5; mixed VI+EN; pass=top3 and step 8 listed
+vi-03,vi,làm sao để giới hạn số lần gọi API của mỗi người dùng,V31LdXN,Rate Limiter for API Gateway,,"natural question; pass=top3; basis=title/prompt; glossary-hint: giới hạn=limit, số lần gọi=rate"
+vi-04,vi,thiết kế hệ thống thanh toán trực tuyến giống Stripe,5Qtbelx,Payment Processing System,,"natural phrasing; pass=top3; basis=title/prompt; glossary-hint: thanh toán=payment, hệ thống=system"
+vi-05,vi,ứng dụng nhắn tin trò chuyện thời gian thực như Slack,Y5P3EPP,Real-time Chat,,"pass=top3; neighbour SiQy7W5 (Messaging App) is acceptable at rank 2-3; glossary-hint: trò chuyện=chat, thời gian thực=real-time"
+vi-06,vi,"gửi thông báo đẩy, email và SMS cho người dùng",QOCCw38,Notification System,,"pass=top3; query contains commas (CSV quoting test); glossary-hint: thông báo=notification, gửi=send"
+vi-07,vi,hàng đợi công việc và lập lịch tác vụ nền,8p9pNPE,Job Queue and Task Scheduling System,,"pass=top3; glossary-hint: hàng đợi=queue, công việc/tác vụ=job/task, lập lịch=scheduling"
+vi-08,vi,phát hiện gian lận giao dịch theo thời gian thực,KBPqGim,Real-time Fraud Detection using ML,,"pass=top3; glossary-hint: gian lận=fraud, phát hiện=detection, giao dịch=transaction"
+vi-09,vi,gợi ý từ khóa tự động khi người dùng đang gõ tìm kiếm,Y7bn4LZ,Typeahead / Autocomplete Search,,"natural phrasing, no English term in query; pass=top5 (weakest glossary mapping: gợi ý khi gõ=typeahead/autocomplete)"
+vi-10,vi,kho lưu trữ khóa giá trị phân tán giống Redis,e0CHp8C,Distributed Key-Value Store,,"pass=top3; glossary-hint: khóa giá trị=key-value, phân tán=distributed; Redis also appears in ExMwREO steps, so rank 1-3"
+vi-11,vi,thu thập log và giám sát hệ thống tập trung,PmdoJ4E,Log Aggregation and Monitoring,,"pass=top3; glossary-hint: giám sát=monitoring, thu thập=aggregation/collection, tập trung=centralized"
+vi-12,vi,mạng phân phối nội dung CDN,4QyH-9L,Content Delivery Network,,pass=top3; glossary-hint: mạng phân phối nội dung=content delivery network; CDN token is shared with EN
+vi-13,vi,đăng nhập một lần SSO bằng OAuth,XxrAnSc,OAuth 2.0 / SSO Authentication,,"pass=top3; contains đ and ă (diacritic folding); glossary-hint: đăng nhập=login/authentication, một lần=single sign-on"
+vi-14,vi,"bán hàng giảm giá chớp nhoáng, flash sale",YkjBldf,Coupon/Flash Sale System,,"pass=top3; comma in query; mixed VI+EN; glossary-hint: giảm giá=coupon/discount, chớp nhoáng=flash"
+vi-15,vi,thiết kế hệ thống đặt phòng khách sạn như Airbnb,cfa-Ham,Hotel Booking System,,"natural phrasing; pass=top3; glossary-hint: đặt phòng=booking, khách sạn=hotel"
+en-01,en,URL shortener,ExMwREO,URL Shortener,,"AC-02 (03 §7); pass=rank 1; steps 8, 12, 14 are the known matching steps"
+en-02,en,rate limiter,V31LdXN,Rate Limiter for API Gateway,,pass=top3; basis=title
+en-03,en,payment processing system,5Qtbelx,Payment Processing System,,pass=top3; basis=title
+en-04,en,real-time chat,Y5P3EPP,Real-time Chat,,pass=top3; neighbour SiQy7W5 (Messaging App) acceptable; hyphen handling (real-time vs realtime)
+en-05,en,notification system push email SMS,QOCCw38,Notification System,,pass=top3; multi-term AND/OR ranking
+en-06,en,news feed timeline,PdikUkK,News Feed / Timeline,,pass=top3; neighbour b7TrivL (Twitter/X Feed) acceptable; slash in title
+en-07,en,distributed file storage like Dropbox,Ua9Q7YF,Distributed File Storage,,pass=top3; basis=title/prompt
+en-08,en,vector database semantic search,dmMa721,Vector Database and Semantic Search Engine,,pass=top3; neighbour NA-jEnU (RAG Pipeline for Enterprise Knowledge Base) acceptable at rank 2-3
+en-09,en,ride sharing service,zW-YGkY,Ride Sharing,,pass=top3; basis=title/prompt
+en-10,en,redis cache layer for redirects,ExMwREO,URL Shortener,Bước 8: Add Cache Layer for Redirects,pass=top3 and step 8 listed; basis=step content (Redis not in title)

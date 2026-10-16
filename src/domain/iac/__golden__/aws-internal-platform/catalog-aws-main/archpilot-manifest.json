@@ -1,0 +1,91 @@
+{
+  "adapter": {
+    "id": "aws-terraform",
+    "tool": "terraform",
+    "version": "0.1.0"
+  },
+  "coverage": {
+    "annotation": 0,
+    "generatable": 10,
+    "manual": 0,
+    "other": 0,
+    "unsupported": 1
+  },
+  "design": {
+    "codeName": "catalog",
+    "fingerprint": "c1ad68d676ceabc2921b1abef12ab1d5da1347b36e86473c0e745ed26c579e16"
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "290ff6ddc7ab8ed01eeac6b8d0c2b90eaacb331d72c3a6f49f48415aaeaf9928"
+    },
+    {
+      "path": ".terraform.lock.hcl",
+      "sha256": "d0c8867ca778d16aba396efd1d7d4abfcb173dcf4d9a31381f8f21c44df1f17c"
+    },
+    {
+      "path": "COVERAGE.md",
+      "sha256": "6db0fd63f61e7c82d3a5f3a16b8bc9b9abf2da108ad009e3d2cb913fec6bf523"
+    },
+    {
+      "path": "MANUAL-STEPS.md",
+      "sha256": "7b03df6dcd9347d5c4da447652cf07e7862e15cdd49d5d9a09a3882caf5e7df5"
+    },
+    {
+      "path": "README.md",
+      "sha256": "4ed34e3a4ba661451ede787d7d023a571346a9b6ac1e800c347707ea0c6a3427"
+    },
+    {
+      "path": "backend.hcl.example",
+      "sha256": "cd93d9875ccd5a525e0be00f5af1dbeb4a613f58bde647960a26e528a9020a1e"
+    },
+    {
+      "path": "backend.tf",
+      "sha256": "bd45690339dad7b331f51c3b328a7dcd89c84184a00d615641e87a7e79ce73d9"
+    },
+    {
+      "path": "locals.tf",
+      "sha256": "b2d3f161c06bbd8c7e104c39728b484c534ed4617fecd07cea3b216e6c7dc1fe"
+    },
+    {
+      "path": "main.tf",
+      "sha256": "3b1ac35d8cb7def794b3465c62a04a21cf673c7835e4d04b35e08a4a36515de4"
+    },
+    {
+      "path": "outputs.tf",
+      "sha256": "f83f9139fa96ffb7052fd72fb2e9a53c33ab59869ac9354b55cf06b8a44a1b46"
+    },
+    {
+      "path": "providers.tf",
+      "sha256": "b5014c7ca5b2f88462f80a7727c228993cc98b46c7d82089a875ff5196008e75"
+    },
+    {
+      "path": "terraform.tfvars",
+      "sha256": "529b00022b1a2d0093df57b1ed6c81ed7fa7673ecfdb37cf71e7aff7866e23ca"
+    },
+    {
+      "path": "variables.tf",
+      "sha256": "869e9ef96d7158777798b15b38117de8bff5667e89dfebfc9c54a5374422a382"
+    },
+    {
+      "path": "versions.tf",
+      "sha256": "c94f5b348f92937a2e90febfa8deefdad7af1eee9a7b1394ebb9ebd5996a8a17"
+    }
+  ],
+  "generator": {
+    "version": "0.1.0"
+  },
+  "manifestVersion": 1,
+  "pipeline": "none",
+  "providerPins": [
+    {
+      "constraint": ">= 6.66.0, < 7.0.0",
+      "source": "hashicorp/aws"
+    }
+  ],
+  "target": {
+    "kind": "aws",
+    "profileId": "aws_main"
+  }
+}

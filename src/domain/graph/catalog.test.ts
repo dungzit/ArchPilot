@@ -121,6 +121,16 @@ describe('NFR2-NEUT-001', () => {
     expect(neutralityHits({ label: 'cards' })).toEqual([])
   })
 
+  it('the scanner also sees tokens glued into camelCase keys and values (review-v2-phase0)', () => {
+    expect(neutralityHits({ config: { awsRegion: 'x', s3Bucket: 'y', ec2Size: 'z' } })).toEqual([
+      ['$.config.awsRegion', 'aws'], ['$.config.s3Bucket', 's3'], ['$.config.ec2Size', 'ec2'],
+    ])
+    expect(neutralityHits({ label: 'vSphereCluster', note: 'cosmosDb', kind: 'AWSRegion' })).toEqual([
+      ['$.label', 'vsphere'], ['$.note', 'cosmos'], ['$.kind', 'aws'],
+    ])
+    expect(neutralityHits({ label: 'awesomeRegion', key: 'cardsDeck', words: 'Esxi-like but esxiHost' })).toEqual([['$.words', 'esxi']])
+  })
+
   it('the catalogue contains no provider or vendor term', () => {
     const { description: _description, ...content } = readJson('catalog/components.json')
     expect(neutralityHits(content)).toEqual([])

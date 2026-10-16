@@ -2,8 +2,9 @@
 
 * Owner-scoped. A design owned by someone else answers **404, not 403**
   (build-scope §3.4): a 403 would confirm the id exists.
-* ``graph`` is validated against ``contracts/archgraph.schema.json`` by the
-  request model before this module runs.
+* ``graph`` is validated (size, ``contracts/archgraph.schema.json``, L1
+  integrity) by ``_validated_graph`` at the top of each write handler - in a
+  worker thread, never on the event loop.
 * ``PUT`` carries the revision the client last saw; a stale one is a 409.
 * ``GET /api/designs`` is paginated (``limit`` <= 100) and omits the graphs.
 """
@@ -15,11 +16,12 @@ import sqlite3
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Query, Response, status
+from fastapi.exceptions import RequestValidationError
 
 from ..dependencies import CurrentUser, DbConn
 from ..repositories import designs as designs_repo
 from ..repositories.errors import NotFoundError, RevisionConflictError
-from ..schemas import DesignCreate, DesignList, DesignOut, DesignPut, DesignSummary
+from ..schemas import DesignCreate, DesignList, DesignOut, DesignPut, DesignSummary, check_archgraph
 
 router = APIRouter(prefix="/api/designs", tags=["designs"])
 
@@ -46,6 +48,23 @@ def _summary_fields(row: sqlite3.Row) -> dict:
     }
 
 
+def _validated_graph(graph: dict) -> dict:
+    """Size, contract and integrity gates (``schemas.check_archgraph``).
+
+    Called at the top of the sync handlers below, so it runs in FastAPI's
+    worker thread instead of on the event loop, and before any repository
+    call, so a foreign design id cannot be told apart by its validation
+    answer (404-not-403 still holds). The 422 text is exactly what the old
+    pydantic validator produced: ``body.graph: Value error, ...``.
+    """
+    try:
+        return check_archgraph(graph)
+    except ValueError as exc:
+        raise RequestValidationError(
+            [{"type": "value_error", "loc": ("body", "graph"), "msg": f"Value error, {exc}", "input": None}]
+        ) from exc
+
+
 def design_out(row: sqlite3.Row) -> DesignOut:
     return DesignOut(**_summary_fields(row), graph=json.loads(row["graph_json"]))
 
@@ -68,7 +87,8 @@ def list_designs(
 
 @router.post("", response_model=DesignOut, status_code=status.HTTP_201_CREATED, summary="Create a design")
 def create_design(payload: DesignCreate, user: CurrentUser, conn: DbConn, response: Response) -> DesignOut:
-    row = designs_repo.create_design(conn, user["id"], name=payload.name, graph=payload.graph)
+    graph = _validated_graph(payload.graph)
+    row = designs_repo.create_design(conn, user["id"], name=payload.name, graph=graph)
     response.headers["location"] = f"/api/designs/{row['id']}"
     return design_out(row)
 
@@ -88,13 +108,14 @@ def get_design(user: CurrentUser, conn: DbConn, design_id: DesignId) -> DesignOu
     responses={404: {"description": "not found or not yours"}, 409: {"description": "stale revision"}},
 )
 def update_design(payload: DesignPut, user: CurrentUser, conn: DbConn, design_id: DesignId) -> DesignOut:
+    graph = _validated_graph(payload.graph)
     try:
         row = designs_repo.update_design(
             conn,
             user["id"],
             design_id,
             name=payload.name,
-            graph=payload.graph,
+            graph=graph,
             expected_revision=payload.revision,
         )
     except NotFoundError as exc:

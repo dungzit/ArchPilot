@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 from typing import Annotated, Any, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pydantic.alias_generators import to_camel
 
 from .contract import validate_archgraph
@@ -41,25 +41,51 @@ Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max
 OptionalText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
 
 
-def _check_archgraph(value: dict[str, Any]) -> dict[str, Any]:
+def _encoded_size(value: dict[str, Any]) -> int:
+    """Bytes of the compact UTF-8 JSON the database will store.
+
+    Also the gate for two things Python's ``json.loads`` accepts but JSON does
+    not: ``NaN``/``Infinity`` (and ``1e400``, which parses to ``inf``), and
+    unpaired UTF-16 surrogates (``"\\ud800"``). Stored, the first makes the row
+    unreadable by every JSON parser (and trips migration 005's ``json_valid``
+    trigger as a 500); the second cannot be encoded at all.
+    """
+    try:
+        return len(json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise ValueError("graph contains an unpaired UTF-16 surrogate; send well-formed Unicode text") from exc
+    except ValueError as exc:
+        raise ValueError("graph contains NaN or Infinity (or a number too large for a double, such as 1e400)") from exc
+
+
+def check_archgraph(value: dict[str, Any]) -> dict[str, Any]:
     """Three gates, cheapest first, each a 422 in the {detail, requestId} envelope:
 
-    1. shape - contracts/archgraph.schema.json, the same file both test suites
+    1. size - the 1 MiB resource cap (and JSON-only numbers and text). First,
+       because it is linear and C-fast, and it bounds the cost of gate 2:
+       jsonschema over a 1 MiB graph takes seconds; over 7 MB, a minute;
+    2. shape - contracts/archgraph.schema.json, the same file both test suites
        use (schema 1.0 or 2.0). No second definition exists in Python;
-    2. size - the 1 MiB resource cap;
     3. L1 integrity - app/graph_integrity.py: unique ids and codeNames, no
        dangling edges/parents/bindings/placements/decision links, no
        containment cycles, depth, and catalogue membership of 2.0 node types.
+
+    NOT a pydantic validator on purpose: FastAPI validates request bodies on
+    the event loop, so a seconds-long jsonschema pass there stalls every other
+    request (health checks included). The designs router calls this from its
+    sync handlers, which FastAPI runs in a worker thread (review-v2-phase0 M2).
     """
-    validate_archgraph(value)
-    size = len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    size = _encoded_size(value)
     if size > MAX_GRAPH_BYTES:
         raise ValueError(f"graph is {size} bytes; the limit is {MAX_GRAPH_BYTES}")
+    validate_archgraph(value)
     assert_integrity(value)
     return value
 
 
-ArchGraphDocument = Annotated[dict[str, Any], AfterValidator(_check_archgraph)]
+# The request models only check "a JSON object"; `check_archgraph` does the rest
+# off the event loop (see above).
+ArchGraphDocument = dict[str, Any]
 
 
 class ApiModel(BaseModel):

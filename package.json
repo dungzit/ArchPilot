@@ -16,6 +16,10 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
+    "@xyflow/react": "12.11.6",
+    "docx": "9.11.0",
+    "exceljs": "4.4.0",
+    "fflate": "0.8.3",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
@@ -24,6 +28,8 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
     "@types/node": "^24.13.6",
     "ajv": "^8.17.1",
     "jsdom": "^30.1.1",

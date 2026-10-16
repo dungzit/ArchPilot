@@ -24,3 +24,16 @@ backend/data
 .idea/
 .DS_Store
 Thumbs.db
+
+# IaC validation (scripts/iac-validate.mjs): project-local Terraform binaries,
+# provider mirror and plugin cache, and scratch copies of the goldens.
+.tools/
+build/
+
+# Pilot packaging (docker-compose.pilot.yml, scripts/pilot): runtime data, secrets
+# and the generated env file never go to Git.
+pilot-data/
+pilot.env
+
+# Claude Code agent worktrees (local only).
+.claude/worktrees/

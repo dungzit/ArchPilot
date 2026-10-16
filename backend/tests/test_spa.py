@@ -130,3 +130,21 @@ def test_without_a_built_spa_the_api_still_answers_json_404s(client):
     response = client.get("/hub/anything", headers=HTML)
     assert response.status_code == 404
     assert response.headers["content-type"].startswith("application/json")
+
+
+def test_api_docs_are_off_in_pilot_mode(monkeypatch, temp_settings):
+    # Security review 2026-10-15 #3: the pilot runs with ARCHPILOT_ENV=pilot.
+    from fastapi.testclient import TestClient
+
+    from app.config import reset_settings_cache
+    from app.main import create_app
+
+    monkeypatch.setenv("ARCHPILOT_ENV", "pilot")
+    monkeypatch.setenv("ARCHPILOT_COOKIE_SECURE", "false")
+    reset_settings_cache()
+    try:
+        with TestClient(create_app()) as client:
+            assert client.get("/api/docs").status_code == 404
+            assert client.get("/api/openapi.json").status_code == 404
+    finally:
+        reset_settings_cache()

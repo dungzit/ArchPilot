@@ -71,3 +71,17 @@ def test_there_is_no_way_to_pass_the_password_as_an_argument(run):
     with pytest.raises(SystemExit) as exc:
         run(["mallory", "--password", "a-long-enough-password"])
     assert exc.value.code == 2  # argparse: unrecognized arguments
+
+
+def test_a_utf8_bom_from_windows_powershell_is_not_part_of_the_password(run, temp_settings):
+    # Windows PowerShell 5.1 sends EF BB BF + password + CRLF when it pipes into
+    # `docker exec -i` (observed 2026-10-15). The BOM must not end up in the hash.
+    assert run(["erin", "--password-stdin"], chr(0xFEFF) + "a-long-enough-password" + chr(13) + chr(10)) == 0
+
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    with TestClient(create_app()) as client:
+        response = client.post("/api/auth/login", json={"username": "erin", "password": "a-long-enough-password"})
+        assert response.status_code == 200

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "2.0",
+  "settings": { "codeName": "core_network", "environment": "stage" },
+  "nodes": [
+    { "id": "s1", "type": "site", "label": "Region", "codeName": "region", "position": { "x": 0, "y": 0 }, "config": { "siteKind": "cloud_region", "location": "Singapore" } },
+    { "id": "v1", "type": "network_segment", "variant": "network", "label": "Core network", "codeName": "core", "parentId": "s1", "position": { "x": 20, "y": 20 }, "config": { "cidr": "10.1.0.0/16" } },
+    { "id": "z1", "type": "zone", "label": "Zone A", "codeName": "zone_a", "parentId": "v1", "position": { "x": 20, "y": 200 } },
+    { "id": "z2", "type": "zone", "label": "Zone B", "codeName": "zone_b", "parentId": "v1", "position": { "x": 400, "y": 200 } },
+    { "id": "t1", "type": "network_segment", "variant": "subnet", "label": "Public", "codeName": "public", "parentId": "v1", "position": { "x": 20, "y": 40 }, "config": { "exposure": "public", "cidr": "10.1.0.0/24" } },
+    { "id": "t2", "type": "network_segment", "variant": "subnet", "label": "Private A", "codeName": "private_a", "parentId": "z1", "position": { "x": 20, "y": 40 }, "config": { "exposure": "private", "cidr": "10.1.10.0/24" } },
+    { "id": "t3", "type": "network_segment", "variant": "subnet", "label": "Isolated B", "codeName": "isolated_b", "parentId": "z2", "position": { "x": 20, "y": 40 }, "config": { "exposure": "isolated", "cidr": "10.1.20.0/24" } },
+    { "id": "d1", "type": "dns", "label": "Public zone", "codeName": "public_zone", "position": { "x": 900, "y": 0 }, "config": { "zoneName": "example.org" } }
+  ],
+  "edges": [],
+  "deployment": {
+    "profiles": [ { "id": "aws_stage", "target": "aws", "label": "Stage", "options": { "region": "eu-west-1", "nat": "none", "projectName": "core" } } ],
+    "scenarios": [ { "id": "main", "label": "Main", "defaultProfileId": "aws_stage" } ]
+  }
+}

@@ -64,7 +64,7 @@ class IntegrityIssue:
 
 class GraphIntegrityError(ContractViolationError):
     """A contract-valid document is internally inconsistent. Subclasses
-    ``ContractViolationError`` (a ``ValueError``), so the request model turns it
+    ``ContractViolationError`` (a ``ValueError``), so the designs router turns it
     into the same 422 ``{detail, requestId}`` envelope as a shape violation."""
 
     def __init__(self, issues: Sequence[IntegrityIssue]) -> None:

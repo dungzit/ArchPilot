@@ -94,3 +94,101 @@ jobs:
 
       - name: Fail if the build produced nothing
         run: test -f dist/index.html
+
+  # IaC goldens through real Terraform (design-v2 4.4.13; NFR2-COR-001, AC-03).
+  # The binary is pinned by version AND SHA-256 (values from the signed
+  # SHA256SUMS on releases.hashicorp.com); versions must match
+  # src/domain/iac/versions.ts (a vitest checks it). Providers come from a
+  # filesystem mirror built from the committed lock files, and the CLI config
+  # allows ONLY that mirror, so init/validate run offline. No cloud
+  # credentials exist in this job; plan/apply/destroy are never run.
+  iac-validate:
+    name: iac-validate (terraform ${{ matrix.terraform }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - terraform: '1.11.4'
+            sha256: 1ce994251c00281d6845f0f268637ba50c0005657eb3cf096b92f753b42ef4dc
+          - terraform: '1.16.4'
+            sha256: dc94af0eef1147718ad7c8daea792ed199e3e0492eec180d0adafa2a65a879df
+    env:
+      TF_MIRROR: ${{ github.workspace }}/.tools/tf-mirror
+      TF_CLI_CONFIG_FILE: ${{ github.workspace }}/.tools/terraformrc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Terraform ${{ matrix.terraform }} (SHA-256 verified)
+        run: |
+          set -euo pipefail
+          zip="terraform_${{ matrix.terraform }}_linux_amd64.zip"
+          curl -fsSLo "$RUNNER_TEMP/$zip" "https://releases.hashicorp.com/terraform/${{ matrix.terraform }}/$zip"
+          echo "${{ matrix.sha256 }}  $RUNNER_TEMP/$zip" | sha256sum -c -
+          unzip -q -o "$RUNNER_TEMP/$zip" -d "$RUNNER_TEMP/terraform"
+          echo "$RUNNER_TEMP/terraform" >> "$GITHUB_PATH"
+
+      - name: Cache the provider mirror (keyed by the committed lock files)
+        id: mirror
+        uses: actions/cache@v4
+        with:
+          path: .tools/tf-mirror
+          key: tf-mirror-linux_amd64-${{ hashFiles('src/domain/iac/adapters/*/terraform.lock.hcl') }}
+
+      - name: Build the provider mirror (only on a cache miss; the one networked step)
+        if: steps.mirror.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$TF_MIRROR"
+          for dir in $(jq -r '[.goldens[] | {adapter, dir}] | unique_by(.adapter) | .[].dir' src/domain/iac/__golden__/index.json); do
+            work="$RUNNER_TEMP/mirror-$(basename "$dir")"
+            cp -r "src/domain/iac/__golden__/$dir" "$work"
+            (cd "$work" && terraform providers mirror -platform=linux_amd64 "$TF_MIRROR")
+          done
+
+      - name: Offline CLI config (filesystem mirror only)
+        run: |
+          mkdir -p .tools/tf-plugin-cache
+          cat > "$TF_CLI_CONFIG_FILE" <<CONFIG
+          provider_installation {
+            filesystem_mirror {
+              path = "$TF_MIRROR"
+            }
+          }
+          plugin_cache_dir = "${{ github.workspace }}/.tools/tf-plugin-cache"
+          CONFIG
+
+      - name: fmt -check, init -backend=false, validate (every golden) + negative control
+        run: node scripts/iac-validate.mjs terraform
+
+  # TC-DET-TZ (review M2): the IaC suite, whose goldens include the zip
+  # SHA-256, must pass byte-for-byte in time zones east and west of UTC.
+  iac-determinism:
+    name: iac-determinism (TZ ${{ matrix.tz }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        tz: ['Asia/Ho_Chi_Minh', 'America/Los_Angeles']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: IaC goldens and determinism under TZ=${{ matrix.tz }}
+        env:
+          TZ: ${{ matrix.tz }}
+        run: npx vitest run src/domain/iac

@@ -70,7 +70,7 @@ export function modulePath(key: ModuleKey): string {
   return key === 'sizing' ? '/sizing' : `/m/${key}`
 }
 
-export type StudioKey = 'home' | 'designs' | 'wizard' | 'templates' | 'hub' | 'sizing' | 'learn' | 'editorial'
+export type StudioKey = 'home' | 'designs' | 'wizard' | 'templates' | 'hub' | 'reference' | 'sizing' | 'rules' | 'hld' | 'learn' | 'editorial'
 
 export interface StudioItem {
   key: StudioKey
@@ -95,11 +95,15 @@ export interface StudioItem {
  */
 export const studioItems: StudioItem[] = [
   { key: 'home', path: '/', icon: LayoutDashboard, label: copy('Tổng quan', 'Overview'), status: 'live', eyebrow: 'HOME', purpose: copy('Bắt đầu từ đây.', 'Start here.'), patterns: ['/'] },
-  { key: 'designs', path: '/designs', icon: PenTool, label: copy('Thiết kế', 'Designs'), status: 'planned', phase: '2', eyebrow: 'DESIGNS', purpose: copy('Canvas thiết kế logic, trung lập với nhà cung cấp, cho on-prem và đám mây.', 'The provider-neutral design canvas for on-prem and cloud.'), patterns: ['/designs', '/designs/:designId'] },
+  { key: 'designs', path: '/designs', icon: PenTool, label: copy('Thiết kế', 'Designs'), status: 'live', eyebrow: 'DESIGNS', purpose: copy('Canvas thiết kế logic, trung lập với nhà cung cấp, cho on-prem và đám mây.', 'The provider-neutral design canvas for on-prem and cloud.'), patterns: ['/designs', '/designs/:designId'] },
   { key: 'wizard', path: '/wizard', icon: WandSparkles, label: copy('Thiết kế có hướng dẫn', 'New guided design'), status: 'planned', phase: 'W', eyebrow: 'GUIDED DESIGN', purpose: copy('Bảng câu hỏi dựa trên quy tắc: nhu cầu, năng lực, thành phần gợi ý. Không dùng AI.', 'A rule-based questionnaire: needs, capacity, suggested components. No AI.'), patterns: ['/wizard', '/designs/:designId/brief/:step'] },
   { key: 'templates', path: '/templates', icon: LayoutTemplate, label: copy('Mẫu thiết kế', 'Templates'), status: 'planned', phase: '5', eyebrow: 'TEMPLATES', purpose: copy('Bắt đầu từ một thiết kế logic có sẵn.', 'Start from a ready-made logical design.'), patterns: ['/templates', '/templates/:slug'] },
   { key: 'hub', path: '/hub', icon: Library, label: copy('Thư viện tri thức', 'Knowledge hub'), status: 'planned', phase: '5', eyebrow: 'KNOWLEDGE HUB', purpose: copy('Thiết kế tham chiếu do nhóm tự viết, có trích dẫn nguồn gốc.', 'Reference designs written by the team, with attribution.'), patterns: ['/hub', '/hub/:slug'] },
+  // Pilot v1 (docs/v3): SysDesAi reference search, rule-based sizing, HLD export.
+  { key: 'reference', path: '/reference', icon: Search, label: copy('Tra cứu SysDesAi', 'SysDesAi reference'), status: 'live', eyebrow: 'REFERENCE', purpose: copy('Tìm thiết kế tham chiếu, trả về link và bước cụ thể.', 'Find reference designs with links to the matching steps.'), patterns: ['/reference'] },
   { key: 'sizing', path: '/sizing', icon: Gauge, label: copy('Sizing', 'Sizing'), status: 'live', eyebrow: 'SIZING', purpose: copy('Ước lượng năng lực có công thức và khoảng tin cậy.', 'Capacity estimates with formulas and ranges.'), patterns: ['/sizing'] },
+  { key: 'rules', path: '/rules', icon: Workflow, label: copy('Sizing theo rule', 'Rule-based sizing'), status: 'live', eyebrow: 'SIZING STUDIO', purpose: copy('Rule pack, công thức từng bước, import rule từ Excel.', 'Rule packs, step-by-step formulas, Excel rule import.'), patterns: ['/rules'] },
+  { key: 'hld', path: '/hld', icon: FileCheck2, label: copy('Xuất HLD', 'HLD export'), status: 'live', eyebrow: 'HLD EXPORT', purpose: copy('Sinh tài liệu HLD dạng DOCX.', 'Generate the HLD as a DOCX document.'), patterns: ['/hld'] },
   { key: 'learn', path: '/learn', icon: GraduationCap, label: copy('Học tập', 'Learn'), status: 'planned', phase: '6', eyebrow: 'LEARN', purpose: copy('Bài học ngắn với bài tập tự chấm theo quy tắc.', 'Short lessons with rule-checked exercises.'), patterns: ['/learn', '/learn/:slug'] },
 ]
 

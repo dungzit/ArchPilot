@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "2.0",
+  "settings": { "codeName": "hostile", "environment": "dev" },
+  "nodes": [
+    { "id": "v1", "type": "network_segment", "variant": "network", "label": "${file(\"~/.ssh/id_rsa\")} net", "codeName": "net", "position": { "x": 0, "y": 0 }, "config": { "cidr": "10.9.0.0/16" } },
+    { "id": "t1", "type": "network_segment", "variant": "subnet", "label": "\"; } resource \"null_resource\" \"x\" { #", "codeName": "front", "parentId": "v1", "position": { "x": 20, "y": 20 }, "config": { "exposure": "public", "cidr": "10.9.0.0/24" } },
+    { "id": "t2", "type": "network_segment", "variant": "subnet", "label": "%{ if true }x%{ endif }", "codeName": "back", "parentId": "v1", "position": { "x": 20, "y": 120 }, "config": { "exposure": "private", "cidr": "10.9.4.0/24" } },
+    { "id": "l1", "type": "load_balancer", "label": "LB\nwith newline", "codeName": "lb", "parentId": "t1", "position": { "x": 20, "y": 20 },
+      "config": { "scheme": "internet_facing", "layer": "l7", "protocol": "https", "healthPath": "/h?q=${file(\"/etc/passwd\")}%{if}\"\\" } },
+    { "id": "a1", "type": "service", "variant": "web", "label": "AKIAABCDEFGHIJKLMNOP should never appear", "codeName": "web", "parentId": "t2", "position": { "x": 20, "y": 20 }, "config": { "port": 3000 } },
+    { "id": "d1", "type": "dns", "label": "DNS", "codeName": "names", "position": { "x": 600, "y": 0 }, "config": { "zoneName": "`rm -rf /` | <script>alert(1)</script> ${x} # heading" } },
+    { "id": "c1", "type": "client", "label": "Users <img src=x onerror=alert(1)>", "codeName": "users", "position": { "x": -300, "y": 0 } },
+    { "id": "n1", "type": "note", "label": "${{ github.token }}", "codeName": "note_1", "position": { "x": -300, "y": 300 }, "annotation": { "text": "-----BEGIN RSA PRIVATE KEY----- is not a key" } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "c1", "target": "l1", "label": "${jsonencode(1)}", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "https", "port": 443 },
+    { "id": "e2", "source": "l1", "target": "a1", "label": "", "direction": "forward", "kind": "access", "mode": "connect", "protocol": "http", "port": 3000 }
+  ],
+  "deployment": {
+    "profiles": [ { "id": "aws_dev", "target": "aws", "label": "${file(\"x\")} profile", "options": { "region": "ap-southeast-1", "nat": "single" } } ],
+    "scenarios": [ { "id": "main", "label": "Main", "defaultProfileId": "aws_dev" } ]
+  },
+  "decisions": [
+    { "id": "adr1", "number": 1, "title": "| table | break `code` ${var.x} <b>bold</b>\n# not a heading", "status": "proposed", "linkedNodeIds": ["d1"] }
+  ]
+}

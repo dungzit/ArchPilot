@@ -25,3 +25,8 @@ backend/data
 # Keep: backend/requirements.txt, backend/app, backend/scripts and backend/
 # migrations are COPYed explicitly by backend/Dockerfile. Do not exclude
 # backend/ wholesale.
+
+# Pilot packaging: runtime data (SQLite, backups, reference snapshot, user
+# password files) must not be uploaded to the Docker build context.
+pilot-data
+pilot.env

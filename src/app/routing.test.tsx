@@ -69,12 +69,12 @@ afterEach(async () => {
 })
 
 describe('sidebar groups (design-v2 4.2.1)', () => {
-  test('STUDIO lists the seven v1 surfaces in order; unbuilt ones say so', async () => {
+  test('STUDIO lists the v1 surfaces plus the three pilot screens in order; unbuilt ones say so', async () => {
     await open('/')
     const items = $$('.studio-nav .nav-item')
     expect(items.map((item) => item.getAttribute('data-studio'))).toEqual(studioItems.map((item) => item.key))
-    expect(items.map((item) => item.getAttribute('href'))).toEqual(['/', '/designs', '/wizard', '/templates', '/hub', '/sizing', '/learn'])
-    expect(items.filter((item) => item.querySelector('.nav-soon')).map((item) => item.getAttribute('data-studio'))).toEqual(['designs', 'wizard', 'templates', 'hub', 'learn'])
+    expect(items.map((item) => item.getAttribute('href'))).toEqual(['/', '/designs', '/wizard', '/templates', '/hub', '/reference', '/sizing', '/rules', '/hld', '/learn'])
+    expect(items.filter((item) => item.querySelector('.nav-soon')).map((item) => item.getAttribute('data-studio'))).toEqual(['wizard', 'templates', 'hub', 'learn'])
   })
 
   test('ARCHPILOT MODULES is collapsed by default and opens with its toggle', async () => {
@@ -117,7 +117,6 @@ describe('deep links', () => {
 
   test.each([
     ['/hub/netflix-streaming', 'hub', 'Thư viện tri thức', 'slug: netflix-streaming'],
-    ['/designs/dsg_123', 'designs', 'Thiết kế', 'designId: dsg_123'],
     ['/designs/dsg_123/brief/3', 'wizard', 'Thiết kế có hướng dẫn', 'designId: dsg_123 · step: 3'],
     ['/templates/three-tier-web', 'templates', 'Mẫu thiết kế', 'slug: three-tier-web'],
     ['/learn/l3-first-design', 'learn', 'Học tập', 'slug: l3-first-design'],
@@ -127,6 +126,21 @@ describe('deep links', () => {
     expect(heading()).toBe(label)
     expect($('.planned-params')?.textContent).toBe(params)
     expect(where()).toBe(path)
+  })
+
+  test('/designs is the live design list and /designs/:id the workspace, with the sidebar as an icon rail', async () => {
+    await open('/designs')
+    await waitFor(() => $('.designs-screen [role="alert"]') !== null, 'the list error state')
+    expect(heading()).toBe('Thiết kế')
+    expect($('.app-shell')?.classList.contains('focus-rail')).toBe(false)
+    await act(async () => { root.unmount() })
+    container.remove()
+    await open('/designs/dsg_123')
+    await waitFor(() => $('.dw-state[role="alert"]') !== null, 'the workspace error state')
+    expect($('.dw-state')?.textContent).toContain('Không tìm thấy thiết kế này.')
+    expect($('.app-shell')?.classList.contains('focus-rail')).toBe(true)
+    expect(breadcrumb()).toBe('Thiết kế')
+    expect(where()).toBe('/designs/dsg_123')
   })
 
   test('route parameters are rendered as text, never as markup', async () => {

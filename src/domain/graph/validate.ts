@@ -48,10 +48,41 @@ export type IntegrityRule = (typeof INTEGRITY_RULES)[number]
 
 const MAX_VALUE_CHARS = 64
 
-/** Python's repr() of a short string, truncated the same way graph_integrity._show does. */
+/** Python's str.isprintable() per character: not a control, format, surrogate, private-use, unassigned or separator (bar ' '). */
+const NOT_PRINTABLE = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\p{Zs}]/u
+
+const hex = (codePoint: number, width: number) => codePoint.toString(16).padStart(width, '0')
+
+/**
+ * Python's repr() of a str, character for character (CPython unicode_repr):
+ * double quotes when the text has a ' and no ", backslash escapes for the
+ * quote, \\, \t, \n, \r, \xhh / \uhhhh / \Uhhhhhhhh for everything
+ * non-printable. Ids are free strings (contract `id`: 1-64 chars, no pattern),
+ * so "o'brien" or an id with a tab must print the same on both sides.
+ */
+function pythonRepr(text: string): string {
+  const quote = text.includes("'") && !text.includes('"') ? '"' : "'"
+  let out = quote
+  for (const ch of text) {
+    const cp = ch.codePointAt(0) as number
+    if (ch === quote || ch === '\\') out += `\\${ch}`
+    else if (ch === '\t') out += '\\t'
+    else if (ch === '\n') out += '\\n'
+    else if (ch === '\r') out += '\\r'
+    else if (cp < 0x20 || cp === 0x7f) out += `\\x${hex(cp, 2)}`
+    else if (cp < 0x7f || !NOT_PRINTABLE.test(ch)) out += ch
+    else if (cp <= 0xff) out += `\\x${hex(cp, 2)}`
+    else if (cp <= 0xffff) out += `\\u${hex(cp, 4)}`
+    else out += `\\U${hex(cp, 8)}`
+  }
+  return out + quote
+}
+
+/** graph_integrity._show: repr(), cut to 64 code points (not UTF-16 units) with "...". */
 function show(value: unknown): string {
-  const text = typeof value === 'string' ? `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'` : String(value)
-  return text.length <= MAX_VALUE_CHARS ? text : `${text.slice(0, MAX_VALUE_CHARS - 3)}...`
+  const text = typeof value === 'string' ? pythonRepr(value) : String(value)
+  const points = Array.from(text)
+  return points.length <= MAX_VALUE_CHARS ? text : `${points.slice(0, MAX_VALUE_CHARS - 3).join('')}...`
 }
 
 function error(ruleId: IntegrityRule, path: string, en: string, vi: string, extra: Partial<Problem> = {}): Problem {

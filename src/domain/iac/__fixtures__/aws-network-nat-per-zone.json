@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "2.0",
+  "settings": { "codeName": "edge", "environment": "prod" },
+  "nodes": [
+    { "id": "v1", "type": "network_segment", "variant": "network", "label": "Edge network", "codeName": "edge_net", "position": { "x": 0, "y": 0 }, "config": { "cidr": "172.16.0.0/16" } },
+    { "id": "z1", "type": "zone", "label": "Zone A", "codeName": "zone_a", "parentId": "v1", "position": { "x": 20, "y": 300 } },
+    { "id": "z2", "type": "zone", "label": "Zone B", "codeName": "zone_b", "parentId": "v1", "position": { "x": 300, "y": 300 } },
+    { "id": "z3", "type": "zone", "label": "Zone C", "codeName": "zone_c", "parentId": "v1", "position": { "x": 600, "y": 300 } },
+    { "id": "t1", "type": "network_segment", "variant": "subnet", "label": "Public", "codeName": "dmz", "parentId": "v1", "position": { "x": 20, "y": 20 }, "config": { "exposure": "public", "cidr": "172.16.0.0/22" } },
+    { "id": "t2", "type": "network_segment", "variant": "subnet", "label": "Apps", "codeName": "apps", "parentId": "v1", "position": { "x": 20, "y": 120 }, "config": { "exposure": "private", "cidr": "172.16.4.0/22" } },
+    { "id": "t3", "type": "network_segment", "variant": "subnet", "label": "Batch C", "codeName": "batch_c", "parentId": "z3", "position": { "x": 20, "y": 40 }, "config": { "exposure": "private", "cidr": "172.16.9.0/24" } },
+    { "id": "t4", "type": "network_segment", "variant": "subnet", "label": "Data", "codeName": "data", "parentId": "v1", "position": { "x": 20, "y": 220 }, "config": { "exposure": "isolated", "cidr": "172.16.12.0/22" } }
+  ],
+  "edges": [],
+  "deployment": {
+    "profiles": [ { "id": "aws_prod", "target": "aws", "label": "Production", "options": { "region": "ap-southeast-1", "nat": "perZone" } } ],
+    "scenarios": [ { "id": "main", "label": "Main", "defaultProfileId": "aws_prod" } ]
+  }
+}

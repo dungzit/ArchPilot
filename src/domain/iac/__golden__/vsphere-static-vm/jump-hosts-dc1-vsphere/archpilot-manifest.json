@@ -1,0 +1,91 @@
+{
+  "adapter": {
+    "id": "vsphere-terraform",
+    "tool": "terraform",
+    "version": "0.1.0"
+  },
+  "coverage": {
+    "annotation": 0,
+    "generatable": 5,
+    "manual": 2,
+    "other": 0,
+    "unsupported": 0
+  },
+  "design": {
+    "codeName": "jump_hosts",
+    "fingerprint": "2cc74e6c768c59568da13a878efb4614060c3f2614edfd8cd8056d0d533c4ced"
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "290ff6ddc7ab8ed01eeac6b8d0c2b90eaacb331d72c3a6f49f48415aaeaf9928"
+    },
+    {
+      "path": ".terraform.lock.hcl",
+      "sha256": "a067f7934e987d235d613deddb1f4ca5edabe648054e43733fd009c8bb56ec9e"
+    },
+    {
+      "path": "COVERAGE.md",
+      "sha256": "fcdaf6652e047871635ccd9e3b9f362177139a5dda8b0eadbe21b49aa8dcf4c4"
+    },
+    {
+      "path": "MANUAL-STEPS.md",
+      "sha256": "d8792ab69b7fc171819ec6c5a7de9aa1454fddcbf84c1f4dd565dc0ee25c475e"
+    },
+    {
+      "path": "README.md",
+      "sha256": "4c9a35ab4d52846aad64d99587a0ab1fff672a99361ff5ec9d6778d5d0396e25"
+    },
+    {
+      "path": "backend.hcl.example",
+      "sha256": "04fd8358a1cab91f0e44b680de183add7f31466ee545458158dc06be771e5c64"
+    },
+    {
+      "path": "backend.tf",
+      "sha256": "20ef9a6953501053be6a393d18c4c1b57590e47898ed2660fe33258fc8bf716e"
+    },
+    {
+      "path": "locals.tf",
+      "sha256": "52f278afaa4758d3c7732308ac2d90b69fdf7cb593f1e5178c5d5ad995b27fe7"
+    },
+    {
+      "path": "main.tf",
+      "sha256": "67cc553099cbac43cd72f4b4353000b5e41a59b1320e6527dfe92e328532f727"
+    },
+    {
+      "path": "outputs.tf",
+      "sha256": "5015fc5c51a6c9b31e734f49135696587d577745fa5e55e33615497de3331e61"
+    },
+    {
+      "path": "providers.tf",
+      "sha256": "7051331f80a7007eed1ddf30b6cd989d2b331970bb8fe9fac8077d362475b094"
+    },
+    {
+      "path": "terraform.tfvars",
+      "sha256": "e205fe949a18da51ba25a937ec32d7055e5a1d95601cb7cf28b5c3fe8a239c34"
+    },
+    {
+      "path": "variables.tf",
+      "sha256": "6bae5eb42b92ab82e4b8cb3737efa4e99cfb38d94c9b385ff7cb872341291052"
+    },
+    {
+      "path": "versions.tf",
+      "sha256": "142e5dbb5f79739f03009250546f433bffa68e897fc5db04d9b1bbf722260792"
+    }
+  ],
+  "generator": {
+    "version": "0.1.0"
+  },
+  "manifestVersion": 1,
+  "pipeline": "none",
+  "providerPins": [
+    {
+      "constraint": ">= 2.17.1, < 3.0.0",
+      "source": "vmware/vsphere"
+    }
+  ],
+  "target": {
+    "kind": "vsphere",
+    "profileId": "dc1_vsphere"
+  }
+}

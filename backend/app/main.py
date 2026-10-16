@@ -18,20 +18,24 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__
+from .body_limit import DEFAULT_MAX_BODY_BYTES, BodySizeLimitMiddleware
 from .catalog import load_catalog
 from .config import get_settings
 from .contract import load_contract
 from .csrf import CSRF_HEADER, enforce_csrf
 from .db import connect, init_database
 from .logging_config import configure_logging
+from .reference import index as reference_index
 from .repositories import benchmarks as benchmarks_repo
 from .repositories import users as users_repo
-from .routers import auth, benchmarks, designs, health, workspaces
+from .routers import auth, benchmarks, designs, health, reference, rule_packs, sizing_runs, workspaces
 from .spa import SpaStaticFiles
 
 logger = logging.getLogger(__name__)
 
 REQUEST_ID_HEADER = "x-request-id"
+# Whole-request cap (app/body_limit.py). The graph's own 1 MiB cap is in app/schemas.py.
+MAX_REQUEST_BODY_BYTES = DEFAULT_MAX_BODY_BYTES
 
 # Cheap, static hardening headers. The SPA and the API are same-origin in the
 # container, so a restrictive frame/referrer policy costs nothing.
@@ -76,6 +80,9 @@ async def lifespan(app: FastAPI):
     applied = init_database(settings)
     purged = _purge_expired_sessions(settings)
     seeded = _seed_benchmarks(settings)
+    # Pilot WP-B: load the SysDesAi snapshot if it changed. Never raises; a
+    # missing file is a no-op (app/reference/index.py).
+    reference_load = reference_index.autoload(settings)
     logger.info(
         "backend started",
         extra={
@@ -83,6 +90,7 @@ async def lifespan(app: FastAPI):
             "migrations_applied": applied,
             "expired_sessions_purged": purged,
             "benchmarks_seeded": seeded,
+            "reference_snapshot": reference_load,
             "env": settings.env,
         },
     )
@@ -178,11 +186,16 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         # The schema of every route, including the admin surface, is not
         # something an unauthenticated caller needs in production.
-        docs_url=None if settings.is_production else "/api/docs",
+        # Pilot mode too (security review 2026-10-15 #3): Swagger UI loads its
+        # bundle from a CDN into this origin, so docs exist only in development and tests.
+        docs_url="/api/docs" if settings.env in ("development", "test") else None,
         redoc_url=None,
-        openapi_url=None if settings.is_production else "/api/openapi.json",
+        openapi_url="/api/openapi.json" if settings.env in ("development", "test") else None,
     )
 
+    # Innermost (added first): a 413 from here still passes through CORS and
+    # request_context below, so it gets x-request-id and the security headers.
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -267,6 +280,10 @@ def create_app() -> FastAPI:
     app.include_router(workspaces.router)
     app.include_router(designs.router)
     app.include_router(benchmarks.router)
+    # Pilot v1 (docs/v3): one router per work package.
+    app.include_router(reference.router)
+    app.include_router(rule_packs.router)
+    app.include_router(sizing_runs.router)
 
     # Single-container deployment: if the built SPA is present, serve it from
     # the same origin. Then no CORS is involved and the session cookie is
