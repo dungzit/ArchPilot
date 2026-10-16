@@ -64,7 +64,7 @@ Script làm theo thứ tự:
 ```text
 ArchPilot pilot is reachable at:
   This PC     : http://localhost:8000/
-  Other PCs   : http://192.168.1.13:8000/
+  Other PCs   : http://<IP-LAN>:8000/
 ```
 
 Container có `restart: unless-stopped`: khi Docker Desktop khởi động lại (ví dụ sau khi PC reboot và bạn đăng nhập), ứng dụng **tự chạy lại**. Bật *Docker Desktop → Settings → General → "Start Docker Desktop when you sign in"* (cài đặt của người dùng, bạn tự bật).
@@ -97,7 +97,7 @@ Lưu ý:
 - Lần đầu Docker Desktop có thể bật popup của Windows Defender Firewall cho `com.docker.backend.exe`: chọn *Private networks*.
 - Nếu đổi cổng trong `pilot.env` (`ARCHPILOT_PILOT_PORT`), đổi `-LocalPort` tương ứng.
 - Gỡ rule khi kết thúc pilot: `Remove-NetFirewallRule -DisplayName "ArchPilot Pilot (TCP 8000)"`.
-- Kiểm tra từ một máy khác: `Test-NetConnection 192.168.1.13 -Port 8000` (thay bằng IP thật) phải báo `TcpTestSucceeded : True`.
+- Kiểm tra từ một máy khác: `Test-NetConnection <IP-LAN> -Port 8000` (thay `<IP-LAN>` bằng IP mà start.ps1 in ra) phải báo `TcpTestSucceeded : True`.
 
 ### Vì sao pilot chạy HTTP thường và cờ cookie `Secure`
 

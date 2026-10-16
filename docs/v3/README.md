@@ -2,7 +2,7 @@
 
 Nền tảng **Sizing · Design · Knowledge Hub** cho hệ thống IT, dành cho Presales/Solution Architect làm RFP và team kiến trúc nội bộ doanh nghiệp. Ý tưởng tham chiếu từ [SysDesAi](https://www.sysdesai.com/). Điểm khác biệt chính là **sizing do engine tất định tính toán** (không để LLM tự đưa ra con số), **rule sizing tự định nghĩa hoặc import từ Excel**, và đi tới **BOM cấu hình** cho on-prem, cloud (AWS, Azure, Viettel, FPT), K8s và hybrid.
 
-**Trạng thái:** Requirement v0.3. Đã hợp nhất vào ArchPilot (phương án C). Pilot đang được build trên nhánh `pilot/v1` để dùng sáng 2026-10-15. Phạm vi pilot xem 02 §12.3.
+**Trạng thái:** Requirement v0.3. Đã hợp nhất vào ArchPilot (phương án C). **Pilot v1 đã triển khai 2026-10-16** từ nhánh `pilot/v1`: Tra cứu SysDesAi (794 design), Sizing theo rule + import/export Excel, Xuất HLD DOCX. Đã qua review bảo mật và review code (các lỗi chính đã sửa). Vận hành: [pilot/RUNBOOK.md](pilot/RUNBOOK.md); nghiệm thu: [pilot/UAT-checklist.md](pilot/UAT-checklist.md); hạn chế đã biết: cuối [pilot/test-cases.md](pilot/test-cases.md).
 
 ## Tài liệu
 

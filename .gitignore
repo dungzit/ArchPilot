@@ -34,3 +34,6 @@ build/
 # and the generated env file never go to Git.
 pilot-data/
 pilot.env
+
+# Claude Code agent worktrees (local only).
+.claude/worktrees/
